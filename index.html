@@ -168,7 +168,7 @@ footer a:hover{color:#f97316}
     </div>
     <div class="systems-grid">
 
-      <div class="system-card" onclick="location.href='/configurador.html'">
+      <div class="system-card" onclick="location.href='/configurador.html#selectivo'">
         <div class="system-visual" style="padding:0">
           <img src="/proyectos/selectivo.jpg" alt="Rack Selectivo ISARACK" style="width:100%;height:100%;object-fit:cover">
         </div>
@@ -179,13 +179,24 @@ footer a:hover{color:#f97316}
         </div>
       </div>
 
-      <div class="system-card" onclick="location.href='/configurador.html'">
+      <div class="system-card" onclick="location.href='/configurador.html#picking'">
         <div class="system-visual" style="padding:0">
           <img src="/proyectos/picking.jpg" alt="Estantería Picking ISARACK" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Estantería Picking</h3>
           <p>Para preparación manual de pedidos. Acceso rápido a productos de menor rotación.</p>
+          <span class="more">Configurar en 3D →</span>
+        </div>
+      </div>
+
+      <div class="system-card" onclick="location.href='/configurador.html#gondola'">
+        <div class="system-visual" style="padding:0">
+          <img src="/proyectos/gondolas.jpg" alt="Góndolas ISARACK" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <div class="system-body">
+          <h3>Góndolas</h3>
+          <p>Estantería para punto de venta y tiendas. Diseño abierto por ambos lados para autoservicio.</p>
           <span class="more">Configurar en 3D →</span>
         </div>
       </div>
@@ -207,17 +218,6 @@ footer a:hover{color:#f97316}
         <div class="system-body">
           <h3>Archivero móvil</h3>
           <p>Almacenaje compacto sobre rieles con volante manual. Duplica capacidad de archivo en el mismo espacio. Ideal para oficinas, bancos y hospitales.</p>
-        </div>
-      </div>
-
-      <div class="system-card" onclick="location.href='/configurador.html'">
-        <div class="system-visual" style="padding:0">
-          <img src="/proyectos/gondolas.jpg" alt="Góndolas ISARACK" style="width:100%;height:100%;object-fit:cover">
-        </div>
-        <div class="system-body">
-          <h3>Góndolas</h3>
-          <p>Estantería para punto de venta y tiendas. Diseño abierto por ambos lados para autoservicio.</p>
-          <span class="more">Configurar en 3D →</span>
         </div>
       </div>
 
@@ -251,15 +251,18 @@ footer a:hover{color:#f97316}
         </div>
       </div>
 
-      <div class="system-card" onclick="abrirVideoModal()">
+      <div class="system-card">
         <div class="system-visual" style="padding:0">
           <img src="/proyectos/pasarela_poster.jpg" alt="Rack con pasarela ISARACK" style="width:100%;height:100%;object-fit:cover">
-          <div class="video-badge">▶ VIDEO</div>
-          <div class="play-overlay"><div class="play-btn"></div></div>
+          <div class="video-badge">▶ 2 VIDEOS</div>
         </div>
         <div class="system-body">
           <h3>Rack con pasarelas</h3>
           <p>Sistema selectivo con niveles de acceso peatonal. Aprovecha la altura del almacén con múltiples pisos operativos.</p>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button onclick="event.stopPropagation();abrirVideoModal('pasarela.mp4','pasarela_poster.jpg')" style="flex:1;min-width:130px;padding:10px;background:#f97316;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">▶ 2 plantas + mezzanine</button>
+            <button onclick="event.stopPropagation();abrirVideoModal('pasarela3.mp4','pasarela3_poster.jpg')" style="flex:1;min-width:100px;padding:10px;background:#fff;color:#f97316;border:1px solid #f97316;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">▶ 3 pisos</button>
+          </div>
         </div>
       </div>
 
@@ -342,19 +345,22 @@ footer a:hover{color:#f97316}
 <div class="video-modal" id="videoModal" onclick="cerrarVideoModal(event)">
   <div class="video-modal-inner" onclick="event.stopPropagation()">
     <button class="video-close" onclick="cerrarVideoModal()">✕ Cerrar</button>
-    <video id="videoPlayer" controls playsinline preload="none" poster="/proyectos/pasarela_poster.jpg">
-      <source src="/proyectos/pasarela.mp4" type="video/mp4">
+    <video id="videoPlayer" controls playsinline preload="none">
+      <source id="videoSource" src="" type="video/mp4">
     </video>
   </div>
 </div>
 
 <script>
-function abrirVideoModal(){
+function abrirVideoModal(fileName, posterName){
   const m = document.getElementById('videoModal');
   const v = document.getElementById('videoPlayer');
+  const s = document.getElementById('videoSource');
+  s.src = '/proyectos/' + (fileName || 'pasarela.mp4');
+  v.poster = '/proyectos/' + (posterName || 'pasarela_poster.jpg');
+  v.load();
   m.classList.add('active');
   document.body.style.overflow = 'hidden';
-  v.currentTime = 0;
   v.play().catch(()=>{});
 }
 function cerrarVideoModal(e){

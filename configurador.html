@@ -2195,6 +2195,13 @@ function addEvents(){
   document.getElementById('pdfBtn').addEventListener('click', abrirFormCliente);
   addEventListener('resize', ()=>{ requestAnimationFrame(resize3D); });
   addEventListener('orientationchange', ()=>{ setTimeout(resize3D, 200); });
+
+  // Deep-link: abrir en un sistema específico según hash (#selectivo, #picking, #gondola)
+  const hash = (location.hash || '').replace('#','').toLowerCase();
+  if(hash === 'selectivo' || hash === 'picking' || hash === 'gondola'){
+    const tab = document.querySelector('#tabs .tab[data-sys="'+hash+'"]');
+    if(tab) tab.click();
+  }
 }
 
 function animate(){
