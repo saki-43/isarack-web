@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+<title>ISARACK · Racks, Góndolas y Mezzanines Industriales · Tijuana</title>
+<meta name="description" content="Fabricamos, instalamos y damos garantía de sistemas de almacenaje en Tijuana desde hace 20 años. Cotiza góndolas, rack selectivo y picking en línea con nuestro configurador 3D.">
+
+<!-- Open Graph -->
+<meta property="og:title" content="ISARACK · Racks y Góndolas Industriales · Tijuana">
+<meta property="og:description" content="20 años fabricando racks selectivos, góndolas, mezzanines y sistemas drive-in. Cotiza góndolas en 3D online.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.estanteriaisarack.com/">
+<meta property="og:locale" content="es_MX">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;700;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#fafaf7;
+  --ink:#0f1115;
+  --carbon:#1f2226;
+  --orange:#da6635;
+  --orange-dk:#b14e26;
+  --mute:#6e737b;
+  --line:#e3dfd5;
+  --card:#ffffff;
+  --warn:#c84a3c;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  line-height:1.55;
+  font-size:16px;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:'JetBrains Mono',monospace}
+.display{font-family:'Archivo',sans-serif;font-weight:900;letter-spacing:-0.02em;line-height:0.96}
+
+/* ── NAV ── */
+.nav{
+  position:sticky;top:0;z-index:50;
+  background:rgba(250,250,247,0.92);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.nav-inner{
+  max-width:1280px;margin:0 auto;
+  padding:14px 24px;
+  display:flex;align-items:center;justify-content:space-between;gap:24px;
+}
+.logo{
+  font-family:'Archivo',sans-serif;font-weight:900;
+  font-size:22px;letter-spacing:-0.04em;
+  color:var(--ink);text-decoration:none;
+  display:flex;align-items:center;gap:10px;
+}
+.logo-mark{
+  width:32px;height:32px;
+  background:var(--orange);
+  clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);
+  display:inline-block;
+}
+.nav-links{display:flex;gap:28px;list-style:none}
+.nav-links a{color:var(--ink);text-decoration:none;font-size:14px;font-weight:500}
+.nav-links a:hover{color:var(--orange)}
+.nav-tel{
+  font-family:'JetBrains Mono',monospace;font-size:13px;
+  color:var(--ink);text-decoration:none;font-weight:600;
+  padding:8px 14px;border:1px solid var(--ink);border-radius:999px;
+}
+.nav-tel:hover{background:var(--ink);color:#fff}
+@media(max-width:860px){
+  .nav-links{display:none}
+  .nav-inner{padding:12px 18px}
+  .logo{font-size:18px}
+  .logo-mark{width:26px;height:26px}
+}
+
+/* ── HERO ── */
+.hero{
+  position:relative;
+  padding:96px 24px 80px;
+  max-width:1280px;margin:0 auto;
+  overflow:hidden;
+}
+.hero-eyebrow{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;color:var(--mute);
+  letter-spacing:0.1em;text-transform:uppercase;
+  margin-bottom:32px;
+  display:flex;align-items:center;gap:12px;
+}
+.hero-eyebrow::before{
+  content:"";width:32px;height:1px;background:var(--orange);
+}
+.hero h1{
+  font-family:'Archivo',sans-serif;font-weight:900;
+  font-size:clamp(48px,9vw,128px);
+  letter-spacing:-0.04em;line-height:0.92;
+  margin-bottom:36px;
+}
+.hero h1 .accent{color:var(--orange)}
+.hero-sub{
+  font-size:clamp(17px,2vw,21px);
+  color:var(--mute);max-width:580px;
+  margin-bottom:48px;line-height:1.5;
+}
+.hero-ctas{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.btn{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:16px 26px;border-radius:999px;
+  font-weight:600;font-size:15px;
+  text-decoration:none;cursor:pointer;border:none;
+  transition:transform 0.15s ease,background 0.15s ease;
+  font-family:inherit;
+}
+.btn-primary{background:var(--orange);color:#fff}
+.btn-primary:hover{background:var(--orange-dk);transform:translateY(-1px)}
+.btn-ghost{color:var(--ink);border:1px solid var(--ink)}
+.btn-ghost:hover{background:var(--ink);color:#fff}
+.btn-wa{background:#25d366;color:#fff}
+.btn-wa:hover{background:#1ea854;transform:translateY(-1px)}
+
+.hero-stats{
+  margin-top:80px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  border-top:1px solid var(--line);
+}
+.stat{
+  padding:24px 0;
+  border-right:1px solid var(--line);
+}
+.stat:last-child{border-right:none}
+.stat-num{
+  font-family:'Archivo',sans-serif;font-weight:900;
+  font-size:clamp(36px,5vw,56px);
+  letter-spacing:-0.03em;
+  color:var(--ink);
+}
+.stat-lbl{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;color:var(--mute);
+  letter-spacing:0.08em;text-transform:uppercase;
+  margin-top:4px;
+}
+@media(max-width:760px){
+  .hero{padding:48px 18px 56px}
+  .hero-eyebrow{margin-bottom:20px}
+  .hero h1{margin-bottom:24px}
+  .hero-sub{margin-bottom:32px}
+  .hero-ctas{flex-direction:column;align-items:stretch}
+  .btn{justify-content:center}
+  .hero-stats{grid-template-columns:repeat(2,1fr);margin-top:48px}
+  .stat:nth-child(2n){border-right:none}
+  .stat:nth-child(1),.stat:nth-child(2){border-bottom:1px solid var(--line)}
+}
+
+/* ── DESTACADO COTIZADOR 3D ── */
+.feature-cot{
+  background:var(--ink);color:#fff;
+  padding:80px 24px;
+  margin-top:40px;
+}
+.feature-cot-inner{
+  max-width:1280px;margin:0 auto;
+  display:grid;grid-template-columns:1fr 1.1fr;gap:80px;align-items:center;
+}
+.feature-cot .eyebrow{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;color:var(--orange);
+  letter-spacing:0.1em;text-transform:uppercase;
+  margin-bottom:20px;
+}
+.feature-cot h2{
+  font-family:'Archivo',sans-serif;font-weight:900;
+  font-size:clamp(36px,5vw,64px);
+  letter-spacing:-0.03em;line-height:0.96;
+  margin-bottom:24px;
+}
+.feature-cot p{color:#a8adb4;font-size:17px;margin-bottom:32px;max-width:480px}
+.feature-cot ul{list-style:none;margin-bottom:36px}
+.feature-cot li{
+  font-family:'JetBrains Mono',monospace;font-size:13px;
+  padding:10px 0;border-bottom:1px solid #2a2e34;
+  display:flex;align-items:center;gap:14px;
+}
+.feature-cot li::before{
+  content:"→";color:var(--orange);font-family:'Archivo',sans-serif;
+}
+.feature-cot-visual{
+  background:#2a2e34;
+  border-radius:18px;aspect-ratio:1.3/1;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+.feature-cot-visual svg{width:90%;height:auto;max-height:80%}
+@media(max-width:900px){
+  .feature-cot{padding:56px 18px}
+  .feature-cot-inner{grid-template-columns:1fr;gap:36px}
+  .feature-cot-visual{order:-1;aspect-ratio:1.5/1}
+}
+
+/* ── PRODUCTOS ── */
+.section{padding:96px 24px;max-width:1280px;margin:0 auto}
+.section-head{margin-bottom:56px;display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap}
+.section-head .eyebrow{
+  font-family:'JetBrains Mono',monospace;font-size:12px;
+  color:var(--mute);letter-spacing:0.1em;text-transform:uppercase;
+  margin-bottom:14px;
+}
+.section-head h2{
+  font-family:'Archivo',sans-serif;font-weight:900;
+  font-size:clamp(36px,5vw,64px);letter-spacing:-0.03em;line-height:0.96;
+}
+.section-head .lead{
+  color:var(--mute);max-width:380px;font-size:15px;
+}
+
+.grid-prod{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:24px;
+}
+@media(max-width:1000px){.grid-prod{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:660px){.grid-prod{grid-template-columns:1fr}}
+
+.prod{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  transition:transform 0.2s ease,box-shadow 0.2s ease;
+}
+.prod:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(15,17,21,0.08)}
+.prod-visual{
+  aspect-ratio:1.3/1;
+  background:#f4f1ea;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+.prod-visual svg{width:75%;height:auto;max-height:75%}
+.prod-badge{
+  position:absolute;top:14px;left:14px;
+  background:var(--orange);color:#fff;
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  padding:6px 10px;border-radius:999px;
+  letter-spacing:0.08em;text-transform:uppercase;font-weight:600;
+}
+.prod-body{padding:24px;display:flex;flex-direction:column;flex:1}
+.prod-name{
+  font-family:'Archivo',sans-serif;font-weight:900;
+  font-size:24px;letter-spacing:-0.02em;
+  margin-bottom:6px;
+}
+.prod-desc{color:var(--mute);font-size:14px;margin-bottom:18px;line-height:1.5}
+.prod-specs{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  border-top:1px dashed var(--line);
+  padding-top:16px;margin-bottom:20px;
+  display:grid;gap:8px;
+}
+.prod-specs .row{display:flex;justify-content:space-between;gap:12px}
+.prod-specs .lbl{color:var(--mute);text-transform:uppercase;letter-spacing:0.05em}
+.prod-specs .val{color:var(--ink);font-weight:600;text-align:right}
+.prod-cta{margin-top:auto;display:flex;gap:8px;flex-direction:column}
+.prod-btn{
+  padding:13px 18px;border-radius:999px;text-decoration:none;
+  font-size:14px;font-weight:600;text-align:center;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  transition:all 0.15s ease;
+}
+.prod-btn-primary{background:var(--orange);color:#fff}
+.prod-btn-primary:hover{background:var(--orange-dk)}
+.prod-btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.prod-btn-ghost:hover{border-color:var(--ink)}
+
+/* ── PROCESO ── */
+.process{
+  background:#f0ede5;
+  padding:96px 24px;
+}
+.process-inner{max-width:1280px;margin:0 auto}
+.proc-steps{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:0;
+  margin-top:56px;
+}
+.step{
+  padding:32px 24px;
+  border-right:1px solid var(--line);
+  position:relative;
+}
+.step:last-child{border-right:none}
+.step-num{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;color:var(--orange);font-weight:600;
+  letter-spacing:0.1em;margin-bottom:24px;
+}
+.step-title{
+  font-family:'Archivo',sans-serif;font-weight:900;
+  font-size:22px;letter-spacing:-0.02em;
+  margin-bottom:10px;line-height:1.05;
+}
+.step-desc{color:var(--mute);font-size:14px;line-height:1.5}
+@media(max-width:900px){
+  .proc-steps{grid-template-columns:1fr 1fr;gap:0}
+  .step{border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .step:nth-child(2n){border-right:none}
+  .step:last-child{grid-column:span 2}
+}
+@media(max-width:520px){
+  .proc-steps{grid-template-columns:1fr}
+  .step{border-right:none}
+  .step:last-child{grid-column:auto}
+}
+
+/* ── COBERTURA ── */
+.coverage{
+  display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;
+}
+.coverage-text h2{margin-bottom:24px}
+.coverage-text p{color:var(--mute);font-size:16px;margin-bottom:16px;max-width:480px}
+.coverage-list{
+  list-style:none;margin-top:32px;
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+  max-width:420px;
+}
+.coverage-list li{
+  font-family:'JetBrains Mono',monospace;font-size:13px;
+  padding:10px 14px;background:#fff;border:1px solid var(--line);
+  border-radius:6px;display:flex;align-items:center;gap:10px;
+}
+.coverage-list .dot{width:6px;height:6px;background:var(--orange);border-radius:50%;flex-shrink:0}
+.coverage-map{
+  background:#f0ede5;border-radius:18px;aspect-ratio:4/3;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+@media(max-width:900px){
+  .coverage{grid-template-columns:1fr;gap:36px}
+}
+
+/* ── CONTACTO ── */
+.contact{
+  background:var(--ink);color:#fff;
+  padding:96px 24px;
+}
+.contact-inner{
+  max-width:1280px;margin:0 auto;
+  display:grid;grid-template-columns:1.1fr 1fr;gap:64px;
+}
+.contact h2{
+  font-family:'Archivo',sans-serif;font-weight:900;
+  font-size:clamp(40px,6vw,80px);letter-spacing:-0.03em;
+  line-height:0.96;margin-bottom:24px;
+}
+.contact .eyebrow{
+  font-family:'JetBrains Mono',monospace;font-size:12px;
+  color:var(--orange);letter-spacing:0.1em;text-transform:uppercase;
+  margin-bottom:20px;
+}
+.contact-lead{color:#a8adb4;font-size:17px;margin-bottom:36px;max-width:480px}
+.contact-actions{display:flex;flex-direction:column;gap:14px;max-width:380px}
+.contact-actions .btn{justify-content:center;font-size:16px;padding:18px 24px}
+
+.contact-info{
+  background:#2a2e34;border-radius:18px;padding:36px;
+  display:flex;flex-direction:column;gap:24px;
+}
+.info-item{display:flex;flex-direction:column;gap:4px}
+.info-lbl{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:#a8adb4;letter-spacing:0.1em;text-transform:uppercase;
+}
+.info-val{
+  font-size:16px;color:#fff;text-decoration:none;
+}
+.info-val:hover{color:var(--orange)}
+.info-val.big{
+  font-family:'Archivo',sans-serif;font-weight:900;
+  font-size:24px;letter-spacing:-0.02em;
+}
+.info-divider{border:0;border-top:1px solid #3a3f46;margin:8px 0}
+@media(max-width:860px){
+  .contact{padding:56px 18px}
+  .contact-inner{grid-template-columns:1fr;gap:36px}
+  .contact-info{padding:24px}
+}
+
+/* ── FOOTER ── */
+.footer{
+  background:#0a0c10;color:#a8adb4;
+  padding:48px 24px 32px;
+}
+.footer-inner{
+  max-width:1280px;margin:0 auto;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:24px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;
+}
+.footer .logo{color:#fff;font-size:18px}
+.footer-meta{display:flex;gap:24px;flex-wrap:wrap}
+.footer-meta a{color:#a8adb4;text-decoration:none}
+.footer-meta a:hover{color:var(--orange)}
+
+/* ── REVEAL ANIMATIONS ── */
+@media (prefers-reduced-motion:no-preference){
+  .reveal{opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
+  .reveal.in{opacity:1;transform:translateY(0)}
+}
+</style>
+</head>
+<body>
+
+<!-- ───── NAV ───── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#" class="logo"><span class="logo-mark"></span>ISARACK</a>
+    <ul class="nav-links">
+      <li><a href="#productos">Productos</a></li>
+      <li><a href="#cotizador">Cotizador 3D</a></li>
+      <li><a href="#proceso">Proceso</a></li>
+      <li><a href="#contacto">Contacto</a></li>
+    </ul>
+    <a href="tel:6649699622" class="nav-tel">664·969·9622</a>
+  </div>
+</nav>
+
+<!-- ───── HERO ───── -->
+<header class="hero">
+  <div class="hero-eyebrow">Desde 2005 · Tijuana, B.C.</div>
+  <h1 class="display">
+    Racks<br>
+    y góndolas<br>
+    industriales<br>
+    <span class="accent">a tu medida.</span>
+  </h1>
+  <p class="hero-sub">
+    Diseñamos, fabricamos e instalamos sistemas de almacenaje en Tijuana
+    desde hace 20 años. Garantía de 12 meses, entrega en 5 a 6 días hábiles.
+  </p>
+  <div class="hero-ctas">
+    <a href="#cotizador" class="btn btn-primary">
+      Cotizar góndolas en 3D
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <a href="https://wa.me/5216641236278?text=Hola%2C%20vi%20su%20sitio%20y%20quiero%20cotizar." class="btn btn-wa" target="_blank">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1c-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.4.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5s-.7-1.7-1-2.3c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4s-1 1-1 2.5 1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.3-.7.3-1.3.2-1.4-.1-.2-.3-.3-.6-.4z"/><path d="M20.5 3.5C18.2 1.2 15.2 0 12 0 5.4 0 0 5.4 0 12c0 2.1.6 4.2 1.6 6L0 24l6.2-1.6c1.7.9 3.7 1.4 5.8 1.4 6.6 0 12-5.4 12-12 0-3.2-1.2-6.2-3.5-8.3zM12 22c-1.8 0-3.6-.5-5.2-1.4l-.4-.2-3.7 1 1-3.6-.2-.4C2.5 15.7 2 13.9 2 12 2 6.5 6.5 2 12 2c2.7 0 5.2 1 7.1 2.9C21 6.8 22 9.3 22 12c0 5.5-4.5 10-10 10z"/></svg>
+      WhatsApp
+    </a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="stat">
+      <div class="stat-num">20</div>
+      <div class="stat-lbl">Años de operación</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">12</div>
+      <div class="stat-lbl">Meses de garantía</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">5–6</div>
+      <div class="stat-lbl">Días de entrega</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">MX<span style="color:var(--mute)">+</span>USA</div>
+      <div class="stat-lbl">Cobertura</div>
+    </div>
+  </div>
+</header>
+
+<!-- ───── DESTACADO COTIZADOR 3D ───── -->
+<section class="feature-cot" id="cotizador">
+  <div class="feature-cot-inner">
+    <div>
+      <div class="eyebrow">Configurador online · Único en el sector</div>
+      <h2>Diseña tu góndola en 3D<br>y cotízala al instante.</h2>
+      <p>Elige tipo, medida, niveles y módulos. Mira el resultado girando en tiempo real
+        y descarga el presupuesto en PDF. Sin esperas, sin llamadas.</p>
+      <ul>
+        <li>Tipo pared o central (2 caras)</li>
+        <li>Medidas 141×100, 141×122, 211×100, 211×122 cm</li>
+        <li>De 3 a 6 niveles · hasta 6 módulos · cabeceras opcionales</li>
+        <li>Precio en MXN o USD con TC del DOF</li>
+        <li>PDF descargable con folio único</li>
+      </ul>
+      <a href="configurador-3d.html" class="btn btn-primary" target="_blank">
+        Abrir cotizador 3D
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+    <div class="feature-cot-visual">
+      <svg viewBox="0 0 320 240" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f6f3ec"/>
+            <stop offset="1" stop-color="#d8d3c8"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(160 122)">
+          <!-- Postes laterales -->
+          <rect x="-78" y="-78" width="5" height="98" fill="#8a8a8a"/>
+          <rect x="73" y="-78" width="5" height="98" fill="#8a8a8a"/>
+          <!-- Panel trasero -->
+          <rect x="-75" y="-78" width="150" height="78" fill="url(#metal)" stroke="#c5c0b3" stroke-width="0.5"/>
+          <!-- Charolas inclinadas -->
+          <g>
+            <polygon points="-75,-65 75,-65 75,-62 -75,-62" fill="#f8f5ee"/>
+            <polygon points="-75,-62 -68,-58 68,-58 75,-62" fill="#e8e3d6"/>
+          </g>
+          <g>
+            <polygon points="-75,-42 75,-42 75,-39 -75,-39" fill="#f8f5ee"/>
+            <polygon points="-75,-39 -68,-35 68,-35 75,-39" fill="#e8e3d6"/>
+          </g>
+          <g>
+            <polygon points="-75,-19 75,-19 75,-16 -75,-16" fill="#f8f5ee"/>
+            <polygon points="-75,-16 -68,-12 68,-12 75,-16" fill="#e8e3d6"/>
+          </g>
+          <!-- Zócalo -->
+          <rect x="-75" y="-2" width="150" height="22" fill="#d8d3c8" stroke="#b8b3a5" stroke-width="0.5"/>
+          <rect x="-75" y="-2" width="150" height="3" fill="#f0ebde"/>
+        </g>
+        <!-- Sello de configuración -->
+        <g transform="translate(20 30)">
+          <rect width="120" height="38" rx="6" fill="#0f1115"/>
+          <text x="12" y="16" fill="#da6635" font-family="JetBrains Mono,monospace" font-size="9" font-weight="600">CONFIGURADO</text>
+          <text x="12" y="30" fill="#fff" font-family="JetBrains Mono,monospace" font-size="9">141×100 · 4 niv · 1 mód</text>
+        </g>
+        <!-- Precio -->
+        <g transform="translate(200 184)">
+          <rect width="100" height="36" rx="6" fill="#da6635"/>
+          <text x="12" y="14" fill="#fff" font-family="JetBrains Mono,monospace" font-size="8" font-weight="600" opacity="0.8">TOTAL MXN</text>
+          <text x="12" y="29" fill="#fff" font-family="Archivo,sans-serif" font-size="14" font-weight="900">$4,239.23</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ───── PRODUCTOS ───── -->
+<section class="section" id="productos">
+  <div class="section-head">
+    <div>
+      <div class="eyebrow">Catálogo</div>
+      <h2>Sistemas de almacenaje<br>industrial.</h2>
+    </div>
+    <p class="lead">Cada producto se fabrica en Tijuana y se ajusta a las medidas y carga que tu operación necesita.</p>
+  </div>
+
+  <div class="grid-prod">
+
+    <!-- 1. RACK SELECTIVO -->
+    <div class="prod">
+      <div class="prod-visual">
+        <span class="prod-badge">Cotiza en 3D</span>
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="#3a3f46" stroke-width="1.2" fill="none">
+            <rect x="20" y="20" width="4" height="120" fill="#3a3f46"/>
+            <rect x="98" y="20" width="4" height="120" fill="#3a3f46"/>
+            <rect x="176" y="20" width="4" height="120" fill="#3a3f46"/>
+            <rect x="24" y="50" width="74" height="3" fill="#da6635"/>
+            <rect x="102" y="50" width="74" height="3" fill="#da6635"/>
+            <rect x="24" y="85" width="74" height="3" fill="#da6635"/>
+            <rect x="102" y="85" width="74" height="3" fill="#da6635"/>
+            <rect x="24" y="120" width="74" height="3" fill="#da6635"/>
+            <rect x="102" y="120" width="74" height="3" fill="#da6635"/>
+          </g>
+          <!-- Tarimas -->
+          <g fill="#a8856b">
+            <rect x="30" y="42" width="62" height="8"/>
+            <rect x="108" y="42" width="62" height="8"/>
+            <rect x="30" y="77" width="62" height="8"/>
+            <rect x="108" y="77" width="62" height="8"/>
+          </g>
+        </svg>
+      </div>
+      <div class="prod-body">
+        <h3 class="prod-name">Rack Selectivo</h3>
+        <p class="prod-desc">Para acceso directo a cada tarima. El más versátil y el más vendido.</p>
+        <div class="prod-specs">
+          <div class="row"><span class="lbl">Alto</span><span class="val">2.0 – 12.0 m</span></div>
+          <div class="row"><span class="lbl">Frente</span><span class="val">1.40 – 2.80 m</span></div>
+          <div class="row"><span class="lbl">Fondo</span><span class="val">0.80 – 1.20 m</span></div>
+          <div class="row"><span class="lbl">Carga</span><span class="val">hasta 3,000 kg/niv</span></div>
+        </div>
+        <div class="prod-cta">
+          <a href="configurador-3d.html?sistema=selectivo" class="prod-btn prod-btn-primary" target="_blank">⚡ Configurar en 3D</a>
+          <a href="https://wa.me/5216641236278?text=Hola%2C%20quiero%20cotizar%20rack%20selectivo." class="prod-btn prod-btn-ghost" target="_blank">o por WhatsApp</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. GÓNDOLAS -->
+    <div class="prod">
+      <div class="prod-visual">
+        <span class="prod-badge">Cotiza en 3D</span>
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          <g>
+            <rect x="30" y="30" width="3" height="100" fill="#7a7a7a"/>
+            <rect x="167" y="30" width="3" height="100" fill="#7a7a7a"/>
+            <rect x="30" y="30" width="140" height="80" fill="#f4f0e6" stroke="#c5c0b3" stroke-width="0.6"/>
+            <!-- Charolas inclinadas -->
+            <polygon points="33,48 167,48 170,52 30,52" fill="#fff" stroke="#c5c0b3" stroke-width="0.5"/>
+            <polygon points="33,70 167,70 170,74 30,74" fill="#fff" stroke="#c5c0b3" stroke-width="0.5"/>
+            <polygon points="33,92 167,92 170,96 30,96" fill="#fff" stroke="#c5c0b3" stroke-width="0.5"/>
+            <!-- Zócalo -->
+            <rect x="30" y="115" width="140" height="15" fill="#e0dbcd" stroke="#b8b3a5" stroke-width="0.5"/>
+          </g>
+        </svg>
+      </div>
+      <div class="prod-body">
+        <h3 class="prod-name">Góndolas</h3>
+        <p class="prod-desc">Para tiendas, abarrotes y exhibición. Pared o central (2 caras).</p>
+        <div class="prod-specs">
+          <div class="row"><span class="lbl">Alto</span><span class="val">1.41 / 2.11 m</span></div>
+          <div class="row"><span class="lbl">Frente</span><span class="val">1.00 / 1.22 m</span></div>
+          <div class="row"><span class="lbl">Fondo</span><span class="val">0.40 m</span></div>
+          <div class="row"><span class="lbl">Niveles</span><span class="val">3 a 6</span></div>
+        </div>
+        <div class="prod-cta">
+          <a href="configurador-3d.html?sistema=gondola" class="prod-btn prod-btn-primary" target="_blank">⚡ Configurar en 3D</a>
+          <a href="https://wa.me/5216641236278?text=Hola%2C%20quiero%20cotizar%20g%C3%B3ndolas." class="prod-btn prod-btn-ghost" target="_blank">o por WhatsApp</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. MEZZANINE -->
+    <div class="prod">
+      <div class="prod-visual">
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="#3a3f46" stroke-width="1.5" fill="none">
+            <rect x="20" y="80" width="4" height="60" fill="#3a3f46"/>
+            <rect x="98" y="80" width="4" height="60" fill="#3a3f46"/>
+            <rect x="176" y="80" width="4" height="60" fill="#3a3f46"/>
+          </g>
+          <!-- Piso superior -->
+          <rect x="16" y="76" width="168" height="6" fill="#a8856b"/>
+          <rect x="16" y="82" width="168" height="2" fill="#7a5d4a"/>
+          <!-- Barandal -->
+          <g stroke="#da6635" stroke-width="2" fill="none">
+            <line x1="20" y1="76" x2="20" y2="50"/>
+            <line x1="98" y1="76" x2="98" y2="50"/>
+            <line x1="176" y1="76" x2="176" y2="50"/>
+            <line x1="16" y1="55" x2="184" y2="55"/>
+            <line x1="16" y1="65" x2="184" y2="65"/>
+          </g>
+          <!-- Escalera lateral -->
+          <g stroke="#3a3f46" stroke-width="1" fill="none">
+            <line x1="186" y1="140" x2="186" y2="80"/>
+            <line x1="195" y1="140" x2="195" y2="80"/>
+            <line x1="186" y1="95" x2="195" y2="95"/>
+            <line x1="186" y1="110" x2="195" y2="110"/>
+            <line x1="186" y1="125" x2="195" y2="125"/>
+          </g>
+        </svg>
+      </div>
+      <div class="prod-body">
+        <h3 class="prod-name">Mezzanine</h3>
+        <p class="prod-desc">Duplica el área útil sin construir obra civil. Autosoportada o sobre rack.</p>
+        <div class="prod-specs">
+          <div class="row"><span class="lbl">Carga piso</span><span class="val">hasta 800 kg/m²</span></div>
+          <div class="row"><span class="lbl">Luz libre</span><span class="val">hasta 8 m</span></div>
+          <div class="row"><span class="lbl">Altura</span><span class="val">2 a 4 niveles</span></div>
+          <div class="row"><span class="lbl">Acabado</span><span class="val">losacero / multipanel</span></div>
+        </div>
+        <div class="prod-cta">
+          <a href="https://wa.me/5216641236278?text=Hola%2C%20quiero%20cotizar%20mezzanine." class="prod-btn prod-btn-primary" target="_blank">Cotizar por WhatsApp</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. PICKING -->
+    <div class="prod">
+      <div class="prod-visual">
+        <span class="prod-badge">Cotiza en 3D</span>
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="#3a3f46" stroke-width="1.2">
+            <rect x="30" y="20" width="3" height="120" fill="#3a3f46"/>
+            <rect x="167" y="20" width="3" height="120" fill="#3a3f46"/>
+          </g>
+          <!-- Niveles con cajas -->
+          <g fill="#f4f0e6" stroke="#c5c0b3" stroke-width="0.6">
+            <rect x="33" y="40" width="134" height="2"/>
+            <rect x="33" y="70" width="134" height="2"/>
+            <rect x="33" y="100" width="134" height="2"/>
+            <rect x="33" y="130" width="134" height="2"/>
+          </g>
+          <!-- Cajas/contenedores -->
+          <g>
+            <rect x="40" y="22" width="22" height="18" fill="#da6635" opacity="0.85"/>
+            <rect x="70" y="22" width="22" height="18" fill="#da6635" opacity="0.85"/>
+            <rect x="105" y="22" width="22" height="18" fill="#da6635" opacity="0.85"/>
+            <rect x="135" y="22" width="22" height="18" fill="#da6635" opacity="0.85"/>
+
+            <rect x="40" y="52" width="22" height="18" fill="#a8856b"/>
+            <rect x="70" y="52" width="22" height="18" fill="#a8856b"/>
+            <rect x="105" y="52" width="22" height="18" fill="#a8856b"/>
+            <rect x="135" y="52" width="22" height="18" fill="#a8856b"/>
+
+            <rect x="40" y="82" width="22" height="18" fill="#3a3f46"/>
+            <rect x="70" y="82" width="22" height="18" fill="#3a3f46"/>
+            <rect x="105" y="82" width="22" height="18" fill="#3a3f46"/>
+            <rect x="135" y="82" width="22" height="18" fill="#3a3f46"/>
+
+            <rect x="40" y="112" width="22" height="18" fill="#f4f0e6" stroke="#3a3f46" stroke-width="0.5"/>
+            <rect x="70" y="112" width="22" height="18" fill="#f4f0e6" stroke="#3a3f46" stroke-width="0.5"/>
+            <rect x="105" y="112" width="22" height="18" fill="#f4f0e6" stroke="#3a3f46" stroke-width="0.5"/>
+            <rect x="135" y="112" width="22" height="18" fill="#f4f0e6" stroke="#3a3f46" stroke-width="0.5"/>
+          </g>
+        </svg>
+      </div>
+      <div class="prod-body">
+        <h3 class="prod-name">Picking</h3>
+        <p class="prod-desc">Para selección manual de pedidos. Estiba ligera, acceso directo al SKU.</p>
+        <div class="prod-specs">
+          <div class="row"><span class="lbl">Alto</span><span class="val">2.0 – 3.0 m</span></div>
+          <div class="row"><span class="lbl">Frente</span><span class="val">1.00 – 1.40 m</span></div>
+          <div class="row"><span class="lbl">Fondo</span><span class="val">0.50 – 0.60 m</span></div>
+          <div class="row"><span class="lbl">Carga</span><span class="val">200 – 400 kg/niv</span></div>
+        </div>
+        <div class="prod-cta">
+          <a href="configurador-3d.html?sistema=picking" class="prod-btn prod-btn-primary" target="_blank">⚡ Configurar en 3D</a>
+          <a href="https://wa.me/5216641236278?text=Hola%2C%20quiero%20cotizar%20rack%20picking." class="prod-btn prod-btn-ghost" target="_blank">o por WhatsApp</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. DRIVE-IN -->
+    <div class="prod">
+      <div class="prod-visual">
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          <!-- Túnel drive-in vista perspectiva -->
+          <g>
+            <!-- Postes -->
+            <rect x="25" y="30" width="3" height="100" fill="#3a3f46"/>
+            <rect x="65" y="30" width="3" height="100" fill="#3a3f46"/>
+            <rect x="105" y="30" width="3" height="100" fill="#3a3f46"/>
+            <rect x="145" y="30" width="3" height="100" fill="#3a3f46"/>
+            <rect x="172" y="30" width="3" height="100" fill="#3a3f46"/>
+            <!-- Vigas superiores -->
+            <line x1="25" y1="35" x2="175" y2="35" stroke="#3a3f46" stroke-width="2"/>
+            <line x1="25" y1="60" x2="175" y2="60" stroke="#da6635" stroke-width="2"/>
+            <line x1="25" y1="85" x2="175" y2="85" stroke="#da6635" stroke-width="2"/>
+            <line x1="25" y1="110" x2="175" y2="110" stroke="#da6635" stroke-width="2"/>
+            <!-- Tarimas en profundidad -->
+            <g fill="#a8856b" opacity="0.85">
+              <rect x="32" y="50" width="30" height="8"/>
+              <rect x="72" y="50" width="30" height="8"/>
+              <rect x="112" y="50" width="30" height="8"/>
+              <rect x="32" y="75" width="30" height="8"/>
+              <rect x="72" y="75" width="30" height="8"/>
+              <rect x="32" y="100" width="30" height="8"/>
+              <rect x="72" y="100" width="30" height="8"/>
+              <rect x="112" y="100" width="30" height="8"/>
+            </g>
+            <!-- Flecha entrada -->
+            <path d="M 14 80 L 22 80 M 18 76 L 22 80 L 18 84" stroke="#da6635" stroke-width="2" fill="none"/>
+          </g>
+        </svg>
+      </div>
+      <div class="prod-body">
+        <h3 class="prod-name">Drive-In</h3>
+        <p class="prod-desc">Alta densidad para producto homogéneo. Almacena más tarimas en menos m².</p>
+        <div class="prod-specs">
+          <div class="row"><span class="lbl">Alto</span><span class="val">2.0 – 10.0 m</span></div>
+          <div class="row"><span class="lbl">Profundidad</span><span class="val">hasta 12 tarimas</span></div>
+          <div class="row"><span class="lbl">Sistema</span><span class="val">LIFO</span></div>
+          <div class="row"><span class="lbl">Densidad</span><span class="val">+60% vs selectivo</span></div>
+        </div>
+        <div class="prod-cta">
+          <a href="https://wa.me/5216641236278?text=Hola%2C%20quiero%20cotizar%20rack%20drive-in." class="prod-btn prod-btn-primary" target="_blank">Cotizar por WhatsApp</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. CANTILEVER -->
+    <div class="prod">
+      <div class="prod-visual">
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          <!-- Cantilever: postes con brazos saliendo -->
+          <g>
+            <rect x="50" y="20" width="6" height="120" fill="#3a3f46"/>
+            <rect x="146" y="20" width="6" height="120" fill="#3a3f46"/>
+            <!-- Brazos -->
+            <g stroke="#da6635" stroke-width="3" stroke-linecap="round">
+              <line x1="56" y1="40" x2="105" y2="40"/>
+              <line x1="56" y1="65" x2="105" y2="65"/>
+              <line x1="56" y1="90" x2="105" y2="90"/>
+              <line x1="56" y1="115" x2="105" y2="115"/>
+
+              <line x1="146" y1="40" x2="97" y2="40"/>
+              <line x1="146" y1="65" x2="97" y2="65"/>
+              <line x1="146" y1="90" x2="97" y2="90"/>
+              <line x1="146" y1="115" x2="97" y2="115"/>
+            </g>
+            <!-- Material almacenado: tubos/perfiles -->
+            <g fill="#a8856b">
+              <rect x="55" y="36" width="92" height="4" rx="2"/>
+              <rect x="55" y="61" width="92" height="4" rx="2"/>
+              <rect x="55" y="86" width="92" height="4" rx="2"/>
+            </g>
+            <g fill="#7a7a7a">
+              <rect x="55" y="111" width="92" height="4" rx="2"/>
+            </g>
+            <!-- Base -->
+            <rect x="40" y="138" width="32" height="6" fill="#3a3f46"/>
+            <rect x="136" y="138" width="32" height="6" fill="#3a3f46"/>
+          </g>
+        </svg>
+      </div>
+      <div class="prod-body">
+        <h3 class="prod-name">Cantilever</h3>
+        <p class="prod-desc">Para tubos, perfiles, madera, alfombras y todo lo largo y voluminoso.</p>
+        <div class="prod-specs">
+          <div class="row"><span class="lbl">Alto</span><span class="val">2.0 – 6.0 m</span></div>
+          <div class="row"><span class="lbl">Brazo</span><span class="val">0.60 – 1.50 m</span></div>
+          <div class="row"><span class="lbl">Carga/brazo</span><span class="val">500 – 1,500 kg</span></div>
+          <div class="row"><span class="lbl">Caras</span><span class="val">simple o doble</span></div>
+        </div>
+        <div class="prod-cta">
+          <a href="https://wa.me/5216641236278?text=Hola%2C%20quiero%20cotizar%20cantilever." class="prod-btn prod-btn-primary" target="_blank">Cotizar por WhatsApp</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ───── PROCESO ───── -->
+<section class="process" id="proceso">
+  <div class="process-inner">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Cómo trabajamos</div>
+        <h2>De la visita en sitio<br>a la instalación.</h2>
+      </div>
+      <p class="lead">Cinco pasos que repetimos desde 2005. Sin sorpresas en presupuesto, sin retrasos en obra.</p>
+    </div>
+    <div class="proc-steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-title">Diagnóstico</div>
+        <div class="step-desc">Visitamos tu bodega, medimos el espacio y revisamos flujo y carga.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-title">Cálculo</div>
+        <div class="step-desc">Definimos sistema, layout y carga por nivel según tu mercancía.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-title">Fabricación</div>
+        <div class="step-desc">Producimos en nuestra planta de Tijuana en 5 a 6 días hábiles.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div class="step-title">Instalación</div>
+        <div class="step-desc">Entregamos, montamos y nivelamos en sitio con equipo propio.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">05</div>
+        <div class="step-title">Garantía</div>
+        <div class="step-desc">12 meses sobre material nuevo. Soporte continuo posventa.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───── COBERTURA ───── -->
+<section class="section">
+  <div class="coverage">
+    <div class="coverage-text">
+      <div class="eyebrow" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mute);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;">Cobertura</div>
+      <h2 class="display" style="font-size:clamp(36px,5vw,64px);margin-bottom:24px">México<br>y EE.UU.</h2>
+      <p>Matriz en Tijuana con sucursales en el norte de México y operación transfronteriza con clientes en California.</p>
+      <ul class="coverage-list">
+        <li><span class="dot"></span>Tijuana, B.C. (matriz)</li>
+        <li><span class="dot"></span>Mexicali, B.C.</li>
+        <li><span class="dot"></span>Chihuahua, Chih.</li>
+        <li><span class="dot"></span>Cd. Juárez, Chih.</li>
+        <li><span class="dot"></span>San Diego, CA</li>
+        <li><span class="dot"></span>Hermosillo, Son.</li>
+      </ul>
+    </div>
+    <div class="coverage-map">
+      <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+        <!-- Silueta simplificada del norte de México -->
+        <path d="M 30 110 L 80 90 L 130 95 L 180 105 L 240 100 L 310 120 L 360 145 L 370 200 L 320 240 L 250 245 L 180 230 L 110 215 L 60 195 Z" fill="#fafaf7" stroke="#c5c0b3" stroke-width="1.5"/>
+        <!-- Línea frontera -->
+        <line x1="30" y1="110" x2="370" y2="135" stroke="#da6635" stroke-width="1" stroke-dasharray="4 3" opacity="0.6"/>
+        <!-- Puntos de presencia -->
+        <g>
+          <!-- Tijuana (matriz, más grande) -->
+          <circle cx="50" cy="125" r="10" fill="#da6635" opacity="0.25"/>
+          <circle cx="50" cy="125" r="5" fill="#da6635"/>
+          <text x="62" y="130" font-family="JetBrains Mono,monospace" font-size="10" font-weight="600" fill="#0f1115">Tijuana</text>
+          <!-- Mexicali -->
+          <circle cx="92" cy="120" r="3.5" fill="#da6635"/>
+          <text x="98" y="115" font-family="JetBrains Mono,monospace" font-size="9" fill="#6e737b">Mexicali</text>
+          <!-- Hermosillo -->
+          <circle cx="148" cy="160" r="3.5" fill="#da6635"/>
+          <text x="155" y="164" font-family="JetBrains Mono,monospace" font-size="9" fill="#6e737b">Hermosillo</text>
+          <!-- Chihuahua -->
+          <circle cx="220" cy="155" r="3.5" fill="#da6635"/>
+          <text x="227" y="159" font-family="JetBrains Mono,monospace" font-size="9" fill="#6e737b">Chihuahua</text>
+          <!-- Cd Juárez -->
+          <circle cx="218" cy="115" r="3.5" fill="#da6635"/>
+          <text x="178" y="105" font-family="JetBrains Mono,monospace" font-size="9" fill="#6e737b">Cd. Juárez</text>
+          <!-- San Diego -->
+          <circle cx="45" cy="100" r="3.5" fill="#da6635"/>
+          <text x="53" y="95" font-family="JetBrains Mono,monospace" font-size="9" fill="#6e737b">San Diego</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ───── CONTACTO ───── -->
+<section class="contact" id="contacto">
+  <div class="contact-inner">
+    <div>
+      <div class="eyebrow">Cotiza hoy</div>
+      <h2 class="display">¿Listo para empezar?</h2>
+      <p class="contact-lead">Una llamada o un mensaje. Te respondemos en menos de 1 hora hábil con la primera estimación.</p>
+      <div class="contact-actions">
+        <a href="https://wa.me/5216641236278?text=Hola%2C%20vi%20su%20sitio%20y%20quiero%20cotizar." class="btn btn-wa" target="_blank">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 3.5C18.2 1.2 15.2 0 12 0 5.4 0 0 5.4 0 12c0 2.1.6 4.2 1.6 6L0 24l6.2-1.6c1.7.9 3.7 1.4 5.8 1.4 6.6 0 12-5.4 12-12 0-3.2-1.2-6.2-3.5-8.3zM12 22c-1.8 0-3.6-.5-5.2-1.4l-.4-.2-3.7 1 1-3.6-.2-.4C2.5 15.7 2 13.9 2 12 2 6.5 6.5 2 12 2c2.7 0 5.2 1 7.1 2.9C21 6.8 22 9.3 22 12c0 5.5-4.5 10-10 10z"/></svg>
+          Mandar WhatsApp
+        </a>
+        <a href="configurador-3d.html" class="btn btn-primary" target="_blank">Cotizar góndolas en 3D</a>
+        <a href="tel:6649699622" class="btn btn-ghost" style="border-color:#fff;color:#fff">Llamar 664·969·9622</a>
+      </div>
+    </div>
+
+    <div class="contact-info">
+      <div class="info-item">
+        <span class="info-lbl">WhatsApp</span>
+        <a href="https://wa.me/5216641236278" class="info-val big" target="_blank">664·123·6278</a>
+      </div>
+      <div class="info-item">
+        <span class="info-lbl">Teléfono fijo</span>
+        <a href="tel:6649699622" class="info-val">664·969·9622</a>
+        <a href="tel:6642708523" class="info-val">664·270·8523</a>
+      </div>
+      <hr class="info-divider">
+      <div class="info-item">
+        <span class="info-lbl">Planta · Tijuana</span>
+        <span class="info-val">Lib. Salvador Rosas Magallón 202,<br>Camino Verde, Tijuana, B.C. 22190</span>
+      </div>
+      <hr class="info-divider">
+      <div class="info-item">
+        <span class="info-lbl">Horario</span>
+        <span class="info-val">Lun · Vie · 8:00 – 18:00 hrs<br>Sáb · 8:00 – 14:00 hrs</span>
+      </div>
+      <hr class="info-divider">
+      <div class="info-item">
+        <span class="info-lbl">Redes</span>
+        <a href="https://facebook.com/estanterias.racks.1" class="info-val" target="_blank">Facebook · @estanterias.racks.1</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───── FOOTER ───── -->
+<footer class="footer">
+  <div class="footer-inner">
+    <a href="#" class="logo"><span class="logo-mark"></span>ISARACK</a>
+    <div class="footer-meta">
+      <span>© 2026 ISA RACK SA · Desde 2005</span>
+      <a href="#productos">Productos</a>
+      <a href="#cotizador">Cotizador 3D</a>
+      <a href="#contacto">Contacto</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Reveal on scroll
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+  document.querySelectorAll('.prod, .step, .stat, .feature-cot-inner > *').forEach(el => el.classList.add('reveal'));
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+}
+</script>
+
+</body>
+</html>
