@@ -4,12 +4,59 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Soluciones Integrales · Sistemas de almacenaje industrial</title>
-<meta name="description" content="Diseño, fabricación e instalación de racks, estantería y sistemas de almacenaje industrial. Configurador 3D con cotización al instante.">
+<meta name="description" content="Diseño, fabricación e instalación de racks selectivos, picking, drive-in, góndolas, mezzanines y accesorios. Configurador 3D con cotización al instante. 20+ años de experiencia. Tijuana, B.C.">
+<meta name="keywords" content="racks industriales Tijuana, rack selectivo, estantería picking, drive-in, góndolas comerciales, cantilever, mezzanine, almacenaje industrial México, ISARACK">
+<link rel="canonical" href="https://isarack-web.vercel.app/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 115'%3E%3Cpolygon points='50,5 95,30 95,85 50,110 5,85 5,30' fill='%23f97316'/%3E%3C/svg%3E">
+
+<!-- Open Graph / WhatsApp / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://isarack-web.vercel.app/">
+<meta property="og:title" content="Soluciones Integrales · Sistemas de almacenaje industrial">
+<meta property="og:description" content="Racks, estantería y almacenaje a la medida. Configurador 3D con cotización al instante. 20+ años de experiencia.">
+<meta property="og:image" content="https://isarack-web.vercel.app/proyectos/selectivo.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="960">
+<meta property="og:locale" content="es_MX">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Soluciones Integrales · Sistemas de almacenaje industrial">
+<meta name="twitter:description" content="Racks, estantería y almacenaje a la medida. Configurador 3D con cotización al instante.">
+<meta name="twitter:image" content="https://isarack-web.vercel.app/proyectos/selectivo.jpg">
+
+<!-- Schema.org LocalBusiness (Google Maps + búsquedas locales) -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "Soluciones Integrales · GRUPO ISARACK",
+  "image": "https://isarack-web.vercel.app/proyectos/selectivo.jpg",
+  "url": "https://isarack-web.vercel.app/",
+  "telephone": "+52-664-421-1088",
+  "email": "montajes@isarack.com",
+  "priceRange": "$$",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "Lib. Salvador Rosas Magallón 202",
+    "addressLocality": "Tijuana",
+    "addressRegion": "B.C.",
+    "addressCountry": "MX"
+  },
+  "openingHoursSpecification": [
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "opens": "08:00", "closes": "18:00" },
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "08:00", "closes": "14:00" }
+  ],
+  "areaServed": { "@type": "Country", "name": "Mexico" }
+}
+</script>
+
+<!-- Google Fonts: Inter -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;background:#fff;color:#111;line-height:1.55;-webkit-font-smoothing:antialiased}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff;color:#111;line-height:1.55;-webkit-font-smoothing:antialiased;font-feature-settings:'cv02','cv03','cv04','cv11'}
 a{color:inherit;text-decoration:none}
 img{max-width:100%;display:block}
 .container{max-width:1200px;margin:0 auto;padding:0 24px}
@@ -114,6 +161,60 @@ footer{padding:30px 0;background:#111;color:#888;font-size:13px}
 .footer-inner{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
 footer a{color:#bbb}
 footer a:hover{color:#f97316}
+
+/* ═══ MEJORAS PROFESIONALES ═══ */
+
+/* Botón flotante WhatsApp */
+.fab-wa{position:fixed;bottom:24px;right:24px;width:60px;height:60px;background:#25D366;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(37,211,102,0.4);z-index:900;transition:all 0.2s;font-size:30px;text-decoration:none}
+.fab-wa:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(37,211,102,0.5)}
+.fab-wa::before{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid #25D366;opacity:0;animation:fabPulse 2s infinite}
+@keyframes fabPulse{0%{opacity:0.6;transform:scale(1)}100%{opacity:0;transform:scale(1.4)}}
+@media(max-width:640px){.fab-wa{width:52px;height:52px;font-size:26px;bottom:18px;right:18px}}
+
+/* Sección Nuestro proceso */
+.process-section{background:linear-gradient(180deg,#fff 0%,#fafafa 100%);padding:70px 0}
+.process-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:28px;margin-top:40px}
+.process-step{position:relative;text-align:center;padding:0 12px}
+.process-num{width:56px;height:56px;background:#f97316;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;margin:0 auto 16px;box-shadow:0 6px 18px rgba(249,115,22,0.35)}
+.process-step h4{font-size:16px;font-weight:700;margin-bottom:6px;color:#111}
+.process-step p{color:#666;font-size:13.5px;line-height:1.55}
+.process-step:not(:last-child)::after{content:'→';position:absolute;top:22px;right:-14px;color:#f97316;font-size:22px;font-weight:400;opacity:0.4}
+@media(max-width:768px){.process-step:not(:last-child)::after{display:none}}
+
+/* Modal de sistema (info técnica) */
+.sys-modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1100;display:none;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.sys-modal.active{display:flex}
+.sys-modal-inner{background:#fff;border-radius:12px;max-width:820px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4);position:relative}
+.sys-modal-hero{aspect-ratio:16/9;background:#f5f5f5;overflow:hidden;position:relative}
+.sys-modal-hero img{width:100%;height:100%;object-fit:cover}
+.sys-modal-close{position:absolute;top:14px;right:14px;width:36px;height:36px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:background 0.15s}
+.sys-modal-close:hover{background:rgba(0,0,0,0.85)}
+.sys-modal-body{padding:32px}
+.sys-modal-body h2{font-size:26px;font-weight:700;margin-bottom:8px;letter-spacing:-0.3px}
+.sys-modal-body .subtitle{color:#f97316;font-size:12px;letter-spacing:2px;font-weight:700;margin-bottom:14px}
+.sys-modal-body .lead{color:#555;font-size:15px;line-height:1.6;margin-bottom:24px}
+.sys-modal-specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.sys-modal-spec{background:#fafafa;border:1px solid #eee;border-radius:8px;padding:14px 16px}
+.sys-modal-spec .label{color:#888;font-size:11px;letter-spacing:1px;font-weight:600;margin-bottom:4px}
+.sys-modal-spec .value{color:#111;font-size:14px;font-weight:600}
+.sys-modal-body h4{font-size:12px;letter-spacing:1.5px;color:#666;font-weight:700;margin-bottom:12px;margin-top:20px}
+.sys-modal-body ul{list-style:none;margin-bottom:20px}
+.sys-modal-body ul li{padding-left:22px;position:relative;margin-bottom:8px;color:#444;font-size:14px;line-height:1.5}
+.sys-modal-body ul li::before{content:'✓';position:absolute;left:0;top:0;color:#f97316;font-weight:700}
+.sys-modal-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px;padding-top:20px;border-top:1px solid #eee}
+.sys-modal-actions .btn-primary{background:#f97316;color:#fff;padding:12px 22px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none;flex:1;text-align:center;min-width:160px}
+.sys-modal-actions .btn-primary:hover{background:#ea6a11}
+.sys-modal-actions .btn-secondary{background:#25D366;color:#fff;padding:12px 22px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none;flex:1;text-align:center;min-width:160px}
+.sys-modal-actions .btn-secondary:hover{background:#20b957}
+
+/* Botón "Más info" en cards */
+.more-info-btn{display:inline-flex;align-items:center;gap:4px;color:#666;font-size:12px;font-weight:600;margin-top:8px;padding:0;background:none;border:none;cursor:pointer;transition:color 0.15s}
+.more-info-btn:hover{color:#f97316}
+
+/* Animaciones on-scroll */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity 0.7s ease-out,transform 0.7s ease-out}
+.reveal.visible{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none}}
 </style>
 </head>
 <body>
@@ -167,95 +268,104 @@ footer a:hover{color:#f97316}
 
       <div class="system-card" onclick="location.href='/configurador.html#selectivo'">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/selectivo.jpg" alt="Rack Selectivo ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/selectivo.jpg" alt="Rack Selectivo ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Rack Selectivo</h3>
           <p>Acceso directo a cada tarima. El sistema más versátil para almacenaje de paletizado.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('selectivo')">ℹ Ver detalles</button>
           <span class="more">Configurar en 3D →</span>
         </div>
       </div>
 
       <div class="system-card" onclick="location.href='/configurador.html#picking'">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/picking.jpg" alt="Estantería Picking ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/picking.jpg" alt="Estantería Picking ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Estantería Picking</h3>
           <p>Para preparación manual de pedidos. Acceso rápido a productos de menor rotación.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('picking')">ℹ Ver detalles</button>
           <span class="more">Configurar en 3D →</span>
         </div>
       </div>
 
       <div class="system-card" onclick="location.href='/configurador.html#gondola'">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/gondolas.jpg" alt="Góndolas ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/gondolas.jpg" alt="Góndolas ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Góndolas</h3>
           <p>Estantería para punto de venta y tiendas. Diseño abierto por ambos lados para autoservicio.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('gondolas')">ℹ Ver detalles</button>
           <span class="more">Configurar en 3D →</span>
         </div>
       </div>
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/mecano.jpg" alt="Muebles Mecano ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/mecano.jpg" alt="Muebles Mecano ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Muebles Mecano</h3>
           <p>Estantería metálica ligera de angular ranurado. Ideal para talleres, bodegas y almacenes de refacciones.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('mecano')">ℹ Ver detalles</button>
         </div>
       </div>
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/archivero.jpg" alt="Archivero móvil ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/archivero.jpg" alt="Archivero móvil ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Archivero móvil</h3>
           <p>Almacenaje compacto sobre rieles con volante manual. Duplica capacidad de archivo en el mismo espacio. Ideal para oficinas, bancos y hospitales.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('archivero')">ℹ Ver detalles</button>
         </div>
       </div>
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/drivein.jpg" alt="Drive-In ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/drivein.jpg" alt="Drive-In ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Drive-In</h3>
           <p>Almacenaje compacto de alta densidad. Ideal para muchas tarimas por referencia.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('drivein')">ℹ Ver detalles</button>
         </div>
       </div>
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/cartonflow.jpg" alt="Carton Flow ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/cartonflow.jpg" alt="Carton Flow ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Carton Flow</h3>
           <p>Estantería con rieles de gravedad para cajas. Rotación PEPS automática, ideal para preparación de pedidos.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('cartonflow')">ℹ Ver detalles</button>
         </div>
       </div>
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/cantilever.jpg" alt="Cantilever ISARACK" style="width:100%;height:100%;object-fit:cover;object-position:center 35%">
+          <img src="/proyectos/cantilever.jpg" alt="Cantilever ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:center 35%">
         </div>
         <div class="system-body">
           <h3>Cantilever</h3>
           <p>Para tubos, perfiles, madera y cargas largas. Acceso frontal sin obstáculos verticales.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('cantilever')">ℹ Ver detalles</button>
         </div>
       </div>
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/pasarela_poster.jpg" alt="Rack con pasarela ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/pasarela_poster.jpg" alt="Rack con pasarela ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
           <div class="video-badge">▶ 2 VIDEOS</div>
         </div>
         <div class="system-body">
           <h3>Rack con pasarelas</h3>
           <p>Sistema selectivo con niveles de acceso peatonal. Aprovecha la altura del almacén con múltiples pisos operativos.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('pasarelas')">ℹ Ver detalles</button>
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
             <button onclick="event.stopPropagation();abrirVideoModal('pasarela.mp4','pasarela_poster.jpg')" style="flex:1;min-width:150px;padding:10px;background:#f97316;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">▶ 1 nivel de pasarela + mezzanine</button>
             <button onclick="event.stopPropagation();abrirVideoModal('pasarela3.mp4','pasarela3_poster.jpg')" style="flex:1;min-width:130px;padding:10px;background:#fff;color:#f97316;border:1px solid #f97316;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">▶ 2 niveles de pasarela</button>
@@ -265,24 +375,58 @@ footer a:hover{color:#f97316}
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/mallas.jpg" alt="Mallas anticaída ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/mallas.jpg" alt="Mallas anticaída ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Mallas anticaída</h3>
           <p>Refuerzo posterior de racks selectivos. Evita caída de mercancía hacia el pasillo opuesto o zonas de trabajo.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('mallas')">ℹ Ver detalles</button>
         </div>
       </div>
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
-          <img src="/proyectos/protector.jpg" alt="Protector de puntal doble con barra ISARACK" style="width:100%;height:100%;object-fit:cover">
+          <img src="/proyectos/protector.jpg" alt="Protector de puntal doble con barra ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
         </div>
         <div class="system-body">
           <h3>Protector doble con barra</h3>
           <p>Refuerzo en la base del puntal contra impactos de montacargas. Barra horizontal para mayor cobertura y rigidez.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('protector')">ℹ Ver detalles</button>
         </div>
       </div>
 
+    </div>
+  </div>
+</section>
+
+<!-- NUESTRO PROCESO -->
+<section class="process-section">
+  <div class="container">
+    <div class="section-intro reveal">
+      <h2>Cómo trabajamos</h2>
+      <p>De la idea al arranque de operaciones en 4 pasos.</p>
+    </div>
+    <div class="process-grid">
+      <div class="process-step reveal">
+        <div class="process-num">1</div>
+        <h4>Consulta</h4>
+        <p>Nos platicas tu operación, tus productos y el espacio disponible. Sin costo.</p>
+      </div>
+      <div class="process-step reveal">
+        <div class="process-num">2</div>
+        <h4>Diseño 3D</h4>
+        <p>Configuras tu solución en el simulador o te la diseñamos con las medidas exactas.</p>
+      </div>
+      <div class="process-step reveal">
+        <div class="process-num">3</div>
+        <h4>Cotización</h4>
+        <p>Recibes propuesta con lista de materiales, precios y tiempos de entrega.</p>
+      </div>
+      <div class="process-step reveal">
+        <div class="process-num">4</div>
+        <h4>Instalación</h4>
+        <p>Nuestras cuadrillas certificadas montan el sistema en tu planta y lo dejamos operando.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -344,6 +488,219 @@ function cerrarVideoModal(e){
   v.pause();
 }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarVideoModal(); });
+</script>
+
+<!-- Botón flotante WhatsApp -->
+<a href="https://wa.me/5216644211088?text=Hola,%20me%20interesa%20cotizar%20un%20proyecto" target="_blank" rel="noopener" class="fab-wa" aria-label="WhatsApp"><span>💬</span></a>
+
+<!-- MODAL SISTEMA (info técnica) -->
+<div class="sys-modal" id="sysModal" onclick="cerrarSysModal(event)">
+  <div class="sys-modal-inner" onclick="event.stopPropagation()">
+    <button class="sys-modal-close" onclick="cerrarSysModal()">✕</button>
+    <div class="sys-modal-hero"><img id="sysImg" src="" alt=""></div>
+    <div class="sys-modal-body">
+      <div class="subtitle" id="sysSubtitle">SISTEMA DE ALMACENAJE</div>
+      <h2 id="sysTitle"></h2>
+      <p class="lead" id="sysLead"></p>
+      <div class="sys-modal-specs" id="sysSpecs"></div>
+      <h4>APLICACIONES TÍPICAS</h4>
+      <ul id="sysApps"></ul>
+      <h4>VENTAJAS</h4>
+      <ul id="sysVentajas"></ul>
+      <div class="sys-modal-actions">
+        <a id="sysCTA" href="/configurador.html" class="btn-primary">Configurar en 3D →</a>
+        <a href="https://wa.me/5216644211088?text=Hola,%20quisiera%20m%C3%A1s%20informaci%C3%B3n" target="_blank" rel="noopener" class="btn-secondary">💬 Cotizar por WhatsApp</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Info técnica por sistema
+const SISTEMAS = {
+  selectivo: {
+    titulo: 'Rack Selectivo',
+    img: '/proyectos/selectivo.jpg',
+    lead: 'El sistema más versátil y utilizado en almacenes industriales. Acceso directo e inmediato a cada tarima, ideal para operaciones con mucha rotación y variedad de productos.',
+    specs: [
+      ['Altura típica', 'Hasta 12 m'],
+      ['Capacidad por nivel', 'Hasta 2,700 kg'],
+      ['Configuración', '1 o 2 filas'],
+      ['Acceso', 'Directo a cada tarima']
+    ],
+    apps: ['Almacenes de distribución', 'Bodegas industriales', 'Centros de manufactura', 'Cross-docking'],
+    ventajas: ['Acceso al 100% de las tarimas', 'Instalación rápida y modular', 'Compatible con todo tipo de montacargas', 'Amplia gama de accesorios de seguridad'],
+    cta: '/configurador.html#selectivo'
+  },
+  picking: {
+    titulo: 'Estantería Picking',
+    img: '/proyectos/picking.jpg',
+    lead: 'Sistema pensado para preparación manual de pedidos. Ideal para productos de menor tamaño y rotación media-alta que se acomodan y toman a mano.',
+    specs: [
+      ['Altura típica', '2.4 a 3 m'],
+      ['Capacidad por nivel', 'Hasta 300 kg'],
+      ['Configuración', 'Con o sin panel trasero'],
+      ['Acceso', 'Manual, sin montacargas']
+    ],
+    apps: ['Archivo de expedientes', 'Refacciones y ferretería', 'E-commerce y preparación de pedidos', 'Bodegas de repuestos'],
+    ventajas: ['Sin necesidad de montacargas', 'Niveles ajustables cada 50 mm', 'Fácil reconfiguración', 'Costo por posición muy bajo'],
+    cta: '/configurador.html#picking'
+  },
+  gondolas: {
+    titulo: 'Góndolas',
+    img: '/proyectos/gondolas.jpg',
+    lead: 'Estantería para punto de venta y autoservicio. Diseño abierto por ambos lados que permite exhibir producto y facilitar la reposición.',
+    specs: [
+      ['Altura típica', '1.8 a 2.4 m'],
+      ['Módulos', 'Cabecera y arrimo'],
+      ['Uniones', '11 medidas disponibles'],
+      ['Colores', 'Blanco, negro, personalizable']
+    ],
+    apps: ['Minisúper y tiendas de conveniencia', 'Farmacias', 'Ferreterías retail', 'Tiendas de autoservicio'],
+    ventajas: ['Doble cara para máxima exhibición', 'Fácil rearmado por temporadas', 'Repisas con diferentes profundidades', 'Compatible con ganchos y accesorios de punto de venta'],
+    cta: '/configurador.html#gondola'
+  },
+  mecano: {
+    titulo: 'Muebles Mecano',
+    img: '/proyectos/mecano.jpg',
+    lead: 'Estantería metálica ligera de angular ranurado. Solución económica y flexible para almacenaje manual en talleres, oficinas y bodegas pequeñas.',
+    specs: [
+      ['Altura típica', '2 a 2.5 m'],
+      ['Capacidad por entrepaño', 'Hasta 150 kg'],
+      ['Configuración', 'Sistema modular con tornillería'],
+      ['Ensamble', 'Rápido, sin soldadura']
+    ],
+    apps: ['Talleres y refaccionarias', 'Oficinas y archivos', 'Almacenes de mediana carga', 'Cuartos de aseo y utilería'],
+    ventajas: ['Precio accesible', 'Fácil de reconfigurar', 'Entrepaños ajustables', 'Ensamble en minutos']
+  },
+  archivero: {
+    titulo: 'Archivero móvil',
+    img: '/proyectos/archivero.jpg',
+    lead: 'Sistema de almacenaje compacto sobre rieles con volante manual. Duplica la capacidad de archivo en el mismo espacio eliminando los pasillos fijos.',
+    specs: [
+      ['Ganancia de espacio', 'Hasta 100%'],
+      ['Movimiento', 'Manual con volante mecánico'],
+      ['Cerradura', 'Individual por módulo'],
+      ['Piso', 'Sobre rieles empotrados o sobrepuestos']
+    ],
+    apps: ['Oficinas corporativas', 'Bancos y notarías', 'Hospitales y expedientes clínicos', 'Bodegas de documentación'],
+    ventajas: ['Duplica capacidad sin ampliar espacio', 'Seguridad con cerradura individual', 'Instalación sobre piso existente', 'Sistema silencioso y ergonómico']
+  },
+  drivein: {
+    titulo: 'Drive-In',
+    img: '/proyectos/drivein.jpg',
+    lead: 'Sistema de almacenaje compacto de alta densidad. El montacargas entra directamente al rack para depositar o retirar tarimas, aprovechando al máximo el volumen del almacén.',
+    specs: [
+      ['Densidad', 'Hasta 85% de aprovechamiento'],
+      ['Método', 'LIFO (último en entrar, primero en salir)'],
+      ['Profundidad', 'Hasta 12 tarimas por carril'],
+      ['Ideal para', 'Pocas referencias, muchas tarimas']
+    ],
+    apps: ['Cámaras de refrigeración y congelados', 'Bodegas de materia prima', 'Producto terminado en alto volumen', 'Almacenes estacionales'],
+    ventajas: ['Máximo aprovechamiento del cubicaje', 'Menor superficie por tarima almacenada', 'Ideal para cámaras frías', 'Estructura robusta y probada']
+  },
+  cartonflow: {
+    titulo: 'Carton Flow',
+    img: '/proyectos/cartonflow.jpg',
+    lead: 'Estantería con rieles de gravedad para cajas y contenedores plásticos. Rotación PEPS automática ideal para preparación de pedidos y líneas de picking.',
+    specs: [
+      ['Método', 'PEPS (primero en entrar, primero en salir)'],
+      ['Inclinación', '4° a 7°'],
+      ['Capacidad por carril', 'Variable según carga'],
+      ['Reposición', 'Trasera; picking frontal']
+    ],
+    apps: ['Preparación de pedidos e-commerce', 'Líneas de ensamble industrial', 'Farmacias y almacenes hospitalarios', 'Distribución de consumo masivo'],
+    ventajas: ['Reduce tiempos de picking', 'Rotación PEPS automática', 'Separación clara entre reposición y despacho', 'Ergonomía para el operador']
+  },
+  cantilever: {
+    titulo: 'Cantilever',
+    img: '/proyectos/cantilever.jpg',
+    lead: 'Diseñado para cargas largas y voluminosas. Brazos en voladizo sin obstáculos verticales que permiten almacenar tubería, perfiles, madera y láminas.',
+    specs: [
+      ['Configuración', 'Sencillo o doble cara'],
+      ['Capacidad por brazo', '250 a 1,500 kg'],
+      ['Interior', 'Uso interior o exterior'],
+      ['Brazos', 'Ajustables cada 100 mm']
+    ],
+    apps: ['Aceros y perfiles', 'Tubería PVC y metálica', 'Madera y triplay', 'Tarima larga y no-estándar'],
+    ventajas: ['Sin obstáculos verticales para cargar', 'Brazos ajustables en altura', 'Base robusta anti-vuelco', 'Ideal para cargas de gran longitud']
+  },
+  pasarelas: {
+    titulo: 'Rack con pasarelas',
+    img: '/proyectos/pasarela_poster.jpg',
+    lead: 'Sistema selectivo con niveles de acceso peatonal. Duplica o triplica la superficie operativa aprovechando la altura del almacén sin ampliar el área construida.',
+    specs: [
+      ['Niveles', '1 a 3 pasarelas'],
+      ['Capacidad de piso', '500 kg/m² (estándar)'],
+      ['Acceso', 'Escalera + montacargas'],
+      ['Combinable con', 'Mezzanine intermedia']
+    ],
+    apps: ['Almacenes de partes pequeñas', 'Refacciones y componentes', 'E-commerce con SKU variado', 'Ampliaciones sin obra civil'],
+    ventajas: ['Máximo aprovechamiento de altura', 'Sin necesidad de ampliar la nave', 'Estructura autoportante', 'Combinable con estanterías de cualquier tipo']
+  },
+  mallas: {
+    titulo: 'Mallas anticaída',
+    img: '/proyectos/mallas.jpg',
+    lead: 'Sistema de seguridad para racks selectivos. Panel de malla instalado en la parte posterior evita que producto o tarimas caigan hacia el pasillo o zonas de trabajo.',
+    specs: [
+      ['Instalación', 'Posterior o entre pasillos'],
+      ['Material', 'Malla electrosoldada calibre pesado'],
+      ['Ajuste', 'A la medida del rack'],
+      ['Cumple', 'Normas de seguridad industrial']
+    ],
+    apps: ['Racks selectivos junto a pasillos peatonales', 'Almacenes con circulación de personal', 'Zonas de oficina cercanas al almacén', 'Cámaras frías con acceso lateral'],
+    ventajas: ['Previene accidentes por caída de mercancía', 'Cumple con normativas de seguridad', 'Instalación sin desmontar el rack', 'Estética y durable']
+  },
+  protector: {
+    titulo: 'Protector doble con barra',
+    img: '/proyectos/protector.jpg',
+    lead: 'Refuerzo en la base del puntal contra impactos de montacargas. La barra horizontal amplía la cobertura y protege ambos puntales de una bahía.',
+    specs: [
+      ['Altura estándar', '400 mm'],
+      ['Material', 'Acero calibre pesado'],
+      ['Instalación', 'Anclada al piso'],
+      ['Color', 'Amarillo de seguridad']
+    ],
+    apps: ['Extremos de fila de rack', 'Zonas de tráfico de montacargas', 'Racks en pasillos angostos', 'Almacenes con alta rotación'],
+    ventajas: ['Absorbe impactos sin dañar el rack', 'Barra horizontal para mayor cobertura', 'Alarga la vida útil del sistema', 'Cumple con recomendaciones de seguridad']
+  }
+};
+
+function abrirSysModal(key){
+  const s = SISTEMAS[key];
+  if(!s) return;
+  document.getElementById('sysImg').src = s.img;
+  document.getElementById('sysImg').alt = s.titulo;
+  document.getElementById('sysTitle').textContent = s.titulo;
+  document.getElementById('sysLead').textContent = s.lead;
+  document.getElementById('sysSpecs').innerHTML = s.specs.map(([l,v])=>`<div class="sys-modal-spec"><div class="label">${l.toUpperCase()}</div><div class="value">${v}</div></div>`).join('');
+  document.getElementById('sysApps').innerHTML = s.apps.map(a=>`<li>${a}</li>`).join('');
+  document.getElementById('sysVentajas').innerHTML = s.ventajas.map(v=>`<li>${v}</li>`).join('');
+  const cta = document.getElementById('sysCTA');
+  if(s.cta){ cta.href = s.cta; cta.style.display = ''; cta.textContent = 'Configurar en 3D →'; }
+  else{ cta.style.display = 'none'; }
+  document.getElementById('sysModal').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function cerrarSysModal(e){
+  if(e && e.target && !e.target.classList.contains('sys-modal') && !e.target.classList.contains('sys-modal-close')) return;
+  document.getElementById('sysModal').classList.remove('active');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ cerrarSysModal({target:{classList:{contains:()=>true}}}); cerrarVideoModal({target:{classList:{contains:()=>true}}}); }});
+
+// Animación reveal on-scroll
+if('IntersectionObserver' in window){
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); }});
+  }, {threshold:0.12, rootMargin:'0px 0px -60px 0px'});
+  document.addEventListener('DOMContentLoaded', ()=>{
+    document.querySelectorAll('.reveal, .system-card, .process-step').forEach(el=>{
+      if(!el.classList.contains('reveal')) el.classList.add('reveal');
+      io.observe(el);
+    });
+  });
+}
 </script>
 
 <footer>

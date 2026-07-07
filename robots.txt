@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://isarack-web.vercel.app/sitemap.xml
