@@ -3,85 +3,101 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Soluciones Integrales · Proyectos a la medida</title>
-<meta name="description" content="Ingeniería y diseño de proyectos de almacenamiento industrial. Racks, estantería y configurador 3D interactivo.">
+<title>Soluciones Integrales · Sistemas de almacenaje industrial</title>
+<meta name="description" content="Diseño, fabricación e instalación de racks, estantería y sistemas de almacenaje industrial. Configurador 3D con cotización al instante.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 115'%3E%3Cpolygon points='50,5 95,30 95,85 50,110 5,85 5,30' fill='%23f97316'/%3E%3C/svg%3E">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff;color:#1a1a1a;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;background:#fff;color:#111;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
-.container{max-width:1140px;margin:0 auto;padding:0 24px}
+img{max-width:100%;display:block}
+.container{max-width:1200px;margin:0 auto;padding:0 24px}
 
 /* NAV */
-nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);border-bottom:1px solid #f0f0f0}
-.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;max-width:1140px;margin:0 auto}
-.logo{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;letter-spacing:0.2px;color:#111}
-.logo svg{width:28px;height:32px}
-.nav-links{display:flex;gap:28px;font-size:14px;color:#555}
+nav{position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid #ececec}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;max-width:1200px;margin:0 auto}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;color:#111}
+.logo svg{width:26px;height:30px}
+.nav-links{display:flex;gap:32px;font-size:14px;color:#444}
 .nav-links a:hover{color:#f97316}
-@media(max-width:640px){.nav-links{display:none}}
+.nav-cta{background:#f97316;color:#fff;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600}
+.nav-cta:hover{background:#ea6a11}
+@media(max-width:768px){.nav-links{display:none}}
 
 /* HERO */
-.hero{padding:80px 0 90px;background:linear-gradient(180deg,#fff 0%,#fafafa 100%)}
-.hero-inner{background:linear-gradient(135deg,#ffffff 0%,#fff8f3 100%);border:1px solid #ffe4d1;border-radius:20px;padding:70px 40px;text-align:center;box-shadow:0 4px 24px rgba(249,115,22,0.06)}
-.eyebrow{color:#f97316;font-size:11px;letter-spacing:3px;font-weight:700;margin-bottom:20px}
-.hero h1{font-size:clamp(32px,5vw,54px);font-weight:700;line-height:1.1;margin-bottom:20px;letter-spacing:-0.8px;color:#111}
-.hero p{color:#666;font-size:17px;max-width:560px;margin:0 auto 34px;line-height:1.6}
-.btn{padding:15px 32px;border-radius:10px;font-weight:600;font-size:14px;transition:all 0.15s;display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer}
-.btn-primary{background:#f97316;color:#fff;box-shadow:0 4px 14px rgba(249,115,22,0.35)}
-.btn-primary:hover{background:#ea6a11;transform:translateY(-2px);box-shadow:0 6px 20px rgba(249,115,22,0.4)}
+.hero{position:relative;min-height:520px;display:flex;align-items:center;background:#111 url('https://images.unsplash.com/photo-1553413077-190dd305871c?w=1600&auto=format&fit=crop&q=80') center/cover;color:#fff}
+.hero::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,0.75) 0%,rgba(0,0,0,0.35) 100%)}
+.hero-inner{position:relative;z-index:1;padding:80px 0;max-width:700px}
+.hero h1{font-size:clamp(30px,4.5vw,48px);font-weight:700;line-height:1.1;margin-bottom:20px;letter-spacing:-0.6px}
+.hero p{font-size:17px;line-height:1.6;color:#e5e5e5;margin-bottom:32px;max-width:560px}
+.hero-cta{display:inline-flex;align-items:center;gap:10px;background:#f97316;color:#fff;padding:14px 26px;border-radius:6px;font-weight:600;font-size:15px;transition:all 0.15s}
+.hero-cta:hover{background:#ea6a11;transform:translateY(-1px)}
+.hero-cta-line{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.hero-link{color:#fff;text-decoration:underline;font-size:14px;opacity:0.9}
+.hero-link:hover{opacity:1;color:#f97316}
 
 /* SECTIONS */
 section{padding:80px 0}
-.section-label{color:#f97316;font-size:11px;letter-spacing:3px;margin-bottom:12px;font-weight:700;text-align:center}
-.section-title{font-size:clamp(26px,3.2vw,36px);font-weight:700;margin-bottom:12px;letter-spacing:-0.5px;text-align:center;color:#111}
-.section-sub{color:#666;font-size:15px;text-align:center;max-width:560px;margin:0 auto 50px}
+.section-intro{text-align:center;margin-bottom:50px}
+.section-intro h2{font-size:clamp(24px,3vw,34px);font-weight:700;margin-bottom:12px;letter-spacing:-0.3px}
+.section-intro p{color:#666;font-size:16px;max-width:600px;margin:0 auto}
 
-/* SERVICIOS */
-.services{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
-.service{background:#fff;padding:32px;border-radius:14px;border:1px solid #eee;transition:all 0.2s}
-.service:hover{border-color:#f97316;transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.06)}
-.service-icon{width:44px;height:44px;background:linear-gradient(135deg,#fff4ec,#ffe4d1);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;font-size:22px}
-.service h3{font-size:17px;font-weight:700;margin-bottom:8px;color:#111}
-.service p{color:#666;font-size:14px;line-height:1.6}
+/* SISTEMAS */
+.systems{background:#fafafa}
+.systems-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.system-card{background:#fff;border:1px solid #eaeaea;border-radius:8px;overflow:hidden;transition:all 0.2s;cursor:pointer}
+.system-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,0.08);border-color:#f97316}
+.system-visual{aspect-ratio:16/10;background:#f5f5f5;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.system-visual svg{width:70%;height:70%}
+.system-body{padding:20px 22px}
+.system-body h3{font-size:17px;font-weight:700;margin-bottom:6px;color:#111}
+.system-body p{color:#666;font-size:13.5px;line-height:1.5}
+.system-body .more{color:#f97316;font-size:12px;font-weight:600;margin-top:12px;display:inline-flex;align-items:center;gap:4px}
 
 /* PROYECTOS */
-.proyectos-section{background:#fafafa}
-.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
-.project{position:relative;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#f0f0f0;border:1px solid #eee;cursor:pointer;transition:transform 0.2s}
-.project:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.1)}
-.project img{width:100%;height:100%;object-fit:cover;display:block}
-.project-overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,0.75) 0%,rgba(0,0,0,0) 50%);display:flex;align-items:flex-end;padding:20px;opacity:0;transition:opacity 0.2s}
-.project:hover .project-overlay{opacity:1}
-.project-info{color:#fff}
-.project-info h4{font-size:16px;font-weight:600;margin-bottom:4px}
-.project-info span{font-size:12px;opacity:0.85}
-.project.placeholder{background:linear-gradient(135deg,#fafafa 0%,#f0f0f0 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#bbb;text-align:center;padding:20px}
-.project.placeholder .icon{font-size:36px;margin-bottom:8px;opacity:0.5}
-.project.placeholder .label{font-size:12px;font-weight:600;letter-spacing:1px}
+.projects{background:#fff}
+.projects-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.project-card{position:relative;aspect-ratio:4/3;background:#f0f0f0;border-radius:8px;overflow:hidden;cursor:pointer;transition:transform 0.2s}
+.project-card:hover{transform:translateY(-3px)}
+.project-card img{width:100%;height:100%;object-fit:cover}
+.project-card .overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,0.85) 0%,rgba(0,0,0,0.15) 55%,rgba(0,0,0,0) 100%);display:flex;align-items:flex-end;padding:20px;color:#fff}
+.project-card .overlay h4{font-size:16px;font-weight:700;margin-bottom:2px}
+.project-card .overlay span{font-size:12px;opacity:0.9}
+.project-card.placeholder{background:linear-gradient(135deg,#f5f5f5,#eaeaea);display:flex;align-items:center;justify-content:center;color:#bbb}
+.project-card.placeholder .ico{font-size:32px;opacity:0.4}
+
+/* CONFIGURADOR STRIP */
+.config-strip{background:linear-gradient(135deg,#f97316 0%,#ea6a11 100%);padding:60px 0;color:#fff;text-align:center}
+.config-strip h2{font-size:clamp(24px,3vw,32px);font-weight:700;margin-bottom:14px;letter-spacing:-0.3px}
+.config-strip p{font-size:16px;opacity:0.95;max-width:560px;margin:0 auto 28px}
+.config-strip .btn{display:inline-flex;align-items:center;gap:10px;background:#fff;color:#c2410c;padding:14px 28px;border-radius:6px;font-weight:700;font-size:15px;transition:all 0.15s}
+.config-strip .btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,0.15)}
 
 /* CONTACTO */
-#contacto{background:#fff}
-.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;margin-top:30px}
-@media(max-width:720px){.contact-grid{grid-template-columns:1fr;gap:28px}}
-.contact-info h2{font-size:26px;font-weight:700;line-height:1.25;margin-bottom:24px;letter-spacing:-0.3px;color:#111}
-.contact-list{color:#555;font-size:14px}
-.contact-list div{margin-bottom:14px;display:flex;align-items:center;gap:12px}
-.contact-list .icon{color:#f97316;width:20px;display:inline-block;text-align:center;font-size:16px}
-.contact-list a:hover{color:#f97316}
-.whatsapp-card{background:linear-gradient(135deg,#ffffff,#fff8f3);padding:36px;border-radius:14px;border:1px solid #ffe4d1;text-align:center;box-shadow:0 4px 20px rgba(249,115,22,0.05)}
-.whatsapp-card .wa-icon{width:60px;height:60px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:30px;box-shadow:0 6px 16px rgba(37,211,102,0.3)}
-.whatsapp-card h3{font-size:19px;font-weight:700;margin-bottom:8px;color:#111}
-.whatsapp-card p{color:#666;font-size:14px;margin-bottom:22px}
-.btn-wa{background:#25D366;color:#fff;padding:13px 30px;border-radius:10px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px;transition:all 0.15s;box-shadow:0 4px 12px rgba(37,211,102,0.25)}
-.btn-wa:hover{background:#20b957;transform:translateY(-2px);box-shadow:0 6px 18px rgba(37,211,102,0.35)}
+#contacto{background:#fafafa}
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start}
+@media(max-width:768px){.contact-grid{grid-template-columns:1fr;gap:32px}}
+.contact-block h2{font-size:26px;font-weight:700;margin-bottom:14px;letter-spacing:-0.3px}
+.contact-block p{color:#666;font-size:15px;margin-bottom:28px;line-height:1.6}
+.contact-list{color:#333;font-size:15px}
+.contact-list div{margin-bottom:16px;display:flex;align-items:center;gap:14px}
+.contact-list .icon{color:#f97316;width:22px;font-size:18px;flex-shrink:0}
+.contact-list a{border-bottom:1px solid transparent;transition:border-color 0.15s}
+.contact-list a:hover{border-color:#f97316}
+.wa-box{background:#fff;padding:32px;border-radius:8px;border:1px solid #eaeaea}
+.wa-box .wa-head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.wa-box .wa-icon{width:48px;height:48px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px}
+.wa-box h3{font-size:18px;font-weight:700;color:#111}
+.wa-box p{color:#666;font-size:14px;margin-bottom:20px}
+.wa-btn{display:inline-flex;align-items:center;gap:10px;background:#25D366;color:#fff;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;transition:all 0.15s}
+.wa-btn:hover{background:#20b957;transform:translateY(-1px)}
 
 /* FOOTER */
-footer{padding:30px 0;border-top:1px solid #eee;background:#fafafa;color:#888;font-size:12px}
+footer{padding:30px 0;background:#111;color:#888;font-size:13px}
 .footer-inner{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
-
-.hex-large{width:64px;height:74px;margin:0 auto 16px;display:block}
+footer a{color:#bbb}
+footer a:hover{color:#f97316}
 </style>
 </head>
 <body>
@@ -104,114 +120,217 @@ footer{padding:30px 0;border-top:1px solid #eee;background:#fafafa;color:#888;fo
       <span>Soluciones Integrales</span>
     </div>
     <div class="nav-links">
-      <a href="#servicios">Servicios</a>
+      <a href="#sistemas">Sistemas</a>
       <a href="#proyectos">Proyectos</a>
       <a href="/configurador.html">Configurador</a>
       <a href="#contacto">Contacto</a>
     </div>
+    <a href="/configurador.html" class="nav-cta">Cotizar ahora</a>
   </div>
 </nav>
 
+<!-- HERO -->
 <section class="hero">
   <div class="container">
     <div class="hero-inner">
-      <svg class="hex-large" viewBox="0 0 100 115" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="50,5 95,30 95,85 50,110 5,85 5,30" fill="#f97316"/>
-        <circle cx="50" cy="57" r="7" fill="#fff"/>
-        <circle cx="30" cy="35" r="4.5" fill="#fff"/>
-        <circle cx="70" cy="35" r="4.5" fill="#fff"/>
-        <circle cx="30" cy="80" r="4.5" fill="#fff"/>
-        <circle cx="70" cy="80" r="4.5" fill="#fff"/>
-        <line x1="50" y1="57" x2="30" y2="35" stroke="#fff" stroke-width="1.8"/>
-        <line x1="50" y1="57" x2="70" y2="35" stroke="#fff" stroke-width="1.8"/>
-        <line x1="50" y1="57" x2="30" y2="80" stroke="#fff" stroke-width="1.8"/>
-        <line x1="50" y1="57" x2="70" y2="80" stroke="#fff" stroke-width="1.8"/>
-      </svg>
-      <div class="eyebrow">CONFIGURADOR 3D</div>
-      <h1>Diseña tu rack en minutos</h1>
-      <p>Elige sistema, dimensiones y accesorios. Visualiza en 3D, descarga la cotización en PDF o mándanos tu configuración por WhatsApp.</p>
-      <a href="/configurador.html" class="btn btn-primary">Empezar ahora →</a>
-    </div>
-  </div>
-</section>
-
-<section id="servicios">
-  <div class="container">
-    <div class="section-label">SERVICIOS</div>
-    <h2 class="section-title">Proyectos a la medida</h2>
-    <p class="section-sub">Todo lo que necesitas para tu proyecto de almacenamiento industrial, en un solo lugar.</p>
-    <div class="services">
-      <div class="service">
-        <div class="service-icon">📐</div>
-        <h3>Diseño de layout</h3>
-        <p>Distribución óptima de bahías, pasillos y flujos según las dimensiones y operación de tu bodega.</p>
-      </div>
-      <div class="service">
-        <div class="service-icon">🔧</div>
-        <h3>Cálculo estructural</h3>
-        <p>Selección de perfiles, capacidades por nivel y memorias de cálculo respaldadas por ingeniería.</p>
-      </div>
-      <div class="service">
-        <div class="service-icon">🎯</div>
-        <h3>Modelado 3D + cotización</h3>
-        <p>Configurador interactivo con lista de materiales, PDF y precios en tiempo real.</p>
-      </div>
-      <div class="service">
-        <div class="service-icon">🏗️</div>
-        <h3>Instalación</h3>
-        <p>Cuadrillas propias certificadas para instalar tu sistema listo para operar, en tiempo y forma.</p>
-      </div>
-      <div class="service">
-        <div class="service-icon">📋</div>
-        <h3>Entrega llave en mano</h3>
-        <p>Del layout inicial a la operación, un solo interlocutor para todo el proyecto.</p>
-      </div>
-      <div class="service">
-        <div class="service-icon">🛡️</div>
-        <h3>Accesorios de seguridad</h3>
-        <p>Protectores de puntal, mallas anticaída, topes de tarima y todo el equipamiento complementario.</p>
+      <h1>Sistemas de almacenaje industrial a la medida</h1>
+      <p>Diseñamos, calculamos, fabricamos e instalamos su solución de racks y estantería. Del layout al arranque de operaciones, con más de 20 años de experiencia.</p>
+      <div class="hero-cta-line">
+        <a href="/configurador.html" class="hero-cta">Configurar mi rack 3D →</a>
+        <a href="#sistemas" class="hero-link">Ver sistemas</a>
       </div>
     </div>
   </div>
 </section>
 
-<section id="proyectos" class="proyectos-section">
+<!-- SISTEMAS -->
+<section id="sistemas" class="systems">
   <div class="container">
-    <div class="section-label">PROYECTOS</div>
-    <h2 class="section-title">Instalaciones realizadas</h2>
-    <p class="section-sub">Algunos de los proyectos que hemos entregado en Baja California y el resto de México.</p>
-    <div class="gallery" id="gallery">
-      <div class="project placeholder"><div class="icon">📷</div><div class="label">PROYECTO 1</div></div>
-      <div class="project placeholder"><div class="icon">📷</div><div class="label">PROYECTO 2</div></div>
-      <div class="project placeholder"><div class="icon">📷</div><div class="label">PROYECTO 3</div></div>
-      <div class="project placeholder"><div class="icon">📷</div><div class="label">PROYECTO 4</div></div>
-      <div class="project placeholder"><div class="icon">📷</div><div class="label">PROYECTO 5</div></div>
-      <div class="project placeholder"><div class="icon">📷</div><div class="label">PROYECTO 6</div></div>
+    <div class="section-intro">
+      <h2>Sistemas de almacenaje</h2>
+      <p>Soluciones para cada tipo de operación y mercancía. Todos disponibles bajo pedido y con instalación incluida.</p>
     </div>
-  </div>
-</section>
+    <div class="systems-grid">
 
-<section id="contacto">
-  <div class="container">
-    <div class="section-label">CONTACTO</div>
-    <h2 class="section-title">¿Tienes un proyecto?</h2>
-    <p class="section-sub">Cuéntanos qué necesitas y te acompañamos desde el diseño hasta la instalación.</p>
-    <div class="contact-grid">
-      <div class="contact-info">
-        <div class="contact-list">
-          <div><span class="icon">✉</span> <a href="mailto:montajes@isarack.com">montajes@isarack.com</a></div>
-          <div><span class="icon">📱</span> <a href="tel:+526644211088">+52 664 421 1088</a></div>
-          <div><span class="icon">📍</span> Lib. Salvador Rosas Magallón 202, Tijuana B.C.</div>
-          <div><span class="icon">🕐</span> Lun-Vie 8:00-18:00 · Sáb 8:00-14:00</div>
+      <div class="system-card" onclick="location.href='/configurador.html'">
+        <div class="system-visual" style="background:#fff3ea">
+          <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#f97316" stroke-width="3" fill="none">
+              <rect x="20" y="20" width="4" height="80"/><rect x="176" y="20" width="4" height="80"/>
+              <rect x="98" y="20" width="4" height="80"/>
+              <line x1="20" y1="25" x2="180" y2="25"/><line x1="20" y1="52" x2="180" y2="52"/><line x1="20" y1="79" x2="180" y2="79"/>
+            </g>
+            <rect x="30" y="30" width="60" height="18" fill="#f97316" opacity="0.35"/>
+            <rect x="108" y="30" width="60" height="18" fill="#f97316" opacity="0.35"/>
+            <rect x="30" y="57" width="60" height="18" fill="#f97316" opacity="0.35"/>
+            <rect x="108" y="57" width="60" height="18" fill="#f97316" opacity="0.35"/>
+          </svg>
+        </div>
+        <div class="system-body">
+          <h3>Rack Selectivo</h3>
+          <p>Acceso directo a cada tarima. El sistema más versátil para almacenaje de paletizado.</p>
+          <span class="more">Configurar en 3D →</span>
         </div>
       </div>
-      <div class="whatsapp-card">
-        <div class="wa-icon">💬</div>
-        <h3>Escríbenos por WhatsApp</h3>
-        <p>Respuesta rápida. Cuéntanos tu proyecto y te contactamos en el día.</p>
-        <a href="https://wa.me/5216644211088?text=Hola,%20me%20interesa%20cotizar%20un%20proyecto%20de%20racks" target="_blank" rel="noopener" class="btn-wa">
-          <span>WhatsApp</span> →
-        </a>
+
+      <div class="system-card" onclick="location.href='/configurador.html'">
+        <div class="system-visual" style="background:#fff3ea">
+          <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#f97316" stroke-width="2" fill="none">
+              <rect x="30" y="15" width="140" height="90"/>
+              <line x1="30" y1="35" x2="170" y2="35"/><line x1="30" y1="55" x2="170" y2="55"/><line x1="30" y1="75" x2="170" y2="75"/><line x1="30" y1="95" x2="170" y2="95"/>
+            </g>
+            <rect x="34" y="18" width="30" height="14" fill="#f97316" opacity="0.5"/>
+            <rect x="70" y="18" width="30" height="14" fill="#f97316" opacity="0.35"/>
+            <rect x="106" y="18" width="30" height="14" fill="#f97316" opacity="0.5"/>
+            <rect x="34" y="38" width="45" height="14" fill="#f97316" opacity="0.4"/>
+            <rect x="34" y="58" width="30" height="14" fill="#f97316" opacity="0.5"/>
+            <rect x="70" y="58" width="60" height="14" fill="#f97316" opacity="0.35"/>
+          </svg>
+        </div>
+        <div class="system-body">
+          <h3>Estantería Picking</h3>
+          <p>Para preparación manual de pedidos. Acceso rápido a productos de menor rotación.</p>
+          <span class="more">Configurar en 3D →</span>
+        </div>
+      </div>
+
+      <div class="system-card" onclick="location.href='/configurador.html'">
+        <div class="system-visual" style="background:#fff3ea">
+          <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#f97316" stroke-width="2" fill="none">
+              <path d="M 40 100 L 40 25 L 100 25 L 100 100"/>
+              <path d="M 100 100 L 100 25 L 160 25 L 160 100"/>
+              <line x1="40" y1="45" x2="160" y2="45"/><line x1="40" y1="65" x2="160" y2="65"/><line x1="40" y1="85" x2="160" y2="85"/>
+            </g>
+            <rect x="43" y="47" width="54" height="16" fill="#f97316" opacity="0.4"/>
+            <rect x="103" y="47" width="54" height="16" fill="#f97316" opacity="0.4"/>
+            <rect x="43" y="67" width="54" height="16" fill="#f97316" opacity="0.4"/>
+            <rect x="103" y="67" width="54" height="16" fill="#f97316" opacity="0.4"/>
+          </svg>
+        </div>
+        <div class="system-body">
+          <h3>Góndolas</h3>
+          <p>Estantería para punto de venta y tiendas. Diseño abierto por ambos lados para autoservicio.</p>
+          <span class="more">Configurar en 3D →</span>
+        </div>
+      </div>
+
+      <div class="system-card">
+        <div class="system-visual" style="background:#fff3ea">
+          <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#f97316" stroke-width="2" fill="none">
+              <rect x="20" y="20" width="160" height="80"/>
+              <line x1="60" y1="20" x2="60" y2="100"/><line x1="100" y1="20" x2="100" y2="100"/><line x1="140" y1="20" x2="140" y2="100"/>
+              <line x1="20" y1="45" x2="180" y2="45"/><line x1="20" y1="72" x2="180" y2="72"/>
+            </g>
+            <rect x="24" y="24" width="32" height="18" fill="#f97316" opacity="0.35"/>
+            <rect x="64" y="24" width="32" height="18" fill="#f97316" opacity="0.35"/>
+            <rect x="104" y="24" width="32" height="18" fill="#f97316" opacity="0.35"/>
+            <rect x="144" y="24" width="32" height="18" fill="#f97316" opacity="0.35"/>
+            <path d="M 100 100 L 90 90 L 110 90 Z" fill="#f97316"/>
+          </svg>
+        </div>
+        <div class="system-body">
+          <h3>Drive-In</h3>
+          <p>Almacenaje compacto de alta densidad. Ideal para muchas tarimas por referencia.</p>
+        </div>
+      </div>
+
+      <div class="system-card">
+        <div class="system-visual" style="background:#fff3ea">
+          <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#f97316" stroke-width="2" fill="none">
+              <path d="M 25 30 L 175 45 L 175 90 L 25 75 Z"/>
+              <line x1="25" y1="52" x2="175" y2="67"/>
+              <line x1="25" y1="30" x2="25" y2="105"/>
+              <line x1="175" y1="45" x2="175" y2="105"/>
+            </g>
+            <rect x="35" y="36" width="40" height="12" fill="#f97316" opacity="0.4" transform="skewY(3)"/>
+            <rect x="90" y="41" width="40" height="12" fill="#f97316" opacity="0.5" transform="skewY(3)"/>
+            <circle cx="45" cy="98" r="4" fill="#f97316"/>
+            <circle cx="90" cy="100" r="4" fill="#f97316"/>
+            <circle cx="140" cy="102" r="4" fill="#f97316"/>
+          </svg>
+        </div>
+        <div class="system-body">
+          <h3>Pallet Flow</h3>
+          <p>Sistema por gravedad con rotación PEPS. Máxima agilidad en preparación de pedidos.</p>
+        </div>
+      </div>
+
+      <div class="system-card">
+        <div class="system-visual" style="background:#fff3ea">
+          <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#f97316" stroke-width="3" fill="none">
+              <line x1="100" y1="15" x2="100" y2="105"/>
+              <line x1="50" y1="30" x2="150" y2="30"/>
+              <line x1="45" y1="55" x2="155" y2="55"/>
+              <line x1="40" y1="80" x2="160" y2="80"/>
+            </g>
+            <rect x="55" y="22" width="90" height="6" fill="#f97316" opacity="0.5"/>
+            <rect x="50" y="47" width="100" height="6" fill="#f97316" opacity="0.5"/>
+            <rect x="45" y="72" width="110" height="6" fill="#f97316" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="system-body">
+          <h3>Cantilever</h3>
+          <p>Para tubos, perfiles, madera y cargas largas. Acceso frontal sin obstáculos verticales.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- CONFIGURADOR STRIP -->
+<section class="config-strip">
+  <div class="container">
+    <h2>Diseña tu solución en 3D</h2>
+    <p>Elige sistema, medidas y accesorios. Visualiza en tiempo real y descarga tu cotización en PDF.</p>
+    <a href="/configurador.html" class="btn">Abrir configurador 3D →</a>
+  </div>
+</section>
+
+<!-- PROYECTOS -->
+<section id="proyectos" class="projects">
+  <div class="container">
+    <div class="section-intro">
+      <h2>Proyectos realizados</h2>
+      <p>Algunas instalaciones que hemos entregado en Baja California y el resto de México.</p>
+    </div>
+    <div class="projects-grid">
+      <div class="project-card placeholder"><div class="ico">📷</div></div>
+      <div class="project-card placeholder"><div class="ico">📷</div></div>
+      <div class="project-card placeholder"><div class="ico">📷</div></div>
+      <div class="project-card placeholder"><div class="ico">📷</div></div>
+      <div class="project-card placeholder"><div class="ico">📷</div></div>
+      <div class="project-card placeholder"><div class="ico">📷</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACTO -->
+<section id="contacto">
+  <div class="container">
+    <div class="contact-grid">
+      <div class="contact-block">
+        <h2>Contáctenos</h2>
+        <p>Un asesor analizará sus necesidades y le propondrá la solución más adecuada, sin compromiso.</p>
+        <div class="contact-list">
+          <div><span class="icon">✉</span><a href="mailto:montajes@isarack.com">montajes@isarack.com</a></div>
+          <div><span class="icon">📱</span><a href="tel:+526644211088">+52 664 421 1088</a></div>
+          <div><span class="icon">📍</span>Lib. Salvador Rosas Magallón 202, Tijuana B.C.</div>
+          <div><span class="icon">🕐</span>Lun–Vie 8:00–18:00 · Sáb 8:00–14:00</div>
+        </div>
+      </div>
+      <div class="wa-box">
+        <div class="wa-head">
+          <div class="wa-icon">💬</div>
+          <h3>Escríbenos por WhatsApp</h3>
+        </div>
+        <p>Cuéntenos su proyecto y le contactamos el mismo día. Respuesta rápida.</p>
+        <a href="https://wa.me/5216644211088?text=Hola,%20me%20interesa%20cotizar%20un%20proyecto%20de%20racks" target="_blank" rel="noopener" class="wa-btn">WhatsApp →</a>
       </div>
     </div>
   </div>
