@@ -1575,15 +1575,90 @@ async function sbInsertVenta(body){
 
 async function cargarPrecios(){
   if(preciosCache) return preciosCache;
-  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO)&select=sku,producto,precio,sistema");
+  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO)&select=sku,producto,precio,sistema,cantidad");
   const map = {};
   for(const row of data){
-    const item = { sku:row.sku, producto:row.producto, precio:parseFloat(row.precio), sistema:row.sistema };
+    const item = { sku:row.sku, producto:row.producto, precio:parseFloat(row.precio), sistema:row.sistema, cantidad:parseInt(row.cantidad)||0 };
     map[row.producto] = item;   // góndolas usa nombre como key
     map[row.sku] = item;        // selectivo usa SKU como key
   }
   preciosCache = map;
+  try{ actualizarStockEnDropdowns(); }catch(e){ console.warn(e); }
   return map;
+}
+
+// Devuelve stock físico del SKU, o null si no está cargado
+function stockDe(sku){
+  if(!preciosCache) return null;
+  const item = preciosCache[sku];
+  return item ? item.cantidad : null;
+}
+function _fmtStockLabel(n){
+  if(n===null||n===undefined) return '';
+  if(n<=0) return ' · agotado';
+  if(n>=1000) return ' · '+(Math.floor(n/100)/10)+'k disp.';
+  return ' · '+n+' disp.';
+}
+
+// Repinta cada dropdown clave con la existencia de su SKU asociado
+function actualizarStockEnDropdowns(){
+  if(!preciosCache) return;
+  // 1) Vigas Selectivo (SKU directo en value)
+  const viga = document.getElementById('selViga');
+  if(viga){
+    Array.from(viga.options).forEach(opt=>{
+      if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
+      opt.textContent = opt.dataset.baseLabel + _fmtStockLabel(stockDe(opt.value));
+    });
+  }
+  // 2) Alto Selectivo: el SKU depende de (alto, fondo). Se pinta contra el fondo actual.
+  const alto = document.getElementById('selAlto');
+  const fondo = document.getElementById('selFondo');
+  if(alto && fondo){
+    const fondoActual = parseInt(fondo.value);
+    Array.from(alto.options).forEach(opt=>{
+      if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
+      const altoIn = parseInt(opt.value);
+      const sku = (typeof MARCOS_SEL !== 'undefined' && MARCOS_SEL[altoIn] && MARCOS_SEL[altoIn][fondoActual]) || null;
+      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDe(sku)) : '');
+    });
+    // 3) Fondo Selectivo: mismo tema pero contra el alto actual
+    const altoActual = parseInt(alto.value);
+    Array.from(fondo.options).forEach(opt=>{
+      if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
+      const fondoIn = parseInt(opt.value);
+      const sku = (typeof MARCOS_SEL !== 'undefined' && MARCOS_SEL[altoActual] && MARCOS_SEL[altoActual][fondoIn]) || null;
+      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDe(sku)) : '');
+    });
+  }
+  // 4) Picking - alto/fondo/largo: SKU en MARCOS_PIC[alto][fondo] + VIGAS_PIC[largoCm]
+  const picAlto = document.getElementById('picAlto');
+  const picFondo = document.getElementById('picFondo');
+  const picLargo = document.getElementById('picLargo');
+  if(picAlto && picFondo){
+    const fondoIn = parseInt(picFondo.value);
+    Array.from(picAlto.options).forEach(opt=>{
+      if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
+      const altoIn = parseInt(opt.value);
+      const sku = (typeof MARCOS_PIC !== 'undefined' && MARCOS_PIC[altoIn] && MARCOS_PIC[altoIn][fondoIn]) || null;
+      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDe(sku)) : '');
+    });
+    const altoIn = parseInt(picAlto.value);
+    Array.from(picFondo.options).forEach(opt=>{
+      if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
+      const fIn = parseInt(opt.value);
+      const sku = (typeof MARCOS_PIC !== 'undefined' && MARCOS_PIC[altoIn] && MARCOS_PIC[altoIn][fIn]) || null;
+      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDe(sku)) : '');
+    });
+  }
+  if(picLargo){
+    Array.from(picLargo.options).forEach(opt=>{
+      if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
+      const largoCm = parseInt(opt.value);
+      const sku = (typeof VIGAS_PIC !== 'undefined' && VIGAS_PIC[largoCm]) || null;
+      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDe(sku)) : '');
+    });
+  }
 }
 
 async function cargarTC(){
@@ -2076,6 +2151,11 @@ function addEvents(){
   // Mantener el texto de capacidad del selectivo siempre sincronizado
   document.getElementById('selViga').addEventListener('change', actualizarSelVigaCap);
   actualizarSelVigaCap();
+  // Recalcular stock visible al cambiar alto/fondo (el SKU de marco depende de la combinación)
+  ['selAlto','selFondo','picAlto','picFondo'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', ()=>{ try{ actualizarStockEnDropdowns(); }catch(e){} });
+  });
   // Color del rack
   document.getElementById('colorRack').addEventListener('change', ()=>{
     actualizarColorRack();
