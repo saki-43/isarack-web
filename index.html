@@ -488,29 +488,68 @@ footer a:hover{color:#f97316}
     <video id="videoPlayer" controls playsinline preload="none">
       <source id="videoSource" src="" type="video/mp4">
     </video>
+    <audio id="videoNarration" preload="auto"></audio>
   </div>
 </div>
 
 <script>
+// Mapeo video → audio de narración (en Supabase Storage)
+const SB_AUDIOS_URL = 'https://zjvuugslnfrivlyvzlei.supabase.co/storage/v1/object/public/planos/audios-videos/';
+const NARRACIONES = {
+  'dinamico.mp4':  SB_AUDIOS_URL + 'dinamico.mp3',
+  'pasarela.mp4':  SB_AUDIOS_URL + 'pasarela.mp3',
+  'pasarela3.mp4': SB_AUDIOS_URL + 'pasarela3.mp3'
+};
 function abrirVideoModal(fileName, posterName){
   const m = document.getElementById('videoModal');
   const v = document.getElementById('videoPlayer');
   const s = document.getElementById('videoSource');
+  const a = document.getElementById('videoNarration');
   s.src = '/proyectos/' + (fileName || 'pasarela.mp4');
   v.poster = '/proyectos/' + (posterName || 'pasarela_poster.jpg');
+  // Cargar narración si existe
+  const audioUrl = NARRACIONES[fileName];
+  if(audioUrl){
+    a.src = audioUrl;
+    a.currentTime = 0;
+    v.muted = true;  // silenciar video original
+  } else {
+    a.src = '';
+    v.muted = false;
+  }
   v.load();
   m.classList.add('active');
   document.body.style.overflow = 'hidden';
+  // Sincronizar play/pause/seek entre video y audio
   v.play().catch(()=>{});
+  if(audioUrl) a.play().catch(()=>{});
 }
 function cerrarVideoModal(e){
   if(e && e.target.closest && !e.target.closest('.video-modal') && !e.target.classList.contains('video-modal')) return;
   const m = document.getElementById('videoModal');
   const v = document.getElementById('videoPlayer');
+  const a = document.getElementById('videoNarration');
   m.classList.remove('active');
   document.body.style.overflow = '';
   v.pause();
+  a.pause();
+  a.currentTime = 0;
 }
+// Sincronizar controles del video con el audio
+(function(){
+  const v = document.getElementById('videoPlayer');
+  const a = document.getElementById('videoNarration');
+  v.addEventListener('play',  ()=>{ if(a.src) a.play().catch(()=>{}); });
+  v.addEventListener('pause', ()=>{ if(a.src) a.pause(); });
+  v.addEventListener('seeked',()=>{ if(a.src) a.currentTime = v.currentTime; });
+  v.addEventListener('ended', ()=>{ if(a.src) a.pause(); });
+  // Ajuste fino de sync cada segundo (por si se desincroniza)
+  v.addEventListener('timeupdate', ()=>{
+    if(a.src && !a.paused && Math.abs(a.currentTime - v.currentTime) > 0.5){
+      a.currentTime = v.currentTime;
+    }
+  });
+})();
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarVideoModal(); });
 </script>
 
