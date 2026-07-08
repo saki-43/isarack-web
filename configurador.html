@@ -1456,7 +1456,7 @@ function renderCotizacion(){
 
   let materialUSD = 0;
   let piezasTot = 0;
-  const lineas = bom.map(item=>{
+  let lineas = bom.map(item=>{
     if(!Array.isArray(item)){
       const impUSD = item.precioUSD * item.cantidad;
       materialUSD += impUSD;
@@ -1473,6 +1473,27 @@ function renderCotizacion(){
     const producto = inv ? (inv.producto||key) : key;
     return { sku, producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD };
   });
+
+  // GÓNDOLA: agrupar todo el material en 1 sola línea "Góndola [tipo] [medida]"
+  // Guardamos el desglose para el PDF
+  window._desgloseGondola = null;
+  if(sistemaActual === 'gondola'){
+    const cfgRes = configResumen();
+    const cantModulos = Math.max(1, parseInt(cfgRes.modulos||1) + parseInt(cfgRes.cabeceras||0));
+    const precioUnit = materialUSD / cantModulos;
+    const nombreGondola = 'GÓNDOLA ' + (cfgRes.tipo||'').toUpperCase() + ' · ' + (cfgRes.medida||'') + ' · ' + (cfgRes.niveles||'') + ' NIVELES';
+    // Guardar desglose de piezas para el PDF (sin flete/instalación)
+    window._desgloseGondola = lineas.slice();
+    // Reemplazar todas las líneas con 1 sola línea agrupada
+    lineas = [{
+      sku: '—',
+      producto: nombreGondola,
+      cantidad: cantModulos,
+      precioUSD: precioUnit,
+      importeUSD: materialUSD,
+      _esGondolaAgrupada: true
+    }];
+  }
   // Flete como línea más del listado (no en el total)
   const fleteUSD = requiereEnvio ? calcularFlete(materialUSD).flete : 0;
   if(requiereEnvio){
@@ -1964,13 +1985,32 @@ function generarPDF(datos){
     const producto = inv ? (inv.producto||key) : key;
     return { sku, producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD };
   });
+
+  // GÓNDOLA: colapsar en 1 sola línea y guardar el desglose para imprimirlo debajo
+  let desgloseGondola = null;
+  let lineasParaPDF = lineas;
+  if(sistemaActual === 'gondola'){
+    const cfgRes = configResumen();
+    const cantModulos = Math.max(1, parseInt(cfgRes.modulos||1) + parseInt(cfgRes.cabeceras||0));
+    const precioUnit = materialUSD / cantModulos;
+    const nombreGondola = 'GÓNDOLA ' + (cfgRes.tipo||'').toUpperCase() + ' · ' + (cfgRes.medida||'') + ' · ' + (cfgRes.niveles||'') + ' NIVELES';
+    desgloseGondola = lineas.slice();
+    lineasParaPDF = [{
+      sku: '—',
+      producto: nombreGondola,
+      cantidad: cantModulos,
+      precioUSD: precioUnit,
+      importeUSD: materialUSD
+    }];
+  }
+
   const fleteUSD = requiereEnvio ? calcularFlete(materialUSD).flete : 0;
   if(requiereEnvio){
-    lineas.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
+    lineasParaPDF.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
   }
   const instalacionUSD = requiereInstalacion ? calcularInstalacion(materialUSD) : 0;
   if(requiereInstalacion){
-    lineas.push({ sku:'SRV-INST', producto:'SERVICIO DE INSTALACION', cantidad:1, precioUSD:instalacionUSD, importeUSD:instalacionUSD });
+    lineasParaPDF.push({ sku:'SRV-INST', producto:'SERVICIO DE INSTALACION', cantidad:1, precioUSD:instalacionUSD, importeUSD:instalacionUSD });
   }
   const subtotalUSD = materialUSD + fleteUSD + instalacionUSD;
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
@@ -2052,7 +2092,7 @@ function generarPDF(datos){
   doc.autoTable({
     startY: y,
     head: [['DESCRIPCIÓN','CANTIDAD','PRECIO UNITARIO','IMPUESTOS','IMPORTE']],
-    body: lineas.map(l => [
+    body: lineasParaPDF.map(l => [
       l.producto,
       l.cantidad + ' Unidades',
       fmt(l.precioUSD),
@@ -2072,6 +2112,40 @@ function generarPDF(datos){
       4:{cellWidth:'auto', halign:'right', fontStyle:'bold'}
     }
   });
+
+  // ── DESGLOSE DE MATERIALES (solo para góndola) ──
+  if(desgloseGondola && desgloseGondola.length){
+    const yAfter = doc.lastAutoTable.finalY + 18;
+    doc.setFontSize(9);
+    doc.setTextColor(...ORANGE);
+    doc.text('DESGLOSE DE MATERIALES', M, yAfter);
+    doc.setDrawColor(...ORANGE);
+    doc.setLineWidth(0.5);
+    doc.line(M, yAfter+3, M+120, yAfter+3);
+    doc.autoTable({
+      startY: yAfter + 8,
+      head: [['SKU','MATERIAL','CANT','P.UNIT.','IMPORTE']],
+      body: desgloseGondola.map(l => [
+        l.sku || '—',
+        l.producto,
+        String(l.cantidad),
+        fmt(l.precioUSD),
+        fmt(l.importeUSD)
+      ]),
+      margin:{left:M, right:M},
+      theme:'plain',
+      styles:{ fontSize:7.5, cellPadding:{top:2.5,right:5,bottom:2.5,left:5}, textColor:GREY },
+      headStyles:{ textColor:GREY, fontStyle:'bold', fontSize:7.5, cellPadding:{top:3,right:5,bottom:3,left:5}, lineWidth:{bottom:0.4}, lineColor:[230,232,235] },
+      bodyStyles:{ lineWidth:{bottom:0.3}, lineColor:[245,246,248] },
+      columnStyles:{
+        0:{cellWidth:55, textColor:ORANGE, fontStyle:'bold'},
+        1:{cellWidth:'auto'},
+        2:{cellWidth:35, halign:'right'},
+        3:{cellWidth:75, halign:'right'},
+        4:{cellWidth:75, halign:'right', textColor:DARK}
+      }
+    });
+  }
 
   let fy = doc.lastAutoTable.finalY + 16;
 
@@ -2157,7 +2231,7 @@ function generarPDF(datos){
 
   // Preparar payload de venta
   const sistemaLabel = sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking' : 'Góndola');
-  const lineasVenta = lineas.map(l => ({
+  const lineasVenta = lineasParaPDF.map(l => ({
     producto: l.producto,
     cantidad: l.cantidad,
     precio: parseFloat((l.precioUSD * tc).toFixed(4)),
