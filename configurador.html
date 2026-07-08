@@ -2434,6 +2434,25 @@ function addEvents(){
   });
   document.getElementById('selUnion').addEventListener('change', build);
   actualizarSelUnion();
+
+  // Los tipos de CARGA por nivel son mutuamente exclusivos: solo se puede elegir uno
+  // (rejilla / triplay o madera / panel beige)
+  function grupoExclusivo(ids){
+    ids.forEach(id=>{
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.addEventListener('change', function(){
+        if(this.checked){
+          ids.filter(x=>x!==id).forEach(other=>{
+            const e = document.getElementById(other);
+            if(e) e.checked = false;
+          });
+        }
+      });
+    });
+  }
+  grupoExclusivo(['selChkRej','selChkTri']);      // Selectivo: rejilla ↔ triplay
+  grupoExclusivo(['picChkRej','picChkPanel']);    // Picking:   rejilla ↔ panel beige
   // Tabs: cambiar de sistema
   document.querySelectorAll('#tabs .tab').forEach(tab=>{
     tab.addEventListener('click', ()=>{
