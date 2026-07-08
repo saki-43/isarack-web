@@ -1707,27 +1707,32 @@ function comprometidoDe(item){
 }
 
 // Cuántos marcos se pueden FABRICAR con los componentes en stock (descontando comprometidos)
-function marcosFabricables(altoIn, color){
+// Toma en cuenta el color Y la medida del fondo (para que las diagonales que se usen sean del fondo correcto)
+function marcosFabricables(altoIn, fondoIn, color){
   if(!inventarioArr) return 0;
   const bom = MARCO_BOM[String(altoIn)];
   if(!bom) return 0;
   const colorUp = (color||'VERDE').toUpperCase();
+  const fondoStr = String(fondoIn||42);
 
-  // Cantidad disponible real de una pieza = físico - comprometido
   const dispReal = (item)=>Math.max(0, Number(item.cantidad||0) - comprometidoDe(item));
 
+  // Postes del tamaño y color
   const postes = inventarioArr.filter(p=>{
     const u = (p.producto||'').toUpperCase();
     return u.includes('POSTE') && u.includes(bom.posteSize+'"') && u.includes(colorUp);
   }).reduce((s,p)=>s+dispReal(p),0);
 
-  const buscarDiag = (tipo)=>inventarioArr.filter(p=>{
+  // Diagonales D y H — el nombre real es "D DIAGONAL" y "H DIAGONAL" (letra primero)
+  // Además filtramos por medida del fondo (36, 42, 48)
+  const buscarDiag = (letra)=>inventarioArr.filter(p=>{
     const u = (p.producto||'').toUpperCase();
-    return u.includes('DIAGONAL '+tipo) && u.includes(colorUp);
+    return u.includes(letra + ' DIAGONAL') && u.includes(fondoStr+'"') && u.includes(colorUp);
   }).reduce((s,p)=>s+dispReal(p),0);
   const diagD = buscarDiag('D');
   const diagH = buscarDiag('H');
 
+  // Pies del color
   const pies = inventarioArr.filter(p=>{
     const u = (p.producto||'').toUpperCase();
     return (u.includes('PIE BASE') || u.includes('PIE ')) && u.includes(colorUp);
@@ -1741,11 +1746,10 @@ function marcosFabricables(altoIn, color){
   return Math.max(0, Math.min(maxPostes, maxDiagD, maxDiagH, maxPies));
 }
 
-// Total disponible marcos = armados (físico - comprometido) + fabricables
-function disponibleMarco(sku, altoIn, color){
+function disponibleMarco(sku, altoIn, fondoIn, color){
   const item = preciosCache ? preciosCache[sku] : null;
   const armadosDisp = item ? Math.max(0, Number(item.cantidad||0) - comprometidoDe(item)) : 0;
-  const fabricables = marcosFabricables(altoIn, color);
+  const fabricables = marcosFabricables(altoIn, fondoIn, color);
   return armadosDisp + fabricables;
 }
 
@@ -1790,7 +1794,7 @@ function actualizarStockEnDropdowns(){
       if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
       const altoIn = parseInt(opt.value);
       const sku = (typeof MARCOS_SEL !== 'undefined' && MARCOS_SEL[altoIn] && MARCOS_SEL[altoIn][fondoActual]) || null;
-      const total = disponibleMarco(sku, altoIn, colorSel);
+      const total = disponibleMarco(sku, altoIn, fondoActual, colorSel);
       opt.textContent = opt.dataset.baseLabel + _fmtStockLabel(total);
     });
     // 3) Fondo Selectivo: mismo tema pero contra el alto actual
@@ -1799,7 +1803,7 @@ function actualizarStockEnDropdowns(){
       if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
       const fondoIn = parseInt(opt.value);
       const sku = (typeof MARCOS_SEL !== 'undefined' && MARCOS_SEL[altoActual] && MARCOS_SEL[altoActual][fondoIn]) || null;
-      const total = disponibleMarco(sku, altoActual, colorSel);
+      const total = disponibleMarco(sku, altoActual, fondoIn, colorSel);
       opt.textContent = opt.dataset.baseLabel + _fmtStockLabel(total);
     });
   }
