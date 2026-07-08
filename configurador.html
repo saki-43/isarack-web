@@ -2034,16 +2034,17 @@ function generarPDF(datos){
 
   // Nombre limpio para el archivo
   const clienteSafe = (datos.cliente||'cliente').replace(/[^a-z0-9]/gi,'_').substring(0,40);
-  const pdfFileName = folio + '_' + clienteSafe + '.pdf';
-  const storagePath = 'cotizaciones-web/' + pdfFileName;
+  const pdfFileName = 'Cotizacion_' + folio + '_' + clienteSafe + '.pdf';
+  const storagePath = 'cotizaciones-web/' + folio + '_' + clienteSafe + '.pdf';
 
-  // Convertir el PDF a Blob para subirlo y también permitir descarga en móvil
+  // Convertir el PDF a Blob/File para compartir o descargar
   const pdfBlob = doc.output('blob');
+  let pdfFile = null;
+  try{ pdfFile = new File([pdfBlob], pdfFileName, {type:'application/pdf'}); }catch(e){}
 
-  // Deshabilitar el botón y mostrar estado mientras sube
   const btnSubmit = document.querySelector('#modalCliente button.primary, #modalCliente button.btn-primary');
   const submitTxt = btnSubmit ? btnSubmit.textContent : '';
-  if(btnSubmit){ btnSubmit.disabled = true; btnSubmit.textContent = 'Subiendo…'; }
+  if(btnSubmit){ btnSubmit.disabled = true; btnSubmit.textContent = 'Procesando…'; }
 
   // Guardar cotización en Supabase (tabla ventas)
   const sistemaLabel = sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking' : 'Góndola');
@@ -2056,7 +2057,6 @@ function generarPDF(datos){
     desc: ''
   }));
 
-  // Función que hace TODO el flujo: subir PDF, insertar venta, abrir PDF al cliente, notificar por WA
   (async ()=>{
     let pdfUrl = null;
 
@@ -2103,43 +2103,56 @@ function generarPDF(datos){
       });
     }catch(e){ console.error('sbInsertVenta:', e); }
 
-    // 3) Notificar a Soluciones Integrales por WhatsApp — con link al PDF
-    try{
-      const wa = [];
-      wa.push('*Nueva cotización* — Soluciones Integrales');
-      wa.push('Folio: *' + folio + '*');
-      wa.push('Fecha: ' + dFmt(fechaHoy));
-      wa.push('');
-      wa.push('*Cliente:* ' + datos.cliente);
-      if(datos.tel)      wa.push('Tel: ' + datos.tel);
-      if(datos.email)    wa.push('Email: ' + datos.email);
-      wa.push('');
-      wa.push('*' + sistemaLabel + '* · ' + configResumen().txt);
-      wa.push('*TOTAL: ' + fmt(totalUSD) + ' ' + monedaSel + '*');
-      if(pdfUrl){
-        wa.push('');
-        wa.push('📄 *Ver PDF de la cotización:*');
-        wa.push(pdfUrl);
-      }
-      const url = 'https://wa.me/5216644211088?text=' + encodeURIComponent(wa.join('\n'));
-      window.open(url, '_blank');
-    }catch(e){ console.error('WA notify:', e); }
+    // 3) Preparar texto para WhatsApp
+    const wa = [];
+    wa.push('*Nueva cotización* — Soluciones Integrales');
+    wa.push('Folio: *' + folio + '*');
+    wa.push('Fecha: ' + dFmt(fechaHoy));
+    wa.push('');
+    wa.push('*Cliente:* ' + datos.cliente);
+    if(datos.tel)   wa.push('Tel: ' + datos.tel);
+    if(datos.email) wa.push('Email: ' + datos.email);
+    wa.push('');
+    wa.push('*' + sistemaLabel + '* · ' + configResumen().txt);
+    wa.push('*TOTAL: ' + fmt(totalUSD) + ' ' + monedaSel + '*');
+    const waText = wa.join('\n');
+    const waTextConLink = pdfUrl ? (waText + '\n\n📄 PDF: ' + pdfUrl) : waText;
 
-    // 4) Entregar el PDF al cliente — funciona en móvil e iPhone
-    try{
-      if(pdfUrl){
-        // Mejor experiencia: abrir la URL pública en nueva pestaña
-        // Móvil muestra el PDF inline y permite compartir/guardar
-        window.open(pdfUrl, '_blank');
-      } else {
-        // Fallback si Storage falló: descarga local con Blob URL
+    // 4) Entregar cotización
+    const puedeCompartirArchivo = !!(pdfFile && navigator.canShare && navigator.canShare({files:[pdfFile]}));
+    const esMovil = /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+
+    let entregado = false;
+
+    // A) MÓVIL con soporte de share con archivos → adjunta PDF real (WhatsApp lo recibe como archivo)
+    if(puedeCompartirArchivo && esMovil){
+      try{
+        await navigator.share({
+          files: [pdfFile],
+          title: 'Cotización ' + folio,
+          text: waText + '\n\nEnviar a: wa.me/5216644211088'
+        });
+        entregado = true;
+      }catch(e){
+        // Usuario canceló o falló: caemos al método B
+        console.log('share cancelled/failed:', e.message);
+      }
+    }
+
+    // B) Fallback: descargar PDF localmente + abrir WhatsApp con link al PDF
+    if(!entregado){
+      try{
+        // Descarga PDF local
         const blobUrl = URL.createObjectURL(pdfBlob);
         const a = document.createElement('a');
-        a.href = blobUrl; a.download = pdfFileName; a.target = '_blank';
+        a.href = blobUrl; a.download = pdfFileName;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(()=>URL.revokeObjectURL(blobUrl), 5000);
-      }
-    }catch(e){ console.error('Deliver PDF:', e); }
+        // Abrir WhatsApp con texto + link al PDF en la nube
+        const waUrl = 'https://wa.me/5216644211088?text=' + encodeURIComponent(waTextConLink);
+        window.open(waUrl, '_blank');
+      }catch(e){ console.error('Fallback deliver:', e); }
+    }
 
     if(btnSubmit){ btnSubmit.disabled = false; btnSubmit.textContent = submitTxt; }
     cerrarModal();
