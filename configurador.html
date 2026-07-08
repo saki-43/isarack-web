@@ -418,6 +418,16 @@ const REJILLAS_POR_VIGA_SEL = { 96:2, 108:2, 144:3 };
 const SOPORTE_TRIPLAY_SEL = 'SEL-0322';
 const TRIPLAY_SEL = 'SEL-0338';
 const TRIPLAY_POR_VIGA_SEL = { 96:1, 108:1, 144:2 };
+// Panel Beige Selectivo por fondo (in): pieza de fondoIn × 8"; cubre 8" de alto de viga
+const PANEL_BEIGE_SEL = { 18:'SEL-0433', 24:'SEL-0432', 36:'SEL-0440', 42:'SEL-0442', 48:'SEL-0441' };
+// TAM (Madera Picking) por largo(cm) × fondo(in)
+const TAM_PIC = {
+  120:{18:'PIC-0065',24:'PIC-0066',36:'PIC-0067'},
+  150:{18:'PIC-0068',24:'PIC-0069',36:'PIC-0070'},
+  180:{18:'PIC-0071',24:'PIC-0072',36:'PIC-0073'},
+  200:{18:'PIC-0074',24:'PIC-0075',36:'PIC-0076'},
+  230:{18:'PIC-0077',24:'PIC-0078',36:'PIC-0079'}
+};
 
 // Sistema activo
 let sistemaActual = 'gondola';
@@ -1452,9 +1462,9 @@ function calcularBomPicking(){
     const skuPanel = PANELES_BEIGE_PIC[cfg.fondoIn];
     add(skuPanel, cfg.niveles * cfg.cuerpos);
   } else if(cfg.madera){
-    // Triplay + soportes (mismos SKUs que selectivo, aprox 1 triplay + 3 soportes por nivel-cuerpo)
-    add(TRIPLAY_SEL, cfg.niveles * cfg.cuerpos);
-    add(SOPORTE_TRIPLAY_SEL, 3 * cfg.niveles * cfg.cuerpos);
+    // TAM (madera picking) — 1 pieza por nivel-cuerpo, SKU depende de largoCm × fondoIn
+    const skuTam = TAM_PIC[cfg.largoCm] && TAM_PIC[cfg.largoCm][cfg.fondoIn];
+    if(skuTam) add(skuTam, cfg.niveles * cfg.cuerpos);
   }
   return orden.map(sku => [sku, items[sku]]);
 }
@@ -1477,9 +1487,13 @@ function calcularBomSelectivo(){
     add(REJILLAS_SEL[cfg.fondoIn], REJILLAS_POR_VIGA_SEL[cfg.vigaIn] * cfg.niveles * cfg.cuerpos * F);
   }
   if(cfg.panel){
-    // Panel beige por fondo (mismo SKU que picking, aprox 1 panel por nivel-cuerpo-fila)
-    const skuPanelSel = PANELES_BEIGE_PIC[cfg.fondoIn];
-    if(skuPanelSel) add(skuPanelSel, cfg.niveles * cfg.cuerpos * F);
+    // Panel Beige por fondo (in): cada pieza es fondoIn × 8", cubre 8" de alto de viga
+    // Cantidad = ceil(vigaIn / 8) por nivel-cuerpo-fila
+    const skuPanelSel = PANEL_BEIGE_SEL[cfg.fondoIn];
+    if(skuPanelSel){
+      const piezasPorNivel = Math.ceil(cfg.vigaIn / 8);
+      add(skuPanelSel, piezasPorNivel * cfg.niveles * cfg.cuerpos * F);
+    }
   }
   if(cfg.botas) add(BOTA_SEL, 2 * nMarcosTotal);
   // Uniones para rack doble (3 por par de marcos)
