@@ -1719,11 +1719,14 @@ let compByProd = {};
 async function cargarComprometido(){
   try{
     // Traer pedidos activos con inventario descontado
-    const url = "orders?select=cotData,estatus,entregado,inventarioDescontado&inventarioDescontado=eq.true&estatus=not.in.(Cancelado,Completado,cancelado,completado)&entregado=neq.si";
+    // Las propiedades inventarioDescontado, entregado y cotData estan DENTRO de payload (jsonb)
+    const url = "orders?select=payload,estatus&payload->>inventarioDescontado=eq.true&estatus=not.in.(Cancelado,Completado,cancelado,completado)";
     const rows = await sbFetch(url);
     const bySku = {}, byProd = {};
     for(const o of rows){
-      const lineas = (o.cotData && Array.isArray(o.cotData.lineas)) ? o.cotData.lineas : [];
+      const p = o.payload || {};
+      if((''+(p.entregado||'')).toLowerCase() === 'si') continue;
+      const lineas = (p.cotData && Array.isArray(p.cotData.lineas)) ? p.cotData.lineas : [];
       for(const l of lineas){
         if(!l || l.tipo) continue;
         const cnt = Number(l.cantidad||0);
@@ -1734,7 +1737,7 @@ async function cargarComprometido(){
     }
     compBySku = bySku;
     compByProd = byProd;
-    console.log('Comprometido cargado:', Object.keys(bySku).length, 'SKUs');
+    console.log('Comprometido cargado:', Object.keys(bySku).length, 'SKUs,', rows.length, 'pedidos');
     actualizarStockEnDropdowns();
   }catch(e){ console.error('cargarComprometido:', e); }
 }
