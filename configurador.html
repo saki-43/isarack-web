@@ -2032,9 +2032,20 @@ function generarPDF(datos){
     doc.text('⚠ Productos sin precio en sistema: '+faltantes.join(', '), M, fy);
   }
 
-  doc.save(folio + '_' + (datos.cliente||'cliente').replace(/[^a-z0-9]/gi,'_') + '.pdf');
+  // Nombre limpio para el archivo
+  const clienteSafe = (datos.cliente||'cliente').replace(/[^a-z0-9]/gi,'_').substring(0,40);
+  const pdfFileName = folio + '_' + clienteSafe + '.pdf';
+  const storagePath = 'cotizaciones-web/' + pdfFileName;
 
-  // Guardar cotización en Supabase (tabla ventas) - marcada como Web
+  // Convertir el PDF a Blob para subirlo y también permitir descarga en móvil
+  const pdfBlob = doc.output('blob');
+
+  // Deshabilitar el botón y mostrar estado mientras sube
+  const btnSubmit = document.querySelector('#modalCliente button.primary, #modalCliente button.btn-primary');
+  const submitTxt = btnSubmit ? btnSubmit.textContent : '';
+  if(btnSubmit){ btnSubmit.disabled = true; btnSubmit.textContent = 'Subiendo…'; }
+
+  // Guardar cotización en Supabase (tabla ventas)
   const sistemaLabel = sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking' : 'Góndola');
   const lineasVenta = lineas.map(l => ({
     producto: l.producto,
@@ -2044,61 +2055,95 @@ function generarPDF(datos){
     descuento: 0,
     desc: ''
   }));
-  sbInsertVenta({
-    num: folio,
-    fecha: fechaHoy.toISOString().slice(0,10),
-    cliente: datos.cliente,
-    razon: datos.razon || null,
-    rfc: datos.rfc || null,
-    email: datos.email || null,
-    tel: datos.tel || null,
-    cel: datos.tel || null,
-    dir: datos.dir || null,
-    contacto: datos.contacto || null,
-    comercial: 'Web',
-    tipo: 'Cotización',
-    stage: 'Presupuesto',
-    estatus: 'Web',
-    moneda: monedaSel,
-    plantilla: sistemaLabel + ' · ' + configResumen().txt,
-    lineas: lineasVenta,
-    total: parseFloat((totalUSD * tc).toFixed(2))
-  }).then(ok => { if(!ok) console.warn('No se pudo guardar en ventas'); });
 
-  // Aviso a Soluciones Integrales por WhatsApp con resumen completo
-  try{
-    const wa = [];
-    wa.push('*Nueva solicitud de cotización* — Soluciones Integrales');
-    wa.push('Folio: *' + folio + '*');
-    wa.push('Fecha: ' + dFmt(fechaHoy));
-    wa.push('');
-    wa.push('*Cliente*');
-    wa.push('· ' + datos.cliente);
-    if(datos.razon)    wa.push('· Razón social: ' + datos.razon);
-    if(datos.rfc)      wa.push('· RFC: ' + datos.rfc);
-    if(datos.contacto) wa.push('· Contacto: ' + datos.contacto);
-    if(datos.tel)      wa.push('· Tel: ' + datos.tel);
-    if(datos.email)    wa.push('· Email: ' + datos.email);
-    if(datos.dir)      wa.push('· Dirección: ' + datos.dir);
-    wa.push('');
-    wa.push('*Configuración*');
-    wa.push('· ' + configResumen().txt);
-    wa.push('');
-    wa.push('*Materiales*');
-    lineas.forEach(l=>{
-      wa.push('· ' + l.cantidad + '× ' + (l.sku||'—') + ' ' + l.producto + '  →  ' + fmt(l.importeUSD));
-    });
-    wa.push('');
-    wa.push('Subtotal: ' + fmt(subtotalUSD));
-    wa.push('IVA ' + IVA_FIJO + '%: ' + fmt(ivaUSD));
-    wa.push('*TOTAL: ' + fmt(totalUSD) + ' ' + monedaSel + '*');
-    wa.push('');
-    wa.push('_PDF descargado por el cliente. Favor de solicitarlo para adjuntarlo al seguimiento._');
-    const url = 'https://wa.me/5216644211088?text=' + encodeURIComponent(wa.join('\n'));
-    window.open(url, '_blank');
-  }catch(e){ console.error('WA notify:', e); }
+  // Función que hace TODO el flujo: subir PDF, insertar venta, abrir PDF al cliente, notificar por WA
+  (async ()=>{
+    let pdfUrl = null;
 
-  cerrarModal();
+    // 1) Subir PDF a Supabase Storage (bucket "planos", carpeta "cotizaciones-web")
+    try{
+      const upResp = await fetch(SB_URL + '/storage/v1/object/planos/' + storagePath, {
+        method: 'POST',
+        headers: {
+          apikey: SB_KEY,
+          Authorization: 'Bearer ' + SB_KEY,
+          'Content-Type': 'application/pdf',
+          'x-upsert': 'true'
+        },
+        body: pdfBlob
+      });
+      if(upResp.ok){
+        pdfUrl = SB_URL + '/storage/v1/object/public/planos/' + storagePath;
+      } else {
+        console.warn('Storage upload failed:', upResp.status, await upResp.text());
+      }
+    }catch(e){ console.error('Upload PDF:', e); }
+
+    // 2) Insertar la venta en la tabla ventas
+    try{
+      await sbInsertVenta({
+        num: folio,
+        fecha: fechaHoy.toISOString().slice(0,10),
+        cliente: datos.cliente,
+        razon: datos.razon || null,
+        rfc: datos.rfc || null,
+        email: datos.email || null,
+        tel: datos.tel || null,
+        cel: datos.tel || null,
+        dir: datos.dir || null,
+        contacto: datos.contacto || null,
+        comercial: 'Web',
+        tipo: 'Cotización',
+        stage: 'Presupuesto',
+        estatus: 'Web',
+        moneda: monedaSel,
+        plantilla: sistemaLabel + ' · ' + configResumen().txt,
+        lineas: lineasVenta,
+        total: parseFloat((totalUSD * tc).toFixed(2))
+      });
+    }catch(e){ console.error('sbInsertVenta:', e); }
+
+    // 3) Notificar a Soluciones Integrales por WhatsApp — con link al PDF
+    try{
+      const wa = [];
+      wa.push('*Nueva cotización* — Soluciones Integrales');
+      wa.push('Folio: *' + folio + '*');
+      wa.push('Fecha: ' + dFmt(fechaHoy));
+      wa.push('');
+      wa.push('*Cliente:* ' + datos.cliente);
+      if(datos.tel)      wa.push('Tel: ' + datos.tel);
+      if(datos.email)    wa.push('Email: ' + datos.email);
+      wa.push('');
+      wa.push('*' + sistemaLabel + '* · ' + configResumen().txt);
+      wa.push('*TOTAL: ' + fmt(totalUSD) + ' ' + monedaSel + '*');
+      if(pdfUrl){
+        wa.push('');
+        wa.push('📄 *Ver PDF de la cotización:*');
+        wa.push(pdfUrl);
+      }
+      const url = 'https://wa.me/5216644211088?text=' + encodeURIComponent(wa.join('\n'));
+      window.open(url, '_blank');
+    }catch(e){ console.error('WA notify:', e); }
+
+    // 4) Entregar el PDF al cliente — funciona en móvil e iPhone
+    try{
+      if(pdfUrl){
+        // Mejor experiencia: abrir la URL pública en nueva pestaña
+        // Móvil muestra el PDF inline y permite compartir/guardar
+        window.open(pdfUrl, '_blank');
+      } else {
+        // Fallback si Storage falló: descarga local con Blob URL
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = blobUrl; a.download = pdfFileName; a.target = '_blank';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(blobUrl), 5000);
+      }
+    }catch(e){ console.error('Deliver PDF:', e); }
+
+    if(btnSubmit){ btnSubmit.disabled = false; btnSubmit.textContent = submitTxt; }
+    cerrarModal();
+  })();
 }
 
 // ───────── Eventos ─────────
