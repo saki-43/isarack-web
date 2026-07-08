@@ -348,6 +348,17 @@ footer a:hover{color:#f97316}
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
+          <img src="/proyectos/aplic.jpg" alt="Rack APLIC ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <div class="system-body">
+          <h3>Rack APLIC</h3>
+          <p>Estantería con entrepaños inclinados hacia el frente. Ideal para refacciones pequeñas, autopartes y cajas de acceso rápido.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('aplic')">ℹ Ver detalles</button>
+        </div>
+      </div>
+
+      <div class="system-card">
+        <div class="system-visual" style="padding:0">
           <img src="/proyectos/dinamico_poster.jpg" alt="Rack dinámico ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
           <div class="video-badge">▶ VIDEO</div>
         </div>
@@ -624,6 +635,20 @@ const SISTEMAS = {
     ],
     apps: ['Preparación de pedidos e-commerce', 'Líneas de ensamble industrial', 'Farmacias y almacenes hospitalarios', 'Distribución de consumo masivo'],
     ventajas: ['Reduce tiempos de picking', 'Rotación PEPS automática', 'Separación clara entre reposición y despacho', 'Ergonomía para el operador']
+  },
+  aplic: {
+    titulo: 'Rack APLIC',
+    img: '/proyectos/aplic.jpg',
+    lead: 'Estantería ligera con entrepaños inclinados hacia el frente. Diseñada para acceso rápido a refacciones, autopartes y cajas pequeñas. Sistema modular armable sin tornillos.',
+    specs: [
+      ['Altura estándar', '9 ft (2.74 m)'],
+      ['Ancho por cuerpo', '4 ft (1.22 m)'],
+      ['Fondo', '45"'],
+      ['Entrepaños', 'Inclinados hacia el frente'],
+      ['Armado', 'Sin tornillos, tipo click-in']
+    ],
+    apps: ['Almacenes de refacciones automotrices', 'Ferreterías y tiendas de autopartes', 'Talleres y áreas de mantenimiento', 'Almacenes de tornillería y consumibles'],
+    ventajas: ['Acceso rápido y visual al producto', 'Rotación PEPS por gravedad de las cajas', 'Ligero y económico', 'Modular: fácil de expandir o reconfigurar', 'No requiere tornillos para armado']
   },
   dinamico: {
     titulo: 'Rack dinámico',
