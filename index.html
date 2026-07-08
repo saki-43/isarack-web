@@ -274,7 +274,7 @@ footer a:hover{color:#f97316}
           <h3>Rack Selectivo</h3>
           <p>Acceso directo a cada tarima. El sistema más versátil para almacenaje de paletizado.</p>
           <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('selectivo')">ℹ Ver detalles</button>
-          <span class="more">Configurar en 3D →</span>
+          <span class="more">Cotizar en 3D →</span>
         </div>
       </div>
 
@@ -286,7 +286,7 @@ footer a:hover{color:#f97316}
           <h3>Estantería Picking</h3>
           <p>Para preparación manual de pedidos. Acceso rápido a productos de menor rotación.</p>
           <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('picking')">ℹ Ver detalles</button>
-          <span class="more">Configurar en 3D →</span>
+          <span class="more">Cotizar en 3D →</span>
         </div>
       </div>
 
@@ -298,7 +298,7 @@ footer a:hover{color:#f97316}
           <h3>Góndolas</h3>
           <p>Estantería para punto de venta y tiendas. Diseño abierto por ambos lados para autoservicio.</p>
           <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('gondolas')">ℹ Ver detalles</button>
-          <span class="more">Configurar en 3D →</span>
+          <span class="more">Cotizar en 3D →</span>
         </div>
       </div>
 
@@ -508,7 +508,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarVideoModal(
       <h4>VENTAJAS</h4>
       <ul id="sysVentajas"></ul>
       <div class="sys-modal-actions">
-        <a id="sysCTA" href="/configurador.html" class="btn-primary">Configurar en 3D →</a>
+        <a id="sysCTA" href="/configurador.html" class="btn-primary">Cotizar en 3D →</a>
         <a href="https://wa.me/5216644211088?text=Hola,%20quisiera%20m%C3%A1s%20informaci%C3%B3n" target="_blank" rel="noopener" class="btn-secondary">💬 Cotizar por WhatsApp</a>
       </div>
     </div>
@@ -677,7 +677,7 @@ function abrirSysModal(key){
   document.getElementById('sysApps').innerHTML = s.apps.map(a=>`<li>${a}</li>`).join('');
   document.getElementById('sysVentajas').innerHTML = s.ventajas.map(v=>`<li>${v}</li>`).join('');
   const cta = document.getElementById('sysCTA');
-  if(s.cta){ cta.href = s.cta; cta.style.display = ''; cta.textContent = 'Configurar en 3D →'; }
+  if(s.cta){ cta.href = s.cta; cta.style.display = ''; cta.textContent = 'Cotizar en 3D →'; }
   else{ cta.style.display = 'none'; }
   document.getElementById('sysModal').classList.add('active');
   document.body.style.overflow = 'hidden';
