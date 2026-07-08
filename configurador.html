@@ -811,12 +811,11 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
   for(let k=0; k<nMarcos; k++) marco(x0 + k * largoM);
   // Posición Y de cada nivel: manual (si está activo) o uniforme
   const alturasManPic = getAlturasManualesM('picking');
-  const yIniN = 0.30, yTopN = altoM - 0.15;
-  const paso = niveles > 1 ? (yTopN - yIniN) / (niveles - 1) : 0;
+  const alturasDefPic = alturasDefaultM(altoM, niveles);
   for(let c=0; c<cuerpos; c++){
     const cx = x0 + c * largoM + largoM/2;
     for(let n=0; n<niveles; n++){
-      const y = alturasManPic ? Math.min(alturasManPic[n], altoM - 0.10) : (yIniN + paso * n);
+      const y = alturasManPic ? Math.min(alturasManPic[n], altoM - 0.10) : Math.min(alturasDefPic[n], altoM - 0.10);
       const usaPanel = tienePanel && !tieneRejilla;
       const usaRej   = tieneRejilla;
       if(usaRej || usaPanel){
@@ -944,13 +943,12 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
   for(let k=0; k<nMarcos; k++) marco(x0 + k * vigaM);
   // Posición Y de cada nivel: manual (si está activo) o uniforme
   const alturasManSel = getAlturasManualesM('selectivo');
-  const yViga0 = 0.40, yVigaTop = altoM - 0.20;
-  const pasoNiv = niveles > 1 ? (yVigaTop - yViga0) / (niveles - 1) : 0;
+  const alturasDefSel = alturasDefaultM(altoM, niveles);
   for(let c=0; c<cuerpos; c++){
     const xL = x0 + c * vigaM, xR = xL + vigaM;
     const cxV = (xL + xR) / 2;
     for(let n=0; n<niveles; n++){
-      const y = alturasManSel ? Math.min(alturasManSel[n], altoM - 0.10) : (yViga0 + pasoNiv * n);
+      const y = alturasManSel ? Math.min(alturasManSel[n], altoM - 0.10) : Math.min(alturasDefSel[n], altoM - 0.10);
       const vF = box(vigaM - postW, vigaH, vigaD, matVigaSel);
       vF.position.set(cxV, y, fondoM/2 - postD/2); parent.add(vF);
       const vB = box(vigaM - postW, vigaH, vigaD, matVigaSel);
@@ -1011,6 +1009,16 @@ function buildGondola(){
 const FT_TO_M = 0.3048;
 const M_TO_FT = 1 / FT_TO_M;
 const M_TO_IN = 1 / IN_TO_M;   // 39.3701
+
+// Distribución default de vigas: espaciado uniforme = 85% del alto útil / niveles
+// Devuelve array de posiciones Y (en metros) desde el piso, acumulativas
+function alturasDefaultM(altoM, niveles){
+  const espacioIn = Math.round(((altoM * 0.85) / niveles) * M_TO_IN / 2) * 2;
+  const espacioM = espacioIn * IN_TO_M;
+  const ys = [];
+  for(let i=0; i<niveles; i++) ys.push(espacioM * (i+1));
+  return ys;
+}
 
 // Genera (o re-genera) los inputs de altura por nivel para un sistema dado
 function actualizarInputsAlturasNivel(sistema){
@@ -1223,9 +1231,8 @@ function buildPicking(){
   if(alturasManPicC){
     for(const y of alturasManPicC) alturasYPic.push(Math.min(y, cfg.altoM - 0.10));
   } else {
-    const yIniP = 0.30, yTopP = cfg.altoM - 0.15;
-    const pasoP = cfg.niveles > 1 ? (yTopP - yIniP) / (cfg.niveles - 1) : 0;
-    for(let n=0; n<cfg.niveles; n++) alturasYPic.push(yIniP + pasoP * n);
+    const alturasDefPC = alturasDefaultM(cfg.altoM, cfg.niveles);
+    for(let n=0; n<cfg.niveles; n++) alturasYPic.push(Math.min(alturasDefPC[n], cfg.altoM - 0.10));
   }
   agregarCotasClaros(grupo, alturasYPic, -totalLenPic/2 - 0.30, cfg.fondoM/2 + 0.05);
   targetY = cfg.altoM * 0.46;
@@ -1341,9 +1348,8 @@ function buildSelectivo(){
   if(alturasManSelC){
     for(const y of alturasManSelC) alturasYSel.push(Math.min(y, cfg.altoM - 0.10));
   } else {
-    const yV0 = 0.40, yVT = cfg.altoM - 0.20;
-    const pasoS = cfg.niveles > 1 ? (yVT - yV0) / (cfg.niveles - 1) : 0;
-    for(let n=0; n<cfg.niveles; n++) alturasYSel.push(yV0 + pasoS * n);
+    const alturasDefC = alturasDefaultM(cfg.altoM, cfg.niveles);
+    for(let n=0; n<cfg.niveles; n++) alturasYSel.push(Math.min(alturasDefC[n], cfg.altoM - 0.10));
   }
   agregarCotasClaros(grupo, alturasYSel, -totalLen/2 - 0.30, profTotal/2 + 0.05);
 }
