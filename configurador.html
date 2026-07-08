@@ -1020,10 +1020,12 @@ function actualizarInputsAlturasNivel(sistema){
   if(!chk.checked){
     container.classList.remove('activo');
     container.innerHTML = '';
+    container.dataset.personalizado = 'no';
     return;
   }
   container.classList.add('activo');
-  // Alturas previas guardadas (mantener si el número de niveles no cambió)
+  const wasPersonalizado = container.dataset.personalizado === 'yes';
+  // Alturas previas guardadas (solo se preservan si el usuario ya personalizó)
   const prevInputs = container.querySelectorAll('input[type=number]');
   const prevVals = Array.from(prevInputs).map(i => parseFloat(i.value));
   // Default: dividir altoM entre niveles, convertir a pulgadas, redondear al múltiplo de 2 más cercano
@@ -1031,7 +1033,12 @@ function actualizarInputsAlturasNivel(sistema){
   const defaultRedondeado = Math.round(espacioDefault / 2) * 2;
   const valores = [];
   for(let i=0; i<cfg.niveles; i++){
-    valores.push(prevVals[i] !== undefined && !isNaN(prevVals[i]) ? prevVals[i] : defaultRedondeado);
+    // Solo conservar si el usuario personalizó Y el nivel ya existía
+    if(wasPersonalizado && prevVals[i] !== undefined && !isNaN(prevVals[i])){
+      valores.push(prevVals[i]);
+    } else {
+      valores.push(defaultRedondeado);
+    }
   }
   // Reconstruir HTML
   const sistemaId = sistema === 'selectivo' ? 'sel' : 'pic';
@@ -1054,6 +1061,8 @@ function actualizarInputsAlturasNivel(sistema){
         const inches = parseFloat(inp.value) || 0;
         cmSpan.textContent = (inches * 2.54).toFixed(0) + ' cm';
       }
+      // Cuando el usuario edita a mano, marcar como personalizado
+      container.dataset.personalizado = 'yes';
       build();
     });
   });
