@@ -2463,6 +2463,8 @@ function addEvents(){
             const e = document.getElementById(other);
             if(e) e.checked = false;
           });
+          // Rebuild despues de desmarcar el otro, para que el 3D refleje solo el seleccionado
+          try{ build(); }catch(e){}
         }
       });
     });
