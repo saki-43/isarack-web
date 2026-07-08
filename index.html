@@ -348,6 +348,19 @@ footer a:hover{color:#f97316}
 
       <div class="system-card">
         <div class="system-visual" style="padding:0">
+          <img src="/proyectos/dinamico_poster.jpg" alt="Rack dinámico ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
+          <div class="video-badge">▶ VIDEO</div>
+        </div>
+        <div class="system-body">
+          <h3>Rack dinámico</h3>
+          <p>Estantería con rieles inclinados y rodillos para tarimas o cajas. Rotación automática PEPS con alta densidad de almacenamiento.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('dinamico')">ℹ Ver detalles</button>
+          <button onclick="event.stopPropagation();abrirVideoModal('dinamico.mp4','dinamico_poster.jpg')" style="margin-top:12px;width:100%;padding:10px;background:#f97316;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">▶ Ver funcionamiento</button>
+        </div>
+      </div>
+
+      <div class="system-card">
+        <div class="system-visual" style="padding:0">
           <img src="/proyectos/cantilever.jpg" alt="Cantilever ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:center 35%">
         </div>
         <div class="system-body">
@@ -611,6 +624,20 @@ const SISTEMAS = {
     ],
     apps: ['Preparación de pedidos e-commerce', 'Líneas de ensamble industrial', 'Farmacias y almacenes hospitalarios', 'Distribución de consumo masivo'],
     ventajas: ['Reduce tiempos de picking', 'Rotación PEPS automática', 'Separación clara entre reposición y despacho', 'Ergonomía para el operador']
+  },
+  dinamico: {
+    titulo: 'Rack dinámico',
+    img: '/proyectos/dinamico_poster.jpg',
+    lead: 'Sistema de almacenamiento por gravedad para tarimas o cajas. Los rieles inclinados con rodillos permiten que la carga fluya desde la zona de carga hasta la de descarga, logrando rotación PEPS automática y máxima densidad.',
+    specs: [
+      ['Método', 'PEPS (primero en entrar, primero en salir)'],
+      ['Inclinación de rieles', '3° a 5°'],
+      ['Capacidad por tarima', 'Hasta 1,500 kg'],
+      ['Densidad', 'Hasta 60% más que rack selectivo'],
+      ['Reposición / Descarga', 'Lados opuestos, sin cruce de flujos']
+    ],
+    apps: ['Centros de distribución de alta rotación', 'Cámaras frías y congelación', 'Industria alimenticia y bebidas', 'Farmacéutica con control de caducidad'],
+    ventajas: ['Rotación PEPS automática sin montacargas guiando', 'Aprovecha altura y profundidad del almacén', 'Menor tiempo de picking y despacho', 'Reduce pasillos operativos', 'Ideal para productos con caducidad']
   },
   cantilever: {
     titulo: 'Cantilever',
