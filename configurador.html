@@ -117,10 +117,10 @@
   </div>
 
   <div class="row" id="rowColorRack">
-    <label>Color del rack (Picking/Selectivo)</label>
+    <label>Color del rack</label>
     <select id="colorRack">
       <option value="verde" selected>Verde ISARACK</option>
-      <option value="azul">Azul industrial</option>
+      <option value="azul" id="optAzul">Azul industrial</option>
     </select>
   </div>
 
@@ -1244,6 +1244,29 @@ function actualizarColorRack(){
   matPiePic.color.setHex(p.pie);
 }
 
+// Ajusta selector de color según sistema activo
+// - Selectivo: verde y azul disponibles sin recargo
+// - Picking:   verde default, azul con recargo +15%
+// - Góndola:   se oculta completamente
+function ajustarSelectorColor(){
+  const row = document.getElementById('rowColorRack');
+  const optAzul = document.getElementById('optAzul');
+  const selColor = document.getElementById('colorRack');
+  if(!row || !optAzul || !selColor) return;
+  if(sistemaActual === 'gondola'){
+    row.style.display = 'none';
+    selColor.value = 'verde'; // reset por si acaso
+    return;
+  }
+  row.style.display = '';
+  if(sistemaActual === 'picking'){
+    optAzul.textContent = 'Azul industrial (+15%)';
+  } else {
+    optAzul.textContent = 'Azul industrial';
+  }
+  actualizarColorRack();
+}
+
 function actualizarSelVigaCap(){
   const el = document.getElementById('selViga');
   const target = document.getElementById('selVigaCap');
@@ -1473,6 +1496,22 @@ function renderCotizacion(){
     const producto = inv ? (inv.producto||key) : key;
     return { sku, producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD };
   });
+
+  // PICKING con color azul: recargo del 15% sobre material
+  if(sistemaActual === 'picking'){
+    const colorPic = document.getElementById('colorRack')?.value || 'verde';
+    if(colorPic === 'azul'){
+      const recargoUSD = materialUSD * 0.15;
+      materialUSD += recargoUSD;
+      lineas.push({
+        sku: 'REC-AZUL',
+        producto: 'RECARGO POR COLOR AZUL (15% sobre material)',
+        cantidad: 1,
+        precioUSD: recargoUSD,
+        importeUSD: recargoUSD
+      });
+    }
+  }
 
   // GÓNDOLA: agrupar todo el material en 1 sola línea "Góndola [tipo] [medida]"
   // Guardamos el desglose para el PDF
@@ -1986,6 +2025,22 @@ function generarPDF(datos){
     return { sku, producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD };
   });
 
+  // PICKING con color azul: recargo del 15% sobre material (misma lógica que renderCotizacion)
+  if(sistemaActual === 'picking'){
+    const colorPic = document.getElementById('colorRack')?.value || 'verde';
+    if(colorPic === 'azul'){
+      const recargoUSD = materialUSD * 0.15;
+      materialUSD += recargoUSD;
+      lineas.push({
+        sku: 'REC-AZUL',
+        producto: 'RECARGO POR COLOR AZUL (15% sobre material)',
+        cantidad: 1,
+        precioUSD: recargoUSD,
+        importeUSD: recargoUSD
+      });
+    }
+  }
+
   // GÓNDOLA: colapsar en 1 sola línea y guardar el desglose para imprimirlo debajo
   let desgloseGondola = null;
   let lineasParaPDF = lineas;
@@ -2363,6 +2418,7 @@ function addEvents(){
     build();
   });
   actualizarColorRack();
+  ajustarSelectorColor();
   // Mostrar/ocultar selector de unión según tipo de fila
   function actualizarSelUnion(){
     const doble = document.getElementById('selTipoFila').value === 'doble';
@@ -2383,6 +2439,7 @@ function addEvents(){
       document.getElementById('opGondola').style.display   = sistemaActual==='gondola'   ? '' : 'none';
       document.getElementById('opPicking').style.display   = sistemaActual==='picking'   ? '' : 'none';
       document.getElementById('opSelectivo').style.display = sistemaActual==='selectivo' ? '' : 'none';
+      ajustarSelectorColor();
       build();
     });
   });
