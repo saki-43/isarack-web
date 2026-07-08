@@ -212,7 +212,7 @@
     <div class="alturas-nivel" id="picAlturasContainer"></div>
     <label class="chk"><input type="checkbox" id="picChkRej" checked> Rejilla electrosoldada por nivel</label>
     <label class="chk"><input type="checkbox" id="picChkPanel"> Panel beige (corte a medida)</label>
-    <label class="chk"><input type="checkbox" id="picChkPie" checked> Incluir pies de poste</label>
+    <label class="chk"><input type="checkbox" id="picChkMadera"> Madera (triplay + soportes)</label>
   </div>
 
   <!-- Opciones SELECTIVO -->
@@ -286,7 +286,7 @@
     <label class="chk"><input type="checkbox" id="selAlturaManual"> Personalizar claros de viga</label>
     <div class="alturas-nivel" id="selAlturasContainer"></div>
     <label class="chk"><input type="checkbox" id="selChkRej" checked> Rejilla electrosoldada</label>
-    <label class="chk"><input type="checkbox" id="selChkTri"> Triplay + soportes</label>
+    <label class="chk"><input type="checkbox" id="selChkPanel"> Panel beige (corte a medida)</label>
     <label class="chk"><input type="checkbox" id="selChkBot"> Protector puntal</label>
   </div>
 
@@ -757,7 +757,7 @@ function init(){
   });
 }
 
-function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tieneRejilla, tienePanel, tienePie){
+function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tieneRejilla, tienePanel, tieneMadera, tienePie){
   const postW = 0.05, postD = 0.05, placaH = 0.012;
   const nMarcos = cuerpos + 1;
   const totalLen = largoM * cuerpos;
@@ -816,18 +816,24 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
     const cx = x0 + c * largoM + largoM/2;
     for(let n=0; n<niveles; n++){
       const y = alturasManPic ? Math.min(alturasManPic[n], altoM - 0.10) : Math.min(alturasDefPic[n], altoM - 0.10);
-      const usaPanel = tienePanel && !tieneRejilla;
-      const usaRej   = tieneRejilla;
-      if(usaRej || usaPanel){
+      const usaRej    = tieneRejilla;
+      const usaPanel  = tienePanel && !tieneRejilla;
+      const usaMadera = tieneMadera && !tieneRejilla && !tienePanel;
+      if(usaRej || usaPanel || usaMadera){
         const cargaW = largoM - postW*1.1;
         const cargaD = fondoM - postD*1.2;
         if(usaRej){
           const rej = crearRejillaReal(cargaW, cargaD);
           rej.position.set(cx, y + 0.005, 0);
           parent.add(rej);
-        } else {
+        } else if(usaPanel) {
           const thk = 0.014;
           const carga = box(cargaW, thk, cargaD, matPanelG);
+          carga.position.set(cx, y, 0);
+          parent.add(carga);
+        } else {
+          const thk = 0.018;
+          const carga = box(cargaW, thk, cargaD, matTriplay);
           carga.position.set(cx, y, 0);
           parent.add(carga);
         }
@@ -863,7 +869,8 @@ function getConfigPic(){
   return {altoIn, fondoIn, largoCm, niveles, cuerpos,
     rejilla: document.getElementById('picChkRej').checked,
     panel:   document.getElementById('picChkPanel').checked,
-    pie:     document.getElementById('picChkPie').checked,
+    madera:  document.getElementById('picChkMadera').checked,
+    pie:     true,
     altoM: altoIn*IN_TO_M, fondoM: fondoIn*IN_TO_M, largoM: largoCm/100};
 }
 
@@ -884,12 +891,12 @@ function getConfigSel(){
   const filas = tipoFila==='doble' ? 2 : 1;
   return {tipoFila, filas, unionIn, unionM, altoIn, fondoIn, vigaSku, vigaIn, vigaAltIn, vigaCapKg, vigaCapLb, niveles, cuerpos,
     rejilla: document.getElementById('selChkRej').checked,
-    triplay: document.getElementById('selChkTri').checked,
+    panel:   document.getElementById('selChkPanel').checked,
     botas:   document.getElementById('selChkBot').checked,
     altoM: altoIn*IN_TO_M, fondoM: fondoIn*IN_TO_M, vigaM: vigaIn*IN_TO_M};
 }
 
-function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tieneTriplay, tieneBotas){
+function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas){
   const postW = 0.076, postD = 0.076, vigaH = 0.10, vigaD = 0.06;
   const nMarcos = cuerpos + 1;
   const totalLen = vigaM * cuerpos;
@@ -968,9 +975,9 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         const rejD = fondoM - postD*1.5;
         const rej = crearRejillaReal(rejW, rejD);
         rej.position.set(cxV, y + vigaH/2 + 0.01, 0); parent.add(rej);
-      } else if(tieneTriplay){
-        const tri = box(vigaM - postW, 0.020, fondoM - postD*1.5, matTriplay);
-        tri.position.set(cxV, y + vigaH/2 + 0.012, 0); parent.add(tri);
+      } else if(tienePanelSel){
+        const pan = box(vigaM - postW, 0.014, fondoM - postD*1.5, matPanelG);
+        pan.position.set(cxV, y + vigaH/2 + 0.010, 0); parent.add(pan);
       }
     }
   }
@@ -1221,7 +1228,7 @@ function buildPicking(){
       build(); return;
     }
   }
-  buildPickingScene(grupo, cfg.altoM, cfg.fondoM, cfg.largoM, cfg.niveles, cfg.cuerpos, cfg.rejilla, cfg.panel, cfg.pie);
+  buildPickingScene(grupo, cfg.altoM, cfg.fondoM, cfg.largoM, cfg.niveles, cfg.cuerpos, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie);
   // Cotas dimensionales en el modelo 3D
   const totalLenPic = cfg.largoM * cfg.cuerpos;
   agregarCotas(grupo, totalLenPic, cfg.fondoM, cfg.altoM, 400, cfg.largoM);
@@ -1305,10 +1312,10 @@ function buildSelectivo(){
     // Separación entre las espaldas de las 2 filas = unión seleccionada
     const centroFila = cfg.fondoM/2 + cfg.unionM/2;
     const filaA = new THREE.Group();
-    buildRackSelectivo(filaA, cfg.altoM, cfg.fondoM, cfg.vigaM, cfg.niveles, cfg.cuerpos, cfg.rejilla, cfg.triplay, cfg.botas);
+    buildRackSelectivo(filaA, cfg.altoM, cfg.fondoM, cfg.vigaM, cfg.niveles, cfg.cuerpos, cfg.rejilla, cfg.panel, cfg.botas);
     filaA.position.z = centroFila; grupo.add(filaA);
     const filaB = new THREE.Group();
-    buildRackSelectivo(filaB, cfg.altoM, cfg.fondoM, cfg.vigaM, cfg.niveles, cfg.cuerpos, cfg.rejilla, cfg.triplay, cfg.botas);
+    buildRackSelectivo(filaB, cfg.altoM, cfg.fondoM, cfg.vigaM, cfg.niveles, cfg.cuerpos, cfg.rejilla, cfg.panel, cfg.botas);
     filaB.position.z = -centroFila; grupo.add(filaB);
     // Uniones horizontales entre las 2 filas — 3 por cada par de marcos (arriba, medio, abajo)
     const nMarcosU = cfg.cuerpos + 1;
@@ -1324,7 +1331,7 @@ function buildSelectivo(){
       });
     }
   } else {
-    buildRackSelectivo(grupo, cfg.altoM, cfg.fondoM, cfg.vigaM, cfg.niveles, cfg.cuerpos, cfg.rejilla, cfg.triplay, cfg.botas);
+    buildRackSelectivo(grupo, cfg.altoM, cfg.fondoM, cfg.vigaM, cfg.niveles, cfg.cuerpos, cfg.rejilla, cfg.panel, cfg.botas);
   }
   targetY = cfg.altoM * 0.46;
   const totalLen = cfg.vigaM * cfg.cuerpos;
@@ -1444,6 +1451,10 @@ function calcularBomPicking(){
     // Panel beige 8 ft cortado a la medida — 1 panel por nivel por cuerpo
     const skuPanel = PANELES_BEIGE_PIC[cfg.fondoIn];
     add(skuPanel, cfg.niveles * cfg.cuerpos);
+  } else if(cfg.madera){
+    // Triplay + soportes (mismos SKUs que selectivo, aprox 1 triplay + 3 soportes por nivel-cuerpo)
+    add(TRIPLAY_SEL, cfg.niveles * cfg.cuerpos);
+    add(SOPORTE_TRIPLAY_SEL, 3 * cfg.niveles * cfg.cuerpos);
   }
   return orden.map(sku => [sku, items[sku]]);
 }
@@ -1465,9 +1476,10 @@ function calcularBomSelectivo(){
   if(cfg.rejilla){
     add(REJILLAS_SEL[cfg.fondoIn], REJILLAS_POR_VIGA_SEL[cfg.vigaIn] * cfg.niveles * cfg.cuerpos * F);
   }
-  if(cfg.triplay){
-    add(TRIPLAY_SEL, TRIPLAY_POR_VIGA_SEL[cfg.vigaIn] * cfg.niveles * cfg.cuerpos * F);
-    add(SOPORTE_TRIPLAY_SEL, 3 * cfg.niveles * cfg.cuerpos * F);
+  if(cfg.panel){
+    // Panel beige por fondo (mismo SKU que picking, aprox 1 panel por nivel-cuerpo-fila)
+    const skuPanelSel = PANELES_BEIGE_PIC[cfg.fondoIn];
+    if(skuPanelSel) add(skuPanelSel, cfg.niveles * cfg.cuerpos * F);
   }
   if(cfg.botas) add(BOTA_SEL, 2 * nMarcosTotal);
   // Uniones para rack doble (3 por par de marcos)
@@ -1878,7 +1890,7 @@ function configResumen(){
     const cfg = getConfigSel();
     const extras = [];
     if(cfg.rejilla) extras.push('rejilla');
-    if(cfg.triplay) extras.push('triplay');
+    if(cfg.panel) extras.push('panel beige');
     if(cfg.botas)   extras.push('protector puntal');
     const ex = extras.length ? ' + '+extras.join(', ') : '';
     const filaTxt = cfg.filas===2 ? 'Doble' : 'Sencilla';
@@ -1891,8 +1903,8 @@ function configResumen(){
     const cfg = getConfigPic();
     const extras = [];
     if(cfg.rejilla) extras.push('rejilla');
-    if(cfg.panel)   extras.push('panel galv');
-    if(cfg.pie)     extras.push('pies');
+    if(cfg.panel)   extras.push('panel beige');
+    if(cfg.madera)  extras.push('madera');
     const ex = extras.length ? ' + '+extras.join(', ') : '';
     return {
       sistema: 'Picking',
@@ -2418,8 +2430,8 @@ function addEvents(){
   document.getElementById('selAlto').addEventListener('change', ()=>actualizarInputsAlturasNivel('selectivo'));
 
   ['tipo','medida','niveles','modulos','cabeceras',
-   'picAlto','picFondo','picLargo','picNiveles','picCuerpos','picChkRej','picChkPanel','picChkPie',
-   'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkTri','selChkBot'].forEach(id=>{
+   'picAlto','picFondo','picLargo','picNiveles','picCuerpos','picChkRej','picChkPanel','picChkMadera',
+   'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkPanel','selChkBot'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.addEventListener('change', build);
   });
@@ -2469,8 +2481,8 @@ function addEvents(){
       });
     });
   }
-  grupoExclusivo(['selChkRej','selChkTri']);      // Selectivo: rejilla ↔ triplay
-  grupoExclusivo(['picChkRej','picChkPanel']);    // Picking:   rejilla ↔ panel beige
+  grupoExclusivo(['selChkRej','selChkPanel']);                  // Selectivo: rejilla ↔ panel beige
+  grupoExclusivo(['picChkRej','picChkPanel','picChkMadera']);   // Picking:   rejilla ↔ panel beige ↔ madera
   // Tabs: cambiar de sistema
   document.querySelectorAll('#tabs .tab').forEach(tab=>{
     tab.addEventListener('click', ()=>{
