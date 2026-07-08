@@ -1600,44 +1600,79 @@ async function cargarPrecios(){
   inventarioArr = [];
   for(const row of data){
     const item = { sku:row.sku, producto:row.producto, precio:parseFloat(row.precio), sistema:row.sistema, cantidad:parseInt(row.cantidad)||0 };
-    map[row.producto] = item;   // góndolas usa nombre como key
-    map[row.sku] = item;        // selectivo usa SKU como key
+    map[row.producto] = item;
+    map[row.sku] = item;
     inventarioArr.push(item);
   }
   preciosCache = map;
+  // Cargar también el material comprometido en pedidos activos (no bloqueante)
+  cargarComprometido().catch(e=>console.warn('comprometido:',e));
   try{ actualizarStockEnDropdowns(); }catch(e){ console.warn(e); }
   return map;
 }
 
-// Cuántos marcos se pueden FABRICAR con los componentes en stock
-// Considera postes, diagonales D, diagonales H y pies del color indicado
+// Mapa de cantidades comprometidas por SKU y por producto (nombre)
+// (mismos criterios que ISA-OS _comprometidoSKU)
+let compBySku = {};
+let compByProd = {};
+async function cargarComprometido(){
+  try{
+    // Traer pedidos activos con inventario descontado
+    const url = "orders?select=cotData,estatus,entregado,inventarioDescontado&inventarioDescontado=eq.true&estatus=not.in.(Cancelado,Completado,cancelado,completado)&entregado=neq.si";
+    const rows = await sbFetch(url);
+    const bySku = {}, byProd = {};
+    for(const o of rows){
+      const lineas = (o.cotData && Array.isArray(o.cotData.lineas)) ? o.cotData.lineas : [];
+      for(const l of lineas){
+        if(!l || l.tipo) continue;
+        const cnt = Number(l.cantidad||0);
+        if(!cnt) continue;
+        if(l.sku){ bySku[l.sku] = (bySku[l.sku]||0) + cnt; }
+        if(l.producto){ const k = (''+l.producto).toLowerCase().trim(); byProd[k] = (byProd[k]||0) + cnt; }
+      }
+    }
+    compBySku = bySku;
+    compByProd = byProd;
+    console.log('Comprometido cargado:', Object.keys(bySku).length, 'SKUs');
+    actualizarStockEnDropdowns();
+  }catch(e){ console.error('cargarComprometido:', e); }
+}
+
+// Comprometido para un SKU (busca por sku y por nombre de producto)
+function comprometidoDe(item){
+  if(!item) return 0;
+  const sku = item.sku||'';
+  const prod = (''+(item.producto||'')).toLowerCase().trim();
+  return (compBySku[sku]||0) + (prod && !compBySku[sku] ? (compByProd[prod]||0) : 0);
+}
+
+// Cuántos marcos se pueden FABRICAR con los componentes en stock (descontando comprometidos)
 function marcosFabricables(altoIn, color){
   if(!inventarioArr) return 0;
   const bom = MARCO_BOM[String(altoIn)];
   if(!bom) return 0;
   const colorUp = (color||'VERDE').toUpperCase();
 
-  // Buscar postes de la medida y color específicos
+  // Cantidad disponible real de una pieza = físico - comprometido
+  const dispReal = (item)=>Math.max(0, Number(item.cantidad||0) - comprometidoDe(item));
+
   const postes = inventarioArr.filter(p=>{
     const u = (p.producto||'').toUpperCase();
     return u.includes('POSTE') && u.includes(bom.posteSize+'"') && u.includes(colorUp);
-  }).reduce((s,p)=>s+Math.max(0,Number(p.cantidad||0)),0);
+  }).reduce((s,p)=>s+dispReal(p),0);
 
-  // Buscar diagonales D y H del color (asumen medidas coincidentes por color)
   const buscarDiag = (tipo)=>inventarioArr.filter(p=>{
     const u = (p.producto||'').toUpperCase();
     return u.includes('DIAGONAL '+tipo) && u.includes(colorUp);
-  }).reduce((s,p)=>s+Math.max(0,Number(p.cantidad||0)),0);
+  }).reduce((s,p)=>s+dispReal(p),0);
   const diagD = buscarDiag('D');
   const diagH = buscarDiag('H');
 
-  // Pies del color
   const pies = inventarioArr.filter(p=>{
     const u = (p.producto||'').toUpperCase();
     return (u.includes('PIE BASE') || u.includes('PIE ')) && u.includes(colorUp);
-  }).reduce((s,p)=>s+Math.max(0,Number(p.cantidad||0)),0);
+  }).reduce((s,p)=>s+dispReal(p),0);
 
-  // Cuello de botella entre los 4 componentes
   const maxPostes = Math.floor((postes * bom.postePartes) / 1);
   const maxDiagD  = bom.diagonalD > 0 ? Math.floor(diagD / bom.diagonalD) : Infinity;
   const maxDiagH  = bom.diagonalH > 0 ? Math.floor(diagH / bom.diagonalH) : Infinity;
@@ -1646,11 +1681,12 @@ function marcosFabricables(altoIn, color){
   return Math.max(0, Math.min(maxPostes, maxDiagD, maxDiagH, maxPies));
 }
 
-// Total disponible = marcos ya armados + marcos fabricables por componentes
+// Total disponible marcos = armados (físico - comprometido) + fabricables
 function disponibleMarco(sku, altoIn, color){
-  const armados = stockDe(sku) || 0;
+  const item = preciosCache ? preciosCache[sku] : null;
+  const armadosDisp = item ? Math.max(0, Number(item.cantidad||0) - comprometidoDe(item)) : 0;
   const fabricables = marcosFabricables(altoIn, color);
-  return armados + fabricables;
+  return armadosDisp + fabricables;
 }
 
 // Devuelve stock físico del SKU, o null si no está cargado
@@ -1658,6 +1694,13 @@ function stockDe(sku){
   if(!preciosCache) return null;
   const item = preciosCache[sku];
   return item ? item.cantidad : null;
+}
+// Stock disponible = físico - comprometido (para SKUs sin fabricación desde componentes)
+function stockDisponibleDe(sku){
+  if(!preciosCache) return null;
+  const item = preciosCache[sku];
+  if(!item) return null;
+  return Math.max(0, Number(item.cantidad||0) - comprometidoDe(item));
 }
 function _fmtStockLabel(n){
   if(n===null||n===undefined) return '';
@@ -1669,12 +1712,12 @@ function _fmtStockLabel(n){
 // Repinta cada dropdown clave con la existencia de su SKU asociado
 function actualizarStockEnDropdowns(){
   if(!preciosCache) return;
-  // 1) Vigas Selectivo (SKU directo en value)
+  // 1) Vigas Selectivo (SKU directo en value) - considera comprometido
   const viga = document.getElementById('selViga');
   if(viga){
     Array.from(viga.options).forEach(opt=>{
       if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
-      opt.textContent = opt.dataset.baseLabel + _fmtStockLabel(stockDe(opt.value));
+      opt.textContent = opt.dataset.baseLabel + _fmtStockLabel(stockDisponibleDe(opt.value));
     });
   }
   // 2) Alto Selectivo: el SKU depende de (alto, fondo). Se pinta contra el fondo actual.
@@ -1710,14 +1753,14 @@ function actualizarStockEnDropdowns(){
       if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
       const altoIn = parseInt(opt.value);
       const sku = (typeof MARCOS_PIC !== 'undefined' && MARCOS_PIC[altoIn] && MARCOS_PIC[altoIn][fondoIn]) || null;
-      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDe(sku)) : '');
+      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDisponibleDe(sku)) : '');
     });
     const altoIn = parseInt(picAlto.value);
     Array.from(picFondo.options).forEach(opt=>{
       if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
       const fIn = parseInt(opt.value);
       const sku = (typeof MARCOS_PIC !== 'undefined' && MARCOS_PIC[altoIn] && MARCOS_PIC[altoIn][fIn]) || null;
-      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDe(sku)) : '');
+      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDisponibleDe(sku)) : '');
     });
   }
   if(picLargo){
@@ -1725,7 +1768,7 @@ function actualizarStockEnDropdowns(){
       if(!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
       const largoCm = parseInt(opt.value);
       const sku = (typeof VIGAS_PIC !== 'undefined' && VIGAS_PIC[largoCm]) || null;
-      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDe(sku)) : '');
+      opt.textContent = opt.dataset.baseLabel + (sku ? _fmtStockLabel(stockDisponibleDe(sku)) : '');
     });
   }
 }
