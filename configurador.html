@@ -1049,10 +1049,13 @@ function buildCantileverScene(parent, cfg, colorHex){
   const matAtir = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.45, metalness:0.55});
   const colW = 0.30, colD = 0.15;
   const brazoAlto = 0.11, brazoAncho = 0.06;
-  // Distribución: primer nivel muy cerca del piso, último casi hasta el top
-  const yPrimero = 0.20;
-  const yUltimo = cfg.altoM - 0.20;
-  const espacioNivel = cfg.niveles > 1 ? (yUltimo - yPrimero) / (cfg.niveles - 1) : 0;
+  // Distribución: los N brazos dividen el espacio útil en (N+1) claros iguales
+  // Claro 1 = entre base y primer brazo; claro N+1 = respaldo arriba del último brazo
+  const baseAltoM = 0.12;   // altura de la base metálica
+  const espacioUtil = cfg.altoM - baseAltoM;
+  const claro = espacioUtil / (cfg.niveles + 1);
+  const yPrimero = baseAltoM + claro;
+  const espacioNivel = claro;
   const isDoble = cfg.tipo === 'doble';
 
   // Función helper: dibujar una columna con perfil I (3 partes: alas y alma)
@@ -1116,7 +1119,7 @@ function buildCantileverScene(parent, cfg, colorHex){
     drawBase(0, zCol, isDoble ? 'ambos' : 'frente');
     // Brazos por nivel
     for(let n=0; n<cfg.niveles; n++){
-      const y = cfg.niveles > 1 ? (yPrimero + espacioNivel * n) : cfg.altoM/2;
+      const y = yPrimero + espacioNivel * n;
       // Brazo lado derecho
       const brazo1 = box(cfg.brazoM, brazoAlto, brazoAncho, matBrazo);
       brazo1.position.set(colW/2 + cfg.brazoM/2, y, zCol);
