@@ -1824,7 +1824,7 @@ async function sbInsertVenta(body){
 
 async function cargarPrecios(){
   if(preciosCache) return preciosCache;
-  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO)&select=sku,producto,precio,sistema,cantidad");
+  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO,MECANO)&select=sku,producto,precio,sistema,cantidad");
   const map = {};
   inventarioArr = [];
   for(const row of data){
