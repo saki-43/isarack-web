@@ -2120,6 +2120,11 @@ function captura3D(){
       xExt = cfg.largoM * cfg.cuerpos;
       zExt = cfg.fondoM;
       alto = cfg.altoM;
+    } else if(sistemaActual === 'mecano'){
+      const cfg = getConfigMec();
+      xExt = cfg.anchoM * cfg.cuerpos;
+      zExt = cfg.fondoM;
+      alto = cfg.altoM;
     } else {
       const m = MED[document.getElementById('medida').value];
       const mods = parseInt(document.getElementById('modulos').value);
