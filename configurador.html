@@ -1627,7 +1627,7 @@ function ajustarSelectorColor(){
   const optAzul = document.getElementById('optAzul');
   const selColor = document.getElementById('colorRack');
   if(!row || !optAzul || !selColor) return;
-  if(sistemaActual === 'gondola' || sistemaActual === 'mecano'){
+  if(sistemaActual === 'gondola' || sistemaActual === 'mecano' || sistemaActual === 'cantilever'){
     row.style.display = 'none';
     selColor.value = 'verde';
     return;
