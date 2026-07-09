@@ -2078,32 +2078,61 @@ function abrirFormCliente(){
   mBody.innerHTML = `
     <div style="margin-bottom:14px"><span class="badge">Configuración</span>
       <div style="margin-top:6px;font-size:13px;color:#555">${configResumen().txt}</div></div>
-    <div class="row"><label>Cliente *</label><input id="f_cliente" placeholder="Nombre o empresa"></div>
+    <div class="row"><label>Cliente *</label><input id="f_cliente" placeholder="Nombre o empresa" maxlength="80" autocomplete="organization"></div>
     <div class="grid2">
-      <div class="row"><label>Razón social</label><input id="f_razon" placeholder="Opcional"></div>
-      <div class="row"><label>RFC</label><input id="f_rfc" placeholder="Opcional"></div>
+      <div class="row"><label>Razón social</label><input id="f_razon" placeholder="Opcional" maxlength="120"></div>
+      <div class="row"><label>RFC</label><input id="f_rfc" placeholder="Opcional" maxlength="13" style="text-transform:uppercase"></div>
     </div>
     <div class="grid2">
-      <div class="row"><label>Contacto</label><input id="f_contacto" placeholder="Nombre"></div>
-      <div class="row"><label>Teléfono / Cel</label><input id="f_tel" placeholder="664 ..."></div>
+      <div class="row"><label>Contacto</label><input id="f_contacto" placeholder="Nombre" maxlength="60" autocomplete="name"></div>
+      <div class="row"><label>Teléfono / Cel</label><input id="f_tel" placeholder="6644211088" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel"></div>
     </div>
-    <div class="row"><label>Email</label><input id="f_email" placeholder="correo@empresa.com"></div>
-    <div class="row"><label>Dirección de entrega</label><input id="f_dir" placeholder="Ciudad / dirección"></div>
+    <div class="row"><label>Email</label><input id="f_email" placeholder="correo@empresa.com" type="email" maxlength="80" autocomplete="email"></div>
+    <div class="row"><label>Dirección de entrega</label><input id="f_dir" placeholder="Ciudad / dirección" maxlength="200"></div>
+    <div id="f_error" style="display:none;margin-top:10px;padding:10px;background:#fee;border:1px solid #fcc;border-radius:6px;color:#c00;font-size:13px"></div>
   `;
+  // Restringir teléfono a solo dígitos
+  const inpTel = document.getElementById('f_tel');
+  inpTel.addEventListener('input', e=>{
+    e.target.value = e.target.value.replace(/[^0-9]/g,'').substring(0,10);
+  });
+  // Sanitizar RFC (mayúsculas y solo alfanumérico)
+  document.getElementById('f_rfc').addEventListener('input', e=>{
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9&Ñ]/g,'').substring(0,13);
+  });
   mFoot.innerHTML = '<button class="sec" id="bCancel">Cancelar</button><button class="prm" id="bPdf">⬇ Descargar PDF</button>';
   document.getElementById('bCancel').onclick = cerrarModal;
   document.getElementById('bPdf').onclick = ()=>{
+    const errBox = document.getElementById('f_error');
+    const mostrarError = m=>{ errBox.textContent = m; errBox.style.display='block'; };
+    errBox.style.display='none';
     const cliente = document.getElementById('f_cliente').value.trim();
-    if(!cliente){ alert('Captura al menos el nombre del cliente.'); return; }
-    generarPDF({
-      cliente,
-      razon: document.getElementById('f_razon').value.trim(),
-      rfc: document.getElementById('f_rfc').value.trim(),
-      contacto: document.getElementById('f_contacto').value.trim(),
-      tel: document.getElementById('f_tel').value.trim(),
-      email: document.getElementById('f_email').value.trim(),
-      dir: document.getElementById('f_dir').value.trim()
-    });
+    const razon = document.getElementById('f_razon').value.trim();
+    const rfc = document.getElementById('f_rfc').value.trim().toUpperCase();
+    const contacto = document.getElementById('f_contacto').value.trim();
+    const tel = document.getElementById('f_tel').value.trim();
+    const email = document.getElementById('f_email').value.trim();
+    const dir = document.getElementById('f_dir').value.trim();
+    // Validaciones básicas
+    if(!cliente){ mostrarError('Captura al menos el nombre del cliente.'); return; }
+    if(cliente.length < 2){ mostrarError('El nombre del cliente es muy corto.'); return; }
+    if(tel && tel.length !== 10){ mostrarError('El teléfono debe tener 10 dígitos (formato México).'); return; }
+    if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ mostrarError('El correo electrónico no es válido.'); return; }
+    if(rfc && !/^([A-ZÑ&]{3,4})\d{6}([A-Z0-9]{3})?$/.test(rfc)){ mostrarError('El RFC no tiene formato válido (ej: XAXX010101000).'); return; }
+    // Filtro anti-groserías (lista básica)
+    const PROHIBIDAS = ['pendej','chinga','pinche','cabron','cabrón','puta','puto','madre tu','wey','pito','verga','joto','maric','culero','mierda','coño','coger','pendejo','estupido','estúpido','idiota','imbecil','imbécil','tarado','baboso','mames','naco','pinch','fuck','shit','bitch','asshole','dick'];
+    const camposTexto = { 'nombre del cliente': cliente, 'razón social': razon, 'contacto': contacto, 'dirección': dir };
+    for(const [nombreCampo, valor] of Object.entries(camposTexto)){
+      if(!valor) continue;
+      const lower = valor.toLowerCase();
+      for(const palabra of PROHIBIDAS){
+        if(lower.includes(palabra)){
+          mostrarError('Por favor evita lenguaje ofensivo en el campo "'+nombreCampo+'".');
+          return;
+        }
+      }
+    }
+    generarPDF({ cliente, razon, rfc, contacto, tel, email, dir });
   };
 }
 
