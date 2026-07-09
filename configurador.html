@@ -301,10 +301,16 @@
       </select>
     </div>
     <div class="row">
-      <label>Medidas fijas por módulo</label>
+      <label>Niveles (paneles)</label>
+      <select id="mecNiveles">
+        <option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Medidas por panel</label>
       <div style="font-size:12px;color:#666;padding:6px 8px;background:#f5f5f5;border-radius:4px">
-        Ancho 90 cm · Fondo 30 cm · 5 entrepaños<br>
-        <span style="color:#DA6635;font-weight:600">4 barras + 5 paneles + 16 escuadras + 60 tornillos</span>
+        Ancho 90 cm · Fondo 30 cm<br>
+        <span style="color:#DA6635;font-weight:600">Kit: 4 barras + N paneles + 8 escuadras + 60 tornillos</span>
       </div>
     </div>
     <div class="row">
@@ -462,8 +468,9 @@ const MEC = {
   ESCUADRA:  'MEC-0006',      // Escuadra esquinero 15cm
   TORNILLO:  'SEL-0337'       // Tornillo M8x15mm (usado en Selectivo también)
 };
-// Composición fija por módulo: 4 barras + 5 paneles + 16 escuadras + 60 tornillos
-const MEC_COMPO = { barras:4, paneles:5, escuadras:16, tornillos:60 };
+// Composición por módulo:
+//   4 barras + N paneles + 8 escuadras (4 arriba + 4 abajo) + 60 tornillos
+const MEC_COMPO = { barras:4, escuadras:8, tornillos:60 };  // paneles = niveles (variable)
 
 // Sistema activo
 let sistemaActual = 'gondola';
@@ -944,8 +951,8 @@ function getConfigSel(){
 
 function getConfigMec(){
   const altoCm = parseInt(document.getElementById('mecAlto').value);
+  const niveles = parseInt(document.getElementById('mecNiveles').value);
   const cuerpos = parseInt(document.getElementById('mecCuerpos').value);
-  const niveles = 5;         // fijo: 5 paneles por módulo
   const anchoCm = 90;        // fijo
   const fondoCm = 30;        // fijo
   return { altoCm, anchoCm, fondoCm, cuerpos, niveles,
@@ -953,30 +960,49 @@ function getConfigMec(){
 }
 
 function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
-  const postW = 0.03, postD = 0.03;                     // barra 30x30mm aprox
-  const espacio = altoM / (niveles);                    // 5 niveles distribuidos incluyendo el piso
-  const colBarra = 0xc0c4c8;                            // gris claro
+  const postW = 0.03, postD = 0.03;
+  const colBarra = 0xc0c4c8;
   const colPanel = 0xdadde0;
+  const colEsc = 0x9098a0;
   const matBarra = new THREE.MeshStandardMaterial({color:colBarra, roughness:0.65, metalness:0.35});
   const matPanel = new THREE.MeshStandardMaterial({color:colPanel, roughness:0.85});
+  const matEsc = new THREE.MeshStandardMaterial({color:colEsc, roughness:0.55, metalness:0.4});
+  // Distribución: nivel 0 abajo (0.02), nivel N-1 arriba (altoM - 0.02)
+  const espacio = niveles > 1 ? (altoM - 0.04) / (niveles - 1) : 0;
   for(let c=0; c<cuerpos; c++){
     const x0 = c * anchoM;
     const xL = x0, xR = x0 + anchoM;
     // 4 barras (verticales) por cuerpo
-    [xL, xR].forEach(x=>{
-      [-fondoM/2 + postD/2, fondoM/2 - postD/2].forEach(z=>{
-        const b = box(postW, altoM, postD, matBarra);
-        b.position.set(x + (x===xL?postW/2:-postW/2), altoM/2, z);
-        parent.add(b);
-      });
+    const barPos = [
+      {x: xL + postW/2, z: -fondoM/2 + postD/2},
+      {x: xL + postW/2, z:  fondoM/2 - postD/2},
+      {x: xR - postW/2, z: -fondoM/2 + postD/2},
+      {x: xR - postW/2, z:  fondoM/2 - postD/2}
+    ];
+    barPos.forEach(p=>{
+      const b = box(postW, altoM, postD, matBarra);
+      b.position.set(p.x, altoM/2, p.z);
+      parent.add(b);
     });
-    // 5 paneles horizontales (niveles): repartidos uniformemente
+    // N paneles horizontales distribuidos (primero al fondo, último hasta arriba)
     for(let n=0; n<niveles; n++){
-      const y = espacio * n + 0.02;
+      const y = niveles > 1 ? (espacio * n + 0.02) : altoM/2;
       const p = box(anchoM - postW, 0.012, fondoM - postD*1.5, matPanel);
       p.position.set(x0 + anchoM/2, y, 0);
       parent.add(p);
     }
+    // 8 escuadras esquineras (4 arriba + 4 abajo)
+    const escS = 0.06;
+    barPos.forEach(p=>{
+      // Escuadra ARRIBA (justo debajo del panel superior)
+      const eArriba = box(escS, escS, escS, matEsc);
+      eArriba.position.set(p.x, altoM - 0.04, p.z);
+      parent.add(eArriba);
+      // Escuadra ABAJO (encima del piso, arriba del primer panel)
+      const eAbajo = box(escS, escS, escS, matEsc);
+      eAbajo.position.set(p.x, 0.06, p.z);
+      parent.add(eAbajo);
+    });
   }
 }
 
@@ -1480,14 +1506,12 @@ function buildMecano(){
   const cfg = getConfigMec();
   const g = new THREE.Group();
   buildMecanoScene(g, cfg.altoM, cfg.anchoM, cfg.fondoM, cfg.niveles, cfg.cuerpos);
-  // Centrar
   g.position.x = -cfg.anchoM * cfg.cuerpos / 2;
   grupo.add(g);
-  // Cotas
   const totalAncho = cfg.anchoM * cfg.cuerpos;
   agregarCotas(grupo, totalAncho, cfg.fondoM, cfg.altoM, null, 0);
-  // Claros
-  const espacio = cfg.altoM / cfg.niveles;
+  // Claros entre niveles (mismos que en 3D: nivel 0 abajo, nivel N-1 arriba)
+  const espacio = cfg.niveles > 1 ? (cfg.altoM - 0.04) / (cfg.niveles - 1) : 0;
   const alturasY = [];
   for(let n=0; n<cfg.niveles; n++) alturasY.push(espacio*n + 0.02);
   agregarCotasClaros(grupo, alturasY, -totalAncho/2 - 0.25, cfg.fondoM/2 + 0.05);
@@ -1502,9 +1526,8 @@ function calcularBomMecano(){
     items[sku] += q;
   }
   const skuBarra = cfg.altoCm === 250 ? MEC.BARRA_250 : MEC.BARRA_200;
-  // Cada módulo: 4 barras + 5 paneles + 16 escuadras + 60 tornillos
   add(skuBarra,     MEC_COMPO.barras    * cfg.cuerpos);
-  add(MEC.PANEL,    MEC_COMPO.paneles   * cfg.cuerpos);
+  add(MEC.PANEL,    cfg.niveles         * cfg.cuerpos);  // N paneles según niveles
   add(MEC.ESCUADRA, MEC_COMPO.escuadras * cfg.cuerpos);
   add(MEC.TORNILLO, MEC_COMPO.tornillos * cfg.cuerpos);
   return { items, orden };
@@ -2569,7 +2592,7 @@ function addEvents(){
   ['tipo','medida','niveles','modulos','cabeceras',
    'picAlto','picFondo','picLargo','picNiveles','picCuerpos','picChkRej','picChkPanel','picChkMadera',
    'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkPanel','selChkBot',
-   'mecAlto','mecCuerpos'].forEach(id=>{
+   'mecAlto','mecNiveles','mecCuerpos'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.addEventListener('change', build);
   });
@@ -2648,7 +2671,7 @@ function addEvents(){
 
   // Deep-link: abrir en un sistema específico según hash (#selectivo, #picking, #gondola)
   const hash = (location.hash || '').replace('#','').toLowerCase();
-  if(hash === 'selectivo' || hash === 'picking' || hash === 'gondola'){
+  if(hash === 'selectivo' || hash === 'picking' || hash === 'gondola' || hash === 'mecano'){
     const tab = document.querySelector('#tabs .tab[data-sys="'+hash+'"]');
     if(tab) tab.click();
   }

@@ -302,6 +302,18 @@ footer a:hover{color:#f97316}
         </div>
       </div>
 
+      <div class="system-card" onclick="location.href='/configurador.html#mecano'">
+        <div class="system-visual" style="padding:0">
+          <img src="/proyectos/mecano.jpg" alt="Mueble Mecano ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
+        </div>
+        <div class="system-body">
+          <h3>Mueble Mecano</h3>
+          <p>Anaquel ligero modular armable sin soldadura. Barras y paneles galvanizados con escuadras esquineras. Ideal para bodegas, garajes y oficinas.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('mecano')">ℹ Ver detalles</button>
+          <span class="more">Cotizar en 3D →</span>
+        </div>
+      </div>
+
       <div class="system-card">
         <div class="system-visual" style="padding:0">
           <img src="/proyectos/mecano.jpg" alt="Muebles Mecano ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
@@ -628,13 +640,16 @@ const SISTEMAS = {
     img: '/proyectos/mecano.jpg',
     lead: 'Estantería metálica ligera de angular ranurado. Solución económica y flexible para almacenaje manual en talleres, oficinas y bodegas pequeñas.',
     specs: [
-      ['Altura típica', '2 a 2.5 m'],
+      ['Altura', '200 cm o 250 cm'],
+      ['Ancho por módulo', '90 cm'],
+      ['Fondo', '30 cm'],
+      ['Niveles', '3 a 7 entrepaños'],
       ['Capacidad por entrepaño', 'Hasta 150 kg'],
-      ['Configuración', 'Sistema modular con tornillería'],
       ['Ensamble', 'Rápido, sin soldadura']
     ],
     apps: ['Talleres y refaccionarias', 'Oficinas y archivos', 'Almacenes de mediana carga', 'Cuartos de aseo y utilería'],
-    ventajas: ['Precio accesible', 'Fácil de reconfigurar', 'Entrepaños ajustables', 'Ensamble en minutos']
+    ventajas: ['Precio accesible', 'Fácil de reconfigurar', 'Entrepaños ajustables', 'Ensamble en minutos', 'Sin soldadura ni herramientas especializadas'],
+    cta: '/configurador.html#mecano'
   },
   archivero: {
     titulo: 'Archivero móvil',
