@@ -1071,19 +1071,20 @@ function buildCantileverScene(parent, cfg, colorHex){
     const zA = p * cfg.separacionM, zB = (p+1) * cfg.separacionM;
     const zM = (zA + zB) / 2;
     const anchoEntre = cfg.separacionM - colD;
-    // 4 horizontales distribuidos verticalmente
+    const sectorH = (cfg.altoM - 0.6) / 3;
+    const yInicio = 0.4;
+    // 4 travesaños horizontales exactamente en los puntos de unión de las X (arriba/abajo de cada sector)
     for(let h=0; h<4; h++){
-      const y = 0.5 + h * ((cfg.altoM - 0.9) / 3);
+      const y = yInicio + h * sectorH;
       const hor = box(0.03, 0.03, anchoEntre, matAtir);
       hor.position.set(0, y, zM);
       parent.add(hor);
     }
-    // 3 pares de verticales (X-brace) por par de columnas
-    const sectorH = (cfg.altoM - 0.6) / 3;
+    // 3 pares de verticales (X-brace) — coinciden con los travesaños arriba y abajo
     const largoDiag = Math.sqrt(anchoEntre*anchoEntre + sectorH*sectorH);
     const anguloDiag = Math.atan2(sectorH, anchoEntre);
     for(let v=0; v<3; v++){
-      const yCentro = 0.4 + v * sectorH + sectorH/2;
+      const yCentro = yInicio + v * sectorH + sectorH/2;
       // Diagonal 1 (\)
       const d1 = box(0.025, 0.025, largoDiag, matAtir);
       d1.position.set(0, yCentro, zM);
