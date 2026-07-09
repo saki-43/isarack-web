@@ -310,7 +310,7 @@
       <label>Medidas por panel</label>
       <div style="font-size:12px;color:#666;padding:6px 8px;background:#f5f5f5;border-radius:4px">
         Ancho 90 cm · Fondo 30 cm<br>
-        <span style="color:#DA6635;font-weight:600">Kit: 4 barras + N paneles + 8 escuadras + 4 bases + 60 tornillos</span>
+        <span style="color:#DA6635;font-weight:600">Kit por módulo: 4 barras + 4 bases + N paneles + 8 escuadras + (40 + 4×N) tornillos</span>
       </div>
     </div>
     <div class="row">
@@ -470,8 +470,10 @@ const MEC = {
   TORNILLO:  'SEL-0337'       // Tornillo M8x15mm
 };
 // Composición por módulo:
-//   4 barras + N paneles + 8 escuadras (4 arriba + 4 abajo) + 4 bases + 60 tornillos
-const MEC_COMPO = { barras:4, escuadras:8, bases:4, tornillos:60 };  // paneles = niveles (variable)
+//   4 barras + 4 bases + N paneles + 8 escuadras + (40 + 4×N) tornillos
+// Formula tornillos: 40 fijos (para escuadras y armado base) + 4 por nivel (para paneles)
+// Ejemplos: 3 niveles→52, 4→56, 5→60, 6→64, 7→68
+const MEC_COMPO = { barras:4, escuadras:8, bases:4, tornillosBase:40, tornillosPorNivel:4 };
 
 // Sistema activo
 let sistemaActual = 'gondola';
@@ -1514,11 +1516,12 @@ function calcularBomMecano(){
     items[sku] += q;
   }
   const skuBarra = cfg.altoCm === 250 ? MEC.BARRA_250 : MEC.BARRA_200;
+  const tornillosTotal = MEC_COMPO.tornillosBase + MEC_COMPO.tornillosPorNivel * cfg.niveles;
   add(skuBarra,     MEC_COMPO.barras    * cfg.cuerpos);
-  add(MEC.BASE,     MEC_COMPO.bases     * cfg.cuerpos);  // 4 bases de plástico (una por barra)
+  add(MEC.BASE,     MEC_COMPO.bases     * cfg.cuerpos);
   add(MEC.PANEL,    cfg.niveles         * cfg.cuerpos);
   add(MEC.ESCUADRA, MEC_COMPO.escuadras * cfg.cuerpos);
-  add(MEC.TORNILLO, MEC_COMPO.tornillos * cfg.cuerpos);
+  add(MEC.TORNILLO, tornillosTotal      * cfg.cuerpos);
   return { items, orden };
 }
 
