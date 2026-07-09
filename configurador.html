@@ -1048,7 +1048,9 @@ function buildCantileverScene(parent, cfg, colorHex){
   const matBase = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.6, metalness:0.4});
   const matAtir = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.55, metalness:0.5});
   const colW = 0.30, colD = 0.15;
-  const brazoAlto = 0.10, brazoAncho = 0.08;
+  const brazoAlto = 0.14;    // más alto que ancho (perfil viga)
+  const brazoAncho = 0.06;
+  const brazoAngulo = -0.055; // ~3° inclinado hacia arriba (frente más alto que raíz)
   const espacioNivel = (cfg.altoM - 0.6) / cfg.niveles;
   const isDoble = cfg.tipo === 'doble';
   for(let c=0; c<cfg.columnas; c++){
@@ -1073,16 +1075,27 @@ function buildCantileverScene(parent, cfg, colorHex){
       base.position.set((baseX/2) - 0.10, baseAlto/2, zCol);
       parent.add(base);
     }
-    // Brazos por nivel
+    // Brazos por nivel (con perfil viga y ligera inclinación hacia arriba)
     for(let n=0; n<cfg.niveles; n++){
       const y = 0.45 + espacioNivel * n;
+      // Brazo lado derecho
       const brazo1 = box(cfg.brazoM, brazoAlto, brazoAncho, matBrazo);
       brazo1.position.set(colW/2 + cfg.brazoM/2, y, zCol);
+      brazo1.rotation.z = brazoAngulo;
       parent.add(brazo1);
+      // Conector visible en la unión con la columna (parte que entra a la columna)
+      const conectorAlto = brazoAlto + 0.03;
+      const conector1 = box(0.06, conectorAlto, brazoAncho + 0.02, matBrazo);
+      conector1.position.set(colW/2 + 0.03, y, zCol);
+      parent.add(conector1);
       if(isDoble){
         const brazo2 = box(cfg.brazoM, brazoAlto, brazoAncho, matBrazo);
         brazo2.position.set(-colW/2 - cfg.brazoM/2, y, zCol);
+        brazo2.rotation.z = -brazoAngulo;
         parent.add(brazo2);
+        const conector2 = box(0.06, conectorAlto, brazoAncho + 0.02, matBrazo);
+        conector2.position.set(-colW/2 - 0.03, y, zCol);
+        parent.add(conector2);
       }
     }
   }
