@@ -2294,12 +2294,43 @@ function generarPDF(datos){
   doc.setFontSize(12);
   doc.setTextColor(...DARK);
   doc.text((datos.cliente||'—').toUpperCase(), M, y);
+  // Bloque de datos adicionales bajo el nombre (giro, RFC, contacto, dirección)
+  const infoY0 = y + 6;
+  let infoY = infoY0;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...GREY);
+  if(datos.giro){
+    infoY += 10;
+    doc.setFont('helvetica','italic');
+    doc.text(datos.giro, M, infoY);
+    doc.setFont('helvetica','normal');
+  }
+  if(datos.rfc){
+    infoY += 10;
+    doc.text('RFC: ' + datos.rfc, M, infoY);
+  }
+  if(datos.contacto || datos.tel){
+    infoY += 10;
+    const partes = [];
+    if(datos.contacto) partes.push('Contacto: ' + datos.contacto);
+    if(datos.tel) partes.push(datos.tel);
+    doc.text(partes.join(' · '), M, infoY);
+  }
+  if(datos.correo){
+    infoY += 10;
+    doc.text(datos.correo, M, infoY);
+  }
+  if(datos.dir){
+    infoY += 10;
+    doc.text('Dir: ' + datos.dir, M, infoY);
+  }
   doc.setTextColor(...ORANGE);
   doc.setFontSize(20);
   doc.text('Presupuesto # ' + folio, W - M, y, {align:'right'});
 
   // ── BLOQUE DE FECHAS ──
-  y = 148;
+  y = Math.max(148, infoY + 15);
   const boxH = 46;
   doc.setDrawColor(220,222,225);
   doc.setLineWidth(0.5);
