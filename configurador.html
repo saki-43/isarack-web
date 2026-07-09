@@ -2085,7 +2085,7 @@ function abrirFormCliente(){
     </div>
     <div class="grid2">
       <div class="row"><label>Contacto</label><input id="f_contacto" placeholder="Nombre" maxlength="60" autocomplete="name"></div>
-      <div class="row"><label>Teléfono / Cel</label><input id="f_tel" placeholder="6644211088" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel"></div>
+      <div class="row"><label>Teléfono / Cel *</label><input id="f_tel" placeholder="6644211088" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel"></div>
     </div>
     <div class="row"><label>Email</label><input id="f_email" placeholder="correo@empresa.com" type="email" maxlength="80" autocomplete="email"></div>
     <div class="row"><label>Dirección de entrega</label><input id="f_dir" placeholder="Ciudad / dirección" maxlength="200"></div>
@@ -2114,9 +2114,10 @@ function abrirFormCliente(){
     const email = document.getElementById('f_email').value.trim();
     const dir = document.getElementById('f_dir').value.trim();
     // Validaciones básicas
-    if(!cliente){ mostrarError('Captura al menos el nombre del cliente.'); return; }
+    if(!cliente){ mostrarError('Captura el nombre del cliente.'); return; }
     if(cliente.length < 2){ mostrarError('El nombre del cliente es muy corto.'); return; }
-    if(tel && tel.length !== 10){ mostrarError('El teléfono debe tener 10 dígitos (formato México).'); return; }
+    if(!tel){ mostrarError('Captura el teléfono de contacto.'); return; }
+    if(tel.length !== 10){ mostrarError('El teléfono debe tener 10 dígitos (formato México).'); return; }
     if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ mostrarError('El correo electrónico no es válido.'); return; }
     if(rfc && !/^([A-ZÑ&]{3,4})\d{6}([A-Z0-9]{3})?$/.test(rfc)){ mostrarError('El RFC no tiene formato válido (ej: XAXX010101000).'); return; }
     // Filtro anti-groserías (lista básica)
