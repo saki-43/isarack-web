@@ -1522,7 +1522,7 @@ function calcularBomMecano(){
   add(MEC.PANEL,    cfg.niveles         * cfg.cuerpos);
   add(MEC.ESCUADRA, MEC_COMPO.escuadras * cfg.cuerpos);
   add(MEC.TORNILLO, tornillosTotal      * cfg.cuerpos);
-  return { items, orden };
+  return orden.map(sku => [sku, items[sku]]);
 }
 
 function calcularBomGondola(){
