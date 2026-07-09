@@ -991,16 +991,29 @@ function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
       p.position.set(x0 + anchoM/2, y, 0);
       parent.add(p);
     }
-    // 8 escuadras esquineras (4 arriba + 4 abajo)
-    const escS = 0.06;
+    // 8 escuadras esquineras (4 arriba + 4 abajo) - refuerzos diagonales tipo ángulo
+    // Cada escuadra: cilindro delgado que va de la barra al panel a ~45°
+    const escLen = 0.15;   // 15cm de largo
+    const escGrosor = 0.008;
     barPos.forEach(p=>{
-      // Escuadra ARRIBA (justo debajo del panel superior)
-      const eArriba = box(escS, escS, escS, matEsc);
-      eArriba.position.set(p.x, altoM - 0.04, p.z);
+      // Vector hacia el centro del módulo (donde está el panel)
+      const dxCentro = (x0 + anchoM/2) - p.x;
+      const dzCentro = 0 - p.z;
+      const normX = dxCentro / Math.abs(dxCentro);
+      const normZ = dzCentro / Math.abs(dzCentro);
+      // Escuadra ARRIBA: va desde barra (arriba) hacia panel superior (adentro)
+      // La escuadra se apoya en el panel superior y baja diagonalmente hacia la barra
+      const geoUp = new THREE.CylinderGeometry(escGrosor, escGrosor, escLen, 6);
+      const eArriba = new THREE.Mesh(geoUp, matEsc);
+      // Punto medio entre (barra, altoM-0.10) y (barra + 0.10*normX, altoM-0.02)
+      eArriba.position.set(p.x + normX*0.05, altoM - 0.06, p.z + normZ*0.02);
+      // Inclinar 45° hacia el panel (rotación combinada X y Z)
+      eArriba.rotation.z = normX > 0 ? -Math.PI/4 : Math.PI/4;
       parent.add(eArriba);
-      // Escuadra ABAJO (encima del piso, arriba del primer panel)
-      const eAbajo = box(escS, escS, escS, matEsc);
-      eAbajo.position.set(p.x, 0.06, p.z);
+      // Escuadra ABAJO: idéntica pero invertida (apoyada en el panel inferior)
+      const eAbajo = new THREE.Mesh(geoUp, matEsc);
+      eAbajo.position.set(p.x + normX*0.05, 0.08, p.z + normZ*0.02);
+      eAbajo.rotation.z = normX > 0 ? Math.PI/4 : -Math.PI/4;
       parent.add(eAbajo);
     });
   }
