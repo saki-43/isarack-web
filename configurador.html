@@ -363,7 +363,8 @@
     </div>
     <div class="row">
       <div style="font-size:12px;color:#666;padding:6px 8px;background:#f5f5f5;border-radius:4px">
-        <span style="color:#DA6635;font-weight:600">Atirantados automáticos: 4 hor. + 3 vert. por par de columnas</span>
+        <span style="color:#DA6635;font-weight:600">Atirantados por par de columnas:</span><br>
+        12' → 2 diagonales + 3 travesaños · 16' → 3+4 · 20' → 4+5
       </div>
     </div>
   </div>
@@ -531,8 +532,16 @@ const CAN = {
   ATIR_HOR: 'CAN-0002',   // Atirantado horizontal 42" C-C ($22)
   ATIR_VER: 'CAN-0003'    // Atirantado vertical (par) ($30)
 };
-// Regla atirantados: por cada par de torres → 4 horizontales + 3 verticales
-// Con N columnas: (N-1) pares → 4*(N-1) hor + 3*(N-1) vert
+// Regla atirantados según altura de columna (POR PAR de torres):
+//   12' → 2 diagonales + 3 travesaños
+//   16' → 3 diagonales + 4 travesaños
+//   20' → 4 diagonales + 5 travesaños
+// Con N columnas: (N-1) pares → cantidades × (N-1)
+const CAN_ATIR = {
+  12: { diagonales:2, travesanos:3 },
+  16: { diagonales:3, travesanos:4 },
+  20: { diagonales:4, travesanos:5 }
+};
 
 // Sistema activo
 let sistemaActual = 'gondola';
@@ -1077,31 +1086,32 @@ function buildCantileverScene(parent, cfg, colorHex){
       }
     }
   }
-  // Atirantados entre pares de columnas (X-brace)
+  // Atirantados entre pares de columnas (X-brace) — cantidad según altura
+  const reglaAtir = CAN_ATIR[cfg.altoFt] || { diagonales:3, travesanos:4 };
+  const N_DIAG = reglaAtir.diagonales;
+  const N_TRAV = reglaAtir.travesanos;  // = N_DIAG + 1
   for(let p=0; p<cfg.columnas - 1; p++){
     const zA = p * cfg.separacionM, zB = (p+1) * cfg.separacionM;
     const zM = (zA + zB) / 2;
     const anchoEntre = cfg.separacionM - colD;
-    const sectorH = (cfg.altoM - 0.6) / 3;
+    const sectorH = (cfg.altoM - 0.6) / N_DIAG;
     const yInicio = 0.4;
-    // 4 travesaños horizontales exactamente en los puntos de unión de las X (arriba/abajo de cada sector)
-    for(let h=0; h<4; h++){
+    // Travesaños en los puntos de unión de las diagonales (N_DIAG+1 puntos)
+    for(let h=0; h<N_TRAV; h++){
       const y = yInicio + h * sectorH;
       const hor = box(0.03, 0.03, anchoEntre, matAtir);
       hor.position.set(0, y, zM);
       parent.add(hor);
     }
-    // 3 pares de verticales (X-brace) — coinciden con los travesaños arriba y abajo
+    // Diagonales (X-brace) — N_DIAG pares
     const largoDiag = Math.sqrt(anchoEntre*anchoEntre + sectorH*sectorH);
     const anguloDiag = Math.atan2(sectorH, anchoEntre);
-    for(let v=0; v<3; v++){
+    for(let v=0; v<N_DIAG; v++){
       const yCentro = yInicio + v * sectorH + sectorH/2;
-      // Diagonal 1 (\)
       const d1 = box(0.025, 0.025, largoDiag, matAtir);
       d1.position.set(0, yCentro, zM);
       d1.rotation.x = anguloDiag;
       parent.add(d1);
-      // Diagonal 2 (/)
       const d2 = box(0.025, 0.025, largoDiag, matAtir);
       d2.position.set(0, yCentro, zM);
       d2.rotation.x = -anguloDiag;
@@ -1137,10 +1147,11 @@ function calcularBomCantilever(){
   add(skuCol,   cfg.columnas);
   add(skuBase,  cfg.columnas);
   add(skuBrazo, cfg.columnas * cfg.niveles * brazoMult);
-  // Atirantados: 4 hor + 3 vert por cada par de columnas (N-1 pares)
+  // Atirantados según altura de columna: 12'→2d+3t, 16'→3d+4t, 20'→4d+5t (por par)
+  const reglaAtir = CAN_ATIR[cfg.altoFt] || { diagonales:3, travesanos:4 };
   const pares = Math.max(0, cfg.columnas - 1);
-  add(CAN.ATIR_HOR, 4 * pares);
-  add(CAN.ATIR_VER, 3 * pares);
+  add(CAN.ATIR_HOR, reglaAtir.travesanos * pares);
+  add(CAN.ATIR_VER, reglaAtir.diagonales * pares);
   return orden.map(sku => [sku, items[sku]]);
 }
 
