@@ -521,12 +521,13 @@ const MEC_COMPO = { barras:4, escuadras:8, bases:4, tornillosBase:40, tornillosP
 
 // CANTILEVER — rack de brazos horizontales para material largo
 const CAN = {
-  COL: { 12:'CAN-0013', 16:'CAN-0014', 20:'CAN-0015' },      // Columna por altura (ft)
-  BRAZO: { 24:'CAN-0008', 36:'CAN-0009', 42:'CAN-0010', 48:'CAN-0011', 65:'CAN-0012' },  // Brazo por largo (in)
-  BASE_SEN: 'CAN-0007',   // Base sencilla 48"/68"
-  BASE_DOB: 'CAN-0006',   // Base doble 48"/113"
-  ATIR_HOR: 'CAN-0002',   // Atirantado horizontal 42" C-C ($22)
-  ATIR_VER: 'CAN-0003'    // Atirantado vertical (par) ($30)
+  COL: { 12:'CAN-0013', 16:'CAN-0014', 20:'CAN-0015' },
+  BRAZO: { 24:'CAN-0008', 36:'CAN-0009', 42:'CAN-0010', 48:'CAN-0011', 65:'CAN-0012' },
+  BASE_SEN: 'CAN-0007',
+  BASE_DOB: 'CAN-0006',
+  ATIR_HOR: 'CAN-0002',
+  ATIR_VER: 'CAN-0003',
+  ANCLA:    'SEL-0001'     // Anclaje 1/2" x 4 1/4" expansible (4 por base)
 };
 // Regla atirantados según altura de columna (POR PAR de torres):
 //   12' → 2 diagonales + 3 travesaños
@@ -1202,6 +1203,7 @@ function calcularBomCantilever(){
   const brazoMult = cfg.tipo === 'doble' ? 2 : 1;
   add(skuCol,   cfg.columnas);
   add(skuBase,  cfg.columnas);
+  add(CAN.ANCLA, 4 * cfg.columnas);           // 4 anclas por base
   add(skuBrazo, cfg.columnas * cfg.niveles * brazoMult);
   // Atirantados según altura de columna: 12'→2d+3t, 16'→3d+4t, 20'→4d+5t (por par)
   const reglaAtir = CAN_ATIR[cfg.altoFt] || { diagonales:3, travesanos:4 };
