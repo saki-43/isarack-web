@@ -1048,11 +1048,22 @@ function buildCantileverScene(parent, cfg, colorHex){
     const col = box(colW, cfg.altoM, colD, matCol);
     col.position.set(0, cfg.altoM/2, zCol);
     parent.add(col);
-    // Base
-    const baseW = colW + 0.30, baseD = isDoble ? 2.30 : 1.20;
-    const base = box(baseW, 0.10, baseD, matBase);
-    base.position.set(0, 0.05, zCol);
-    parent.add(base);
+    // Base: se extiende HACIA EL FRENTE (dirección del brazo), no hacia los lados
+    const baseAlto = 0.10;
+    const baseZ = 0.30;  // estrecha (a lo largo del rack)
+    if(isDoble){
+      // Doble: base extendida a ambos lados
+      const baseX = 2 * cfg.brazoM + 0.20;
+      const base = box(baseX, baseAlto, baseZ, matBase);
+      base.position.set(0, baseAlto/2, zCol);
+      parent.add(base);
+    } else {
+      // Sencillo: base extendida solo hacia el frente (+X)
+      const baseX = cfg.brazoM + 0.20;
+      const base = box(baseX, baseAlto, baseZ, matBase);
+      base.position.set((baseX/2) - 0.10, baseAlto/2, zCol);
+      parent.add(base);
+    }
     // Brazos por nivel
     for(let n=0; n<cfg.niveles; n++){
       const y = 0.45 + espacioNivel * n;
