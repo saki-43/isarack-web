@@ -115,6 +115,7 @@
     <div class="tab" data-sys="picking">📚 Picking</div>
     <div class="tab" data-sys="selectivo">🏗️ Selectivo</div>
     <div class="tab" data-sys="mecano">🔩 Mecano</div>
+    <div class="tab" data-sys="cantilever">🌲 Cantilever</div>
   </div>
 
   <div class="row" id="rowColorRack">
@@ -321,6 +322,52 @@
     </div>
   </div>
 
+  <!-- Opciones CANTILEVER -->
+  <div id="opCantilever" style="display:none">
+    <div class="row">
+      <label>Tipo</label>
+      <select id="canTipo">
+        <option value="sencillo" selected>Sencillo (1 lado)</option>
+        <option value="doble">Doble (2 lados)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Altura de columna</label>
+      <select id="canAlto">
+        <option value="12">12' (3.66 m)</option>
+        <option value="16" selected>16' (4.88 m)</option>
+        <option value="20">20' (6.10 m)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Largo del brazo</label>
+      <select id="canBrazo">
+        <option value="24">24" (61 cm)</option>
+        <option value="36">36" (91 cm)</option>
+        <option value="42">42" (107 cm)</option>
+        <option value="48" selected>48" (122 cm)</option>
+        <option value="65">65" (165 cm)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Niveles de brazos por columna</label>
+      <select id="canNiveles">
+        <option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Columnas</label>
+      <select id="canColumnas">
+        <option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option>
+      </select>
+    </div>
+    <div class="row">
+      <div style="font-size:12px;color:#666;padding:6px 8px;background:#f5f5f5;border-radius:4px">
+        <span style="color:#DA6635;font-weight:600">Atirantados automáticos: 4 hor. + 3 vert. por par de columnas</span>
+      </div>
+    </div>
+  </div>
+
   <label class="chk"><input type="checkbox" id="auto" checked> Girar automático</label>
   <button id="wa">📱 Solicitar cotización por WhatsApp</button>
   <button id="reset">Reiniciar vista</button>
@@ -474,6 +521,18 @@ const MEC = {
 // Formula tornillos: 40 fijos (para escuadras y armado base) + 4 por nivel (para paneles)
 // Ejemplos: 3 niveles→52, 4→56, 5→60, 6→64, 7→68
 const MEC_COMPO = { barras:4, escuadras:8, bases:4, tornillosBase:40, tornillosPorNivel:4 };
+
+// CANTILEVER — rack de brazos horizontales para material largo
+const CAN = {
+  COL: { 12:'CAN-0013', 16:'CAN-0014', 20:'CAN-0015' },      // Columna por altura (ft)
+  BRAZO: { 24:'CAN-0008', 36:'CAN-0009', 42:'CAN-0010', 48:'CAN-0011', 65:'CAN-0012' },  // Brazo por largo (in)
+  BASE_SEN: 'CAN-0007',   // Base sencilla 48"/68"
+  BASE_DOB: 'CAN-0006',   // Base doble 48"/113"
+  ATIR_HOR: 'CAN-0002',   // Atirantado horizontal 42" C-C ($22)
+  ATIR_VER: 'CAN-0003'    // Atirantado vertical (par) ($30)
+};
+// Regla atirantados: por cada par de torres → 4 horizontales + 3 verticales
+// Con N columnas: (N-1) pares → 4*(N-1) hor + 3*(N-1) vert
 
 // Sistema activo
 let sistemaActual = 'gondola';
@@ -960,6 +1019,117 @@ function getConfigMec(){
   const fondoCm = 30;        // fijo
   return { altoCm, anchoCm, fondoCm, cuerpos, niveles,
            altoM: altoCm/100, anchoM: anchoCm/100, fondoM: fondoCm/100 };
+}
+
+function getConfigCan(){
+  const tipo = document.getElementById('canTipo').value;
+  const altoFt = parseInt(document.getElementById('canAlto').value);
+  const brazoIn = parseInt(document.getElementById('canBrazo').value);
+  const niveles = parseInt(document.getElementById('canNiveles').value);
+  const columnas = parseInt(document.getElementById('canColumnas').value);
+  const altoM = altoFt * 0.3048;
+  const brazoM = brazoIn * IN_TO_M;
+  const separacionM = 42 * IN_TO_M;  // 42" C-C
+  return { tipo, altoFt, brazoIn, niveles, columnas, altoM, brazoM, separacionM };
+}
+
+function buildCantileverScene(parent, cfg, colorHex){
+  const matCol = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.55, metalness:0.4});
+  const matBrazo = new THREE.MeshStandardMaterial({color:0xdb6935, roughness:0.5, metalness:0.4});
+  const matBase = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.6, metalness:0.4});
+  const matAtir = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.55, metalness:0.5});
+  const colW = 0.30, colD = 0.15;
+  const brazoAlto = 0.10, brazoAncho = 0.08;
+  const espacioNivel = (cfg.altoM - 0.6) / cfg.niveles;
+  const isDoble = cfg.tipo === 'doble';
+  for(let c=0; c<cfg.columnas; c++){
+    const zCol = c * cfg.separacionM;
+    // Columna
+    const col = box(colW, cfg.altoM, colD, matCol);
+    col.position.set(0, cfg.altoM/2, zCol);
+    parent.add(col);
+    // Base
+    const baseW = colW + 0.30, baseD = isDoble ? 2.30 : 1.20;
+    const base = box(baseW, 0.10, baseD, matBase);
+    base.position.set(0, 0.05, zCol);
+    parent.add(base);
+    // Brazos por nivel
+    for(let n=0; n<cfg.niveles; n++){
+      const y = 0.45 + espacioNivel * n;
+      const brazo1 = box(cfg.brazoM, brazoAlto, brazoAncho, matBrazo);
+      brazo1.position.set(colW/2 + cfg.brazoM/2, y, zCol);
+      parent.add(brazo1);
+      if(isDoble){
+        const brazo2 = box(cfg.brazoM, brazoAlto, brazoAncho, matBrazo);
+        brazo2.position.set(-colW/2 - cfg.brazoM/2, y, zCol);
+        parent.add(brazo2);
+      }
+    }
+  }
+  // Atirantados entre pares de columnas (X-brace)
+  for(let p=0; p<cfg.columnas - 1; p++){
+    const zA = p * cfg.separacionM, zB = (p+1) * cfg.separacionM;
+    const zM = (zA + zB) / 2;
+    const anchoEntre = cfg.separacionM - colD;
+    // 4 horizontales distribuidos verticalmente
+    for(let h=0; h<4; h++){
+      const y = 0.5 + h * ((cfg.altoM - 0.9) / 3);
+      const hor = box(0.03, 0.03, anchoEntre, matAtir);
+      hor.position.set(0, y, zM);
+      parent.add(hor);
+    }
+    // 3 pares de verticales (X-brace) por par de columnas
+    const sectorH = (cfg.altoM - 0.6) / 3;
+    const largoDiag = Math.sqrt(anchoEntre*anchoEntre + sectorH*sectorH);
+    const anguloDiag = Math.atan2(sectorH, anchoEntre);
+    for(let v=0; v<3; v++){
+      const yCentro = 0.4 + v * sectorH + sectorH/2;
+      // Diagonal 1 (\)
+      const d1 = box(0.025, 0.025, largoDiag, matAtir);
+      d1.position.set(0, yCentro, zM);
+      d1.rotation.x = anguloDiag;
+      parent.add(d1);
+      // Diagonal 2 (/)
+      const d2 = box(0.025, 0.025, largoDiag, matAtir);
+      d2.position.set(0, yCentro, zM);
+      d2.rotation.x = -anguloDiag;
+      parent.add(d2);
+    }
+  }
+}
+
+function buildCantilever(){
+  const cfg = getConfigCan();
+  const g = new THREE.Group();
+  const colorHex = document.getElementById('colorRack').value === 'azul' ? 0x1a3f8e : 0x1e6b3a;
+  buildCantileverScene(g, cfg, colorHex);
+  const totalZ = (cfg.columnas - 1) * cfg.separacionM;
+  g.position.z = -totalZ / 2;
+  grupo.add(g);
+  const anchoBase = cfg.brazoM * (cfg.tipo === 'doble' ? 2 : 1) + 0.30;
+  agregarCotas(grupo, anchoBase, totalZ, cfg.altoM, null, 0);
+}
+
+function calcularBomCantilever(){
+  const cfg = getConfigCan();
+  const items = {}; const orden = [];
+  function add(sku, q){
+    if(!sku) return;
+    if(items[sku]===undefined){ items[sku]=0; orden.push(sku); }
+    items[sku] += q;
+  }
+  const skuCol = CAN.COL[cfg.altoFt];
+  const skuBrazo = CAN.BRAZO[cfg.brazoIn];
+  const skuBase = cfg.tipo === 'doble' ? CAN.BASE_DOB : CAN.BASE_SEN;
+  const brazoMult = cfg.tipo === 'doble' ? 2 : 1;
+  add(skuCol,   cfg.columnas);
+  add(skuBase,  cfg.columnas);
+  add(skuBrazo, cfg.columnas * cfg.niveles * brazoMult);
+  // Atirantados: 4 hor + 3 vert por cada par de columnas (N-1 pares)
+  const pares = Math.max(0, cfg.columnas - 1);
+  add(CAN.ATIR_HOR, 4 * pares);
+  add(CAN.ATIR_VER, 3 * pares);
+  return orden.map(sku => [sku, items[sku]]);
 }
 
 function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
@@ -1467,6 +1637,7 @@ function build(){
   if(sistemaActual === 'selectivo') buildSelectivo();
   else if(sistemaActual === 'picking') buildPicking();
   else if(sistemaActual === 'mecano') buildMecano();
+  else if(sistemaActual === 'cantilever') buildCantilever();
   else buildGondola();
   // Muñeco Isaac al lado izquierdo del rack (referencia de escala 1.75 m)
   // Calcular el extremo izquierdo del modelo según el sistema
@@ -1480,6 +1651,10 @@ function build(){
   } else if(sistemaActual === 'mecano'){
     const cfg = getConfigMec();
     extremoIzq = cfg.anchoM * cfg.cuerpos / 2 + 0.9;
+  } else if(sistemaActual === 'cantilever'){
+    const cfg = getConfigCan();
+    const anchoBase = cfg.brazoM * (cfg.tipo === 'doble' ? 2 : 1) + 0.30;
+    extremoIzq = anchoBase / 2 + 1.0;
   } else {
     const m = MED[document.getElementById('medida').value];
     const mods = parseInt(document.getElementById('modulos').value);
@@ -1635,6 +1810,7 @@ function calcularBOM(){
   if(sistemaActual === 'selectivo') return calcularBomSelectivo();
   if(sistemaActual === 'picking')   return calcularBomPicking();
   if(sistemaActual === 'mecano')    return calcularBomMecano();
+  if(sistemaActual === 'cantilever')return calcularBomCantilever();
   return calcularBomGondola();
 }
 
@@ -1824,7 +2000,7 @@ async function sbInsertVenta(body){
 
 async function cargarPrecios(){
   if(preciosCache) return preciosCache;
-  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO,MECANO)&select=sku,producto,precio,sistema,cantidad");
+  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO,MECANO,CANTILEVER)&select=sku,producto,precio,sistema,cantidad");
   const map = {};
   inventarioArr = [];
   for(const row of data){
@@ -2063,6 +2239,13 @@ function configResumen(){
       txt: 'Mecano · '+cfg.altoCm+'cm × '+cfg.anchoCm+'cm × '+cfg.fondoCm+'cm · '+cfg.niveles+' entrepaños · '+cfg.cuerpos+' módulo'+(cfg.cuerpos>1?'s':'')
     };
   }
+  if(sistemaActual === 'cantilever'){
+    const cfg = getConfigCan();
+    return {
+      sistema: 'Cantilever',
+      txt: 'Cantilever '+cfg.tipo+' · Col. '+cfg.altoFt+'ft × 12" · Brazo '+cfg.brazoIn+'" · '+cfg.niveles+' niveles · '+cfg.columnas+' columnas'
+    };
+  }
   const t = document.getElementById('tipo').selectedOptions[0].text;
   const md = document.getElementById('medida').selectedOptions[0].text;
   const nv = document.getElementById('niveles').value;
@@ -2154,6 +2337,11 @@ function captura3D(){
       const cfg = getConfigMec();
       xExt = cfg.anchoM * cfg.cuerpos;
       zExt = cfg.fondoM;
+      alto = cfg.altoM;
+    } else if(sistemaActual === 'cantilever'){
+      const cfg = getConfigCan();
+      xExt = cfg.brazoM * (cfg.tipo === 'doble' ? 2 : 1) + 0.30;
+      zExt = (cfg.columnas - 1) * cfg.separacionM;
       alto = cfg.altoM;
     } else {
       const m = MED[document.getElementById('medida').value];
@@ -2650,7 +2838,8 @@ function addEvents(){
   ['tipo','medida','niveles','modulos','cabeceras',
    'picAlto','picFondo','picLargo','picNiveles','picCuerpos','picChkRej','picChkPanel','picChkMadera',
    'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkPanel','selChkBot',
-   'mecAlto','mecNiveles','mecCuerpos'].forEach(id=>{
+   'mecAlto','mecNiveles','mecCuerpos',
+   'canTipo','canAlto','canBrazo','canNiveles','canColumnas'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.addEventListener('change', build);
   });
@@ -2712,6 +2901,7 @@ function addEvents(){
       document.getElementById('opPicking').style.display   = sistemaActual==='picking'   ? '' : 'none';
       document.getElementById('opSelectivo').style.display = sistemaActual==='selectivo' ? '' : 'none';
       document.getElementById('opMecano').style.display    = sistemaActual==='mecano'    ? '' : 'none';
+      document.getElementById('opCantilever').style.display = sistemaActual==='cantilever' ? '' : 'none';
       ajustarSelectorColor();
       build();
     });
@@ -2729,7 +2919,7 @@ function addEvents(){
 
   // Deep-link: abrir en un sistema específico según hash (#selectivo, #picking, #gondola)
   const hash = (location.hash || '').replace('#','').toLowerCase();
-  if(hash === 'selectivo' || hash === 'picking' || hash === 'gondola' || hash === 'mecano'){
+  if(hash === 'selectivo' || hash === 'picking' || hash === 'gondola' || hash === 'mecano' || hash === 'cantilever'){
     const tab = document.querySelector('#tabs .tab[data-sys="'+hash+'"]');
     if(tab) tab.click();
   }
