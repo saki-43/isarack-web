@@ -1049,9 +1049,9 @@ function buildCantileverScene(parent, cfg, colorHex){
   const matAtir = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.45, metalness:0.55});
   const colW = 0.30, colD = 0.15;
   const brazoAlto = 0.11, brazoAncho = 0.06;
-  // Distribución uniforme: primer nivel a 0.60m del piso, último a 0.30m del top
-  const yPrimero = 0.60;
-  const yUltimo = cfg.altoM - 0.30;
+  // Distribución: primer nivel sobre la base (a 20cm del piso), último con 80cm de respaldo arriba
+  const yPrimero = 0.20;
+  const yUltimo = cfg.altoM - 0.80;
   const espacioNivel = cfg.niveles > 1 ? (yUltimo - yPrimero) / (cfg.niveles - 1) : 0;
   const isDoble = cfg.tipo === 'doble';
 
