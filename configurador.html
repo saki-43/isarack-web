@@ -1043,76 +1043,130 @@ function getConfigCan(){
 }
 
 function buildCantileverScene(parent, cfg, colorHex){
-  const matCol = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.55, metalness:0.4});
-  const matBrazo = new THREE.MeshStandardMaterial({color:0xdb6935, roughness:0.5, metalness:0.4});
-  const matBase = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.6, metalness:0.4});
-  const matAtir = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.55, metalness:0.5});
+  const matCol = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.45, metalness:0.55});
+  const matBrazo = new THREE.MeshStandardMaterial({color:0xdb6935, roughness:0.4, metalness:0.5});
+  const matBase = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.5, metalness:0.5});
+  const matAtir = new THREE.MeshStandardMaterial({color:colorHex, roughness:0.45, metalness:0.55});
   const colW = 0.30, colD = 0.15;
-  const brazoAlto = 0.10, brazoAncho = 0.07;
+  const brazoAlto = 0.11, brazoAncho = 0.06;
   const espacioNivel = (cfg.altoM - 0.6) / cfg.niveles;
   const isDoble = cfg.tipo === 'doble';
+
+  // Función helper: dibujar una columna con perfil I (3 partes: alas y alma)
+  function drawColumnaPerfilI(x, z, alto){
+    const alaGrosor = 0.018;
+    const almaGrosor = 0.04;
+    // Ala frontal (Z+)
+    const alaF = box(colW, alto, alaGrosor, matCol);
+    alaF.position.set(x, alto/2, z + colD/2 - alaGrosor/2);
+    parent.add(alaF);
+    // Ala trasera (Z-)
+    const alaB = box(colW, alto, alaGrosor, matCol);
+    alaB.position.set(x, alto/2, z - colD/2 + alaGrosor/2);
+    parent.add(alaB);
+    // Alma central
+    const alma = box(almaGrosor, alto, colD - 2*alaGrosor, matCol);
+    alma.position.set(x, alto/2, z);
+    parent.add(alma);
+  }
+
+  // Función helper: dibujar una base robusta (tipo pata) hacia adelante
+  function drawBase(x, z, hacia){
+    // hacia: 'frente' | 'ambos'
+    const alto = 0.12;
+    const anchoZ = 0.20;   // ancho a lo largo del rack
+    const largoX = cfg.brazoM + 0.20;
+    if(hacia === 'ambos'){
+      // Base doble: se extiende a los dos lados
+      const totalX = 2 * cfg.brazoM + 0.30;
+      const base = box(totalX, alto, anchoZ, matBase);
+      base.position.set(x, alto/2, z);
+      parent.add(base);
+      // Patitas de sujeción al piso en los extremos
+      const pata1 = box(0.20, 0.03, anchoZ + 0.06, matBase);
+      pata1.position.set(x + totalX/2 - 0.10, 0.015, z);
+      parent.add(pata1);
+      const pata2 = box(0.20, 0.03, anchoZ + 0.06, matBase);
+      pata2.position.set(x - totalX/2 + 0.10, 0.015, z);
+      parent.add(pata2);
+    } else {
+      // Base sencilla: se extiende solo hacia el frente (+X)
+      const base = box(largoX, alto, anchoZ, matBase);
+      base.position.set(x + largoX/2 - 0.10, alto/2, z);
+      parent.add(base);
+      // Patita en el extremo delantero
+      const pata1 = box(0.22, 0.03, anchoZ + 0.06, matBase);
+      pata1.position.set(x + largoX - 0.20, 0.015, z);
+      parent.add(pata1);
+      // Patita en la base de la columna
+      const pata2 = box(0.22, 0.03, anchoZ + 0.06, matBase);
+      pata2.position.set(x - 0.06, 0.015, z);
+      parent.add(pata2);
+    }
+  }
+
   for(let c=0; c<cfg.columnas; c++){
     const zCol = c * cfg.separacionM;
-    // Columna
-    const col = box(colW, cfg.altoM, colD, matCol);
-    col.position.set(0, cfg.altoM/2, zCol);
-    parent.add(col);
-    // Base: se extiende HACIA EL FRENTE (dirección del brazo), no hacia los lados
-    const baseAlto = 0.10;
-    const baseZ = 0.30;  // estrecha (a lo largo del rack)
-    if(isDoble){
-      // Doble: base extendida a ambos lados
-      const baseX = 2 * cfg.brazoM + 0.20;
-      const base = box(baseX, baseAlto, baseZ, matBase);
-      base.position.set(0, baseAlto/2, zCol);
-      parent.add(base);
-    } else {
-      // Sencillo: base extendida solo hacia el frente (+X)
-      const baseX = cfg.brazoM + 0.20;
-      const base = box(baseX, baseAlto, baseZ, matBase);
-      base.position.set((baseX/2) - 0.10, baseAlto/2, zCol);
-      parent.add(base);
-    }
+    // Columna con perfil I
+    drawColumnaPerfilI(0, zCol, cfg.altoM);
+    // Base robusta hacia el frente (o ambos lados si doble)
+    drawBase(0, zCol, isDoble ? 'ambos' : 'frente');
     // Brazos por nivel
     for(let n=0; n<cfg.niveles; n++){
       const y = 0.45 + espacioNivel * n;
+      // Brazo lado derecho
       const brazo1 = box(cfg.brazoM, brazoAlto, brazoAncho, matBrazo);
       brazo1.position.set(colW/2 + cfg.brazoM/2, y, zCol);
       parent.add(brazo1);
+      // Ala superior del brazo (perfil I) — más ancha que el alma
+      const alaBrazoTop = box(cfg.brazoM * 0.95, 0.015, brazoAncho + 0.03, matBrazo);
+      alaBrazoTop.position.set(colW/2 + cfg.brazoM/2, y + brazoAlto/2 + 0.008, zCol);
+      parent.add(alaBrazoTop);
+      // Ala inferior
+      const alaBrazoBot = box(cfg.brazoM * 0.95, 0.015, brazoAncho + 0.03, matBrazo);
+      alaBrazoBot.position.set(colW/2 + cfg.brazoM/2, y - brazoAlto/2 - 0.008, zCol);
+      parent.add(alaBrazoBot);
       if(isDoble){
         const brazo2 = box(cfg.brazoM, brazoAlto, brazoAncho, matBrazo);
         brazo2.position.set(-colW/2 - cfg.brazoM/2, y, zCol);
         parent.add(brazo2);
+        const alaBrazoTop2 = box(cfg.brazoM * 0.95, 0.015, brazoAncho + 0.03, matBrazo);
+        alaBrazoTop2.position.set(-colW/2 - cfg.brazoM/2, y + brazoAlto/2 + 0.008, zCol);
+        parent.add(alaBrazoTop2);
+        const alaBrazoBot2 = box(cfg.brazoM * 0.95, 0.015, brazoAncho + 0.03, matBrazo);
+        alaBrazoBot2.position.set(-colW/2 - cfg.brazoM/2, y - brazoAlto/2 - 0.008, zCol);
+        parent.add(alaBrazoBot2);
       }
     }
   }
   // Atirantados entre pares de columnas (X-brace) — cantidad según altura
   const reglaAtir = CAN_ATIR[cfg.altoFt] || { diagonales:3, travesanos:4 };
   const N_DIAG = reglaAtir.diagonales;
-  const N_TRAV = reglaAtir.travesanos;  // = N_DIAG + 1
+  const N_TRAV = reglaAtir.travesanos;
+  const atirGrosor = 0.035;    // más grueso, más visible
   for(let p=0; p<cfg.columnas - 1; p++){
     const zA = p * cfg.separacionM, zB = (p+1) * cfg.separacionM;
     const zM = (zA + zB) / 2;
     const anchoEntre = cfg.separacionM - colD;
     const sectorH = (cfg.altoM - 0.6) / N_DIAG;
     const yInicio = 0.4;
-    // Travesaños en los puntos de unión de las diagonales (N_DIAG+1 puntos)
+    // Travesaños horizontales en los puntos de unión
     for(let h=0; h<N_TRAV; h++){
       const y = yInicio + h * sectorH;
-      const hor = box(0.03, 0.03, anchoEntre, matAtir);
+      const hor = box(atirGrosor, atirGrosor, anchoEntre, matAtir);
       hor.position.set(0, y, zM);
       parent.add(hor);
     }
-    // Diagonales (X-brace) — N_DIAG pares
+    // Diagonales (X-brace)
     const largoDiag = Math.sqrt(anchoEntre*anchoEntre + sectorH*sectorH);
     const anguloDiag = Math.atan2(sectorH, anchoEntre);
     for(let v=0; v<N_DIAG; v++){
       const yCentro = yInicio + v * sectorH + sectorH/2;
-      const d1 = box(0.025, 0.025, largoDiag, matAtir);
+      const d1 = box(0.028, 0.028, largoDiag, matAtir);
       d1.position.set(0, yCentro, zM);
       d1.rotation.x = anguloDiag;
       parent.add(d1);
-      const d2 = box(0.025, 0.025, largoDiag, matAtir);
+      const d2 = box(0.028, 0.028, largoDiag, matAtir);
       d2.position.set(0, yCentro, zM);
       d2.rotation.x = -anguloDiag;
       parent.add(d2);
