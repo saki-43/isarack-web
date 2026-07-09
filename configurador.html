@@ -114,6 +114,7 @@
     <div class="tab active" data-sys="gondola">📦 Góndola</div>
     <div class="tab" data-sys="picking">📚 Picking</div>
     <div class="tab" data-sys="selectivo">🏗️ Selectivo</div>
+    <div class="tab" data-sys="mecano">🔩 Mecano</div>
   </div>
 
   <div class="row" id="rowColorRack">
@@ -290,6 +291,30 @@
     <label class="chk"><input type="checkbox" id="selChkBot"> Protector puntal</label>
   </div>
 
+  <!-- Opciones MECANO -->
+  <div id="opMecano" style="display:none">
+    <div class="row">
+      <label>Alto del módulo</label>
+      <select id="mecAlto">
+        <option value="200">200 cm (2.00 m)</option>
+        <option value="250" selected>250 cm (2.50 m)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Medidas fijas por módulo</label>
+      <div style="font-size:12px;color:#666;padding:6px 8px;background:#f5f5f5;border-radius:4px">
+        Ancho 90 cm · Fondo 30 cm · 5 entrepaños<br>
+        <span style="color:#DA6635;font-weight:600">4 barras + 5 paneles + 16 escuadras + 60 tornillos</span>
+      </div>
+    </div>
+    <div class="row">
+      <label>Módulos en fila</label>
+      <select id="mecCuerpos">
+        <option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
+      </select>
+    </div>
+  </div>
+
   <label class="chk"><input type="checkbox" id="auto" checked> Girar automático</label>
   <button id="wa">📱 Solicitar cotización por WhatsApp</button>
   <button id="reset">Reiniciar vista</button>
@@ -428,6 +453,17 @@ const TAM_PIC = {
   200:{18:'PIC-0074',24:'PIC-0075',36:'PIC-0076'},
   230:{18:'PIC-0077',24:'PIC-0078',36:'PIC-0079'}
 };
+
+// MECANO — anaqueles ligeros modulares
+const MEC = {
+  BARRA_200: 'MEC-0001',      // Barra 200cm
+  BARRA_250: 'MEC-0007',      // Barra 250cm
+  PANEL:     'MEC-0005',      // Panel 90x30cm
+  ESCUADRA:  'MEC-0006',      // Escuadra esquinero 15cm
+  TORNILLO:  'SEL-0337'       // Tornillo M8x15mm (usado en Selectivo también)
+};
+// Composición fija por módulo: 4 barras + 5 paneles + 16 escuadras + 60 tornillos
+const MEC_COMPO = { barras:4, paneles:5, escuadras:16, tornillos:60 };
 
 // Sistema activo
 let sistemaActual = 'gondola';
@@ -906,6 +942,44 @@ function getConfigSel(){
     altoM: altoIn*IN_TO_M, fondoM: fondoIn*IN_TO_M, vigaM: vigaIn*IN_TO_M};
 }
 
+function getConfigMec(){
+  const altoCm = parseInt(document.getElementById('mecAlto').value);
+  const cuerpos = parseInt(document.getElementById('mecCuerpos').value);
+  const niveles = 5;         // fijo: 5 paneles por módulo
+  const anchoCm = 90;        // fijo
+  const fondoCm = 30;        // fijo
+  return { altoCm, anchoCm, fondoCm, cuerpos, niveles,
+           altoM: altoCm/100, anchoM: anchoCm/100, fondoM: fondoCm/100 };
+}
+
+function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
+  const postW = 0.03, postD = 0.03;                     // barra 30x30mm aprox
+  const espacio = altoM / (niveles);                    // 5 niveles distribuidos incluyendo el piso
+  const colBarra = 0xc0c4c8;                            // gris claro
+  const colPanel = 0xdadde0;
+  const matBarra = new THREE.MeshStandardMaterial({color:colBarra, roughness:0.65, metalness:0.35});
+  const matPanel = new THREE.MeshStandardMaterial({color:colPanel, roughness:0.85});
+  for(let c=0; c<cuerpos; c++){
+    const x0 = c * anchoM;
+    const xL = x0, xR = x0 + anchoM;
+    // 4 barras (verticales) por cuerpo
+    [xL, xR].forEach(x=>{
+      [-fondoM/2 + postD/2, fondoM/2 - postD/2].forEach(z=>{
+        const b = box(postW, altoM, postD, matBarra);
+        b.position.set(x + (x===xL?postW/2:-postW/2), altoM/2, z);
+        parent.add(b);
+      });
+    });
+    // 5 paneles horizontales (niveles): repartidos uniformemente
+    for(let n=0; n<niveles; n++){
+      const y = espacio * n + 0.02;
+      const p = box(anchoM - postW, 0.012, fondoM - postD*1.5, matPanel);
+      p.position.set(x0 + anchoM/2, y, 0);
+      parent.add(p);
+    }
+  }
+}
+
 function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas){
   const postW = 0.076, postD = 0.076, vigaH = 0.10, vigaD = 0.06;
   const nMarcos = cuerpos + 1;
@@ -1286,9 +1360,9 @@ function ajustarSelectorColor(){
   const optAzul = document.getElementById('optAzul');
   const selColor = document.getElementById('colorRack');
   if(!row || !optAzul || !selColor) return;
-  if(sistemaActual === 'gondola'){
+  if(sistemaActual === 'gondola' || sistemaActual === 'mecano'){
     row.style.display = 'none';
-    selColor.value = 'verde'; // reset por si acaso
+    selColor.value = 'verde';
     return;
   }
   row.style.display = '';
@@ -1376,6 +1450,7 @@ function build(){
   grupo = new THREE.Group();
   if(sistemaActual === 'selectivo') buildSelectivo();
   else if(sistemaActual === 'picking') buildPicking();
+  else if(sistemaActual === 'mecano') buildMecano();
   else buildGondola();
   // Muñeco Isaac al lado izquierdo del rack (referencia de escala 1.75 m)
   // Calcular el extremo izquierdo del modelo según el sistema
@@ -1386,6 +1461,9 @@ function build(){
   } else if(sistemaActual === 'picking'){
     const cfg = getConfigPic();
     extremoIzq = cfg.largoM * cfg.cuerpos / 2 + 1.0;
+  } else if(sistemaActual === 'mecano'){
+    const cfg = getConfigMec();
+    extremoIzq = cfg.anchoM * cfg.cuerpos / 2 + 0.9;
   } else {
     const m = MED[document.getElementById('medida').value];
     const mods = parseInt(document.getElementById('modulos').value);
@@ -1396,6 +1474,40 @@ function build(){
   camDist = Math.max(camDist, extremoIzq + 1.8);
   scene.add(grupo);
   renderCotizacion();
+}
+
+function buildMecano(){
+  const cfg = getConfigMec();
+  const g = new THREE.Group();
+  buildMecanoScene(g, cfg.altoM, cfg.anchoM, cfg.fondoM, cfg.niveles, cfg.cuerpos);
+  // Centrar
+  g.position.x = -cfg.anchoM * cfg.cuerpos / 2;
+  grupo.add(g);
+  // Cotas
+  const totalAncho = cfg.anchoM * cfg.cuerpos;
+  agregarCotas(grupo, totalAncho, cfg.fondoM, cfg.altoM, null, 0);
+  // Claros
+  const espacio = cfg.altoM / cfg.niveles;
+  const alturasY = [];
+  for(let n=0; n<cfg.niveles; n++) alturasY.push(espacio*n + 0.02);
+  agregarCotasClaros(grupo, alturasY, -totalAncho/2 - 0.25, cfg.fondoM/2 + 0.05);
+}
+
+function calcularBomMecano(){
+  const cfg = getConfigMec();
+  const items = {}; const orden = [];
+  function add(sku, q){
+    if(!sku) return;
+    if(items[sku]===undefined){ items[sku]=0; orden.push(sku); }
+    items[sku] += q;
+  }
+  const skuBarra = cfg.altoCm === 250 ? MEC.BARRA_250 : MEC.BARRA_200;
+  // Cada módulo: 4 barras + 5 paneles + 16 escuadras + 60 tornillos
+  add(skuBarra,     MEC_COMPO.barras    * cfg.cuerpos);
+  add(MEC.PANEL,    MEC_COMPO.paneles   * cfg.cuerpos);
+  add(MEC.ESCUADRA, MEC_COMPO.escuadras * cfg.cuerpos);
+  add(MEC.TORNILLO, MEC_COMPO.tornillos * cfg.cuerpos);
+  return { items, orden };
 }
 
 function calcularBomGondola(){
@@ -1507,6 +1619,7 @@ function calcularBomSelectivo(){
 function calcularBOM(){
   if(sistemaActual === 'selectivo') return calcularBomSelectivo();
   if(sistemaActual === 'picking')   return calcularBomPicking();
+  if(sistemaActual === 'mecano')    return calcularBomMecano();
   return calcularBomGondola();
 }
 
@@ -1926,6 +2039,13 @@ function configResumen(){
     return {
       sistema: 'Picking',
       txt: 'Picking · '+cfg.altoIn+'"×'+cfg.fondoIn+'" · cuerpo '+cfg.largoCm+'cm · '+cfg.niveles+' niv · '+cfg.cuerpos+' cuerpo'+(cfg.cuerpos>1?'s':'')+ex
+    };
+  }
+  if(sistemaActual === 'mecano'){
+    const cfg = getConfigMec();
+    return {
+      sistema: 'Mecano',
+      txt: 'Mecano · '+cfg.altoCm+'cm × '+cfg.anchoCm+'cm × '+cfg.fondoCm+'cm · '+cfg.niveles+' entrepaños · '+cfg.cuerpos+' módulo'+(cfg.cuerpos>1?'s':'')
     };
   }
   const t = document.getElementById('tipo').selectedOptions[0].text;
@@ -2448,7 +2568,8 @@ function addEvents(){
 
   ['tipo','medida','niveles','modulos','cabeceras',
    'picAlto','picFondo','picLargo','picNiveles','picCuerpos','picChkRej','picChkPanel','picChkMadera',
-   'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkPanel','selChkBot'].forEach(id=>{
+   'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkPanel','selChkBot',
+   'mecAlto','mecCuerpos'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.addEventListener('change', build);
   });
@@ -2509,6 +2630,7 @@ function addEvents(){
       document.getElementById('opGondola').style.display   = sistemaActual==='gondola'   ? '' : 'none';
       document.getElementById('opPicking').style.display   = sistemaActual==='picking'   ? '' : 'none';
       document.getElementById('opSelectivo').style.display = sistemaActual==='selectivo' ? '' : 'none';
+      document.getElementById('opMecano').style.display    = sistemaActual==='mecano'    ? '' : 'none';
       ajustarSelectorColor();
       build();
     });
