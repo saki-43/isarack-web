@@ -81,6 +81,11 @@
     #dims,#hint{display:none}
     .modal{max-height:88vh}
   }
+  /* Modo visor (link para el cliente): el canvas ocupa toda la pantalla,
+     entre la barra superior (52px) y el pie (30px). Aplica también en móvil
+     para que el rack se vea completo y se pueda girar/mover con el dedo. */
+  body.modo-visor{overflow:hidden !important}
+  body.modo-visor #cv{position:fixed !important;top:52px !important;bottom:30px !important;left:0 !important;right:0 !important;width:auto !important;height:auto !important;inset:auto !important}
 /* Tabs selector de sistema */
 .tabs{display:flex;flex-wrap:wrap;background:#f6f4ee;padding:3px;border-radius:8px;margin-bottom:8px;gap:3px}
 .tabs .tab{flex:1 1 auto;min-width:calc(20% - 3px);padding:6px 3px;text-align:center;font-size:10.5px;font-weight:500;color:#6e737b;cursor:pointer;border-radius:6px;transition:all .15s;user-select:none;white-space:nowrap}
@@ -3410,6 +3415,13 @@ function build(){
   else buildPersonaIsaac(grupo, -extremoIzq, 0.3);
   // Ajustar cámara para que el muñeco quepa
   camDist = Math.max(camDist, extremoIzq + 1.8);
+  // En viewports angostos (celular vertical) la FOV horizontal se achica,
+  // así que aleja la cámara para que el rack quepa entero de lado a lado.
+  const _cvB = document.getElementById('cv');
+  const _wB = _cvB.clientWidth || innerWidth;
+  const _hB = _cvB.clientHeight || innerHeight;
+  const _aspB = _wB && _hB ? _wB/_hB : 1.5;
+  if(_aspB < 1.2) camDist *= Math.min(1.2/_aspB, 2.0);
   scene.add(grupo);
   renderCotizacion();
 }
@@ -4784,7 +4796,7 @@ function addEvents(){
   });
 
   addEventListener('resize', ()=>{ requestAnimationFrame(resize3D); });
-  addEventListener('orientationchange', ()=>{ setTimeout(resize3D, 200); });
+  addEventListener('orientationchange', ()=>{ setTimeout(()=>{ build(); resize3D(); }, 200); });
 
   // Deep-link: abrir en un sistema específico según hash (#selectivo, #picking, #gondola)
   const hash = (location.hash || '').replace('#','').toLowerCase();
@@ -4870,7 +4882,9 @@ function activarModoVisor(folio){
   cv.style.left = '0'; cv.style.right = '0'; cv.style.top = '52px'; cv.style.bottom = '30px';
   const auto = document.getElementById('auto');
   if(auto) auto.checked = true;               // arranca girando solo
-  setTimeout(resize3D, 60);
+  // Rebuild con el canvas ya en tamaño visor: el ajuste de camDist por aspect
+  // se recalcula con las dimensiones reales, así el rack se ve completo en móvil.
+  setTimeout(()=>{ build(); resize3D(); }, 60);
 }
 function resumenVisor(){
   const el = document.getElementById('medidasResumen');
