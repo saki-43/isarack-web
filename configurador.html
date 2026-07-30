@@ -3028,19 +3028,21 @@ function getAlturasManualesM(sistema){
 // === Cotas dimensionales (sprites de texto + líneas) ===
 function crearTextoSprite(texto, color){
   const c = document.createElement('canvas');
-  c.width = 256; c.height = 80;
+  c.width = 512; c.height = 160;   // doble resolución → texto nítido, no borroso
   const g = c.getContext('2d');
-  // Sin recuadro: solo texto con halo blanco para que se lea sobre el rack
-  g.font = 'bold 42px Arial, sans-serif';
+  // Sin recuadro: texto con contorno blanco DELGADO (nítido, sin halo/sombra)
+  g.font = 'bold 92px Arial, sans-serif';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.lineJoin = 'round';
-  g.strokeStyle = 'rgba(255,255,255,0.95)';
-  g.lineWidth = 8;
-  g.strokeText(texto, 128, 42);
+  g.miterLimit = 2;
+  g.strokeStyle = '#ffffff';
+  g.lineWidth = 5;
+  g.strokeText(texto, 256, 84);
   g.fillStyle = color;
-  g.fillText(texto, 128, 42);
+  g.fillText(texto, 256, 84);
   const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
   tex.needsUpdate = true;
   const mat = new THREE.SpriteMaterial({map: tex, transparent: true, depthTest: false});
   const sprite = new THREE.Sprite(mat);
