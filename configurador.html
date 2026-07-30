@@ -292,6 +292,17 @@ gtag('config', 'G-XXXXXXXXXX');
         <option value="in">Pulgadas (in)</option>
       </select>
     </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="bodChk" onchange="bodegaOn=this.checked; document.getElementById('bodBox').style.display=this.checked?'':'none'; build();"> Mostrar bodega (ver cuánto entra)</label>
+      <div id="bodBox" style="display:none;background:#f7f4ef;border:1px solid #e3ddd2;border-radius:6px;padding:6px;margin-top:2px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
+          <div><div style="font-size:10px;color:#666">Ancho (m)</div><input type="number" id="bodAncho" value="12" min="1" step="0.5" style="width:100%" oninput="build()"></div>
+          <div><div style="font-size:10px;color:#666">Largo (m)</div><input type="number" id="bodLargo" value="20" min="1" step="0.5" style="width:100%" oninput="build()"></div>
+          <div><div style="font-size:10px;color:#666">Alto (m)</div><input type="number" id="bodAlto" value="7" min="1" step="0.5" style="width:100%" oninput="build()"></div>
+        </div>
+        <div id="bodEstado" style="font-size:11px;font-weight:600;margin-top:5px;line-height:1.3"></div>
+      </div>
+    </div>
     <div class="row" id="selPasilloRow" style="display:none">
       <label>Pasillo entre líneas (m)</label>
       <input type="number" id="selPasillo" value="3.5" min="1" max="10" step="0.1" style="width:100%">
@@ -692,6 +703,9 @@ let scene, camera, renderer, grupo, targetY=0.65, camDist=3.4;
 let rotY=0.7, rotX=0.32, isDrag=false, lpX, lpY;
 // Unidad de las cotas: 'm' (metros), 'cm' o 'in' (pulgadas)
 let unidadCota = 'm';
+// Bodega (cuarto con medidas para ver cuánto entra) + dimensiones actuales del rack
+let bodegaOn = false;
+let _rackDims = null;   // {x: largo total, z: fondo total, y: alto} en metros
 function fmtCota(m){
   if(unidadCota === 'cm') return Math.round(m*100) + ' CM';
   if(unidadCota === 'in') return Math.round(m/0.0254) + '"';
@@ -3152,6 +3166,44 @@ function agregarCotasClaros(parent, alturasYM, xPos, zPos){
   }
 }
 
+// Bodega: dibuja un cuarto (piso + contorno) con sus medidas alrededor del rack,
+// y actualiza el indicador de si el rack cabe. El rack ya está centrado en el origen.
+function agregarBodega(parent){
+  const st = document.getElementById('bodEstado');
+  if(!bodegaOn || !_rackDims){ if(st) st.innerHTML=''; return; }
+  const gv = id => parseFloat((document.getElementById(id)||{}).value) || 0;
+  const A = gv('bodAncho'), L = gv('bodLargo'), H = gv('bodAlto');   // metros
+  if(A<=0 || L<=0 || H<=0){ if(st){ st.innerHTML='Pon las 3 medidas de la bodega'; st.style.color='#888'; } return; }
+  // Piso semitransparente
+  const piso = new THREE.Mesh(new THREE.PlaneGeometry(A, L),
+    new THREE.MeshBasicMaterial({color:0xdfe3e8, transparent:true, opacity:0.22, side:THREE.DoubleSide, depthWrite:false}));
+  piso.rotation.x = -Math.PI/2; piso.position.set(0, 0.002, 0); parent.add(piso);
+  // Contorno del cuarto (aristas)
+  const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(A, H, L));
+  const wire = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0x8a94a3, transparent:true, opacity:0.65}));
+  wire.position.set(0, H/2, 0); wire.renderOrder = 998; parent.add(wire);
+  // Cotas de la bodega, por fuera
+  cotaDim(parent, [-A/2, -0.55, L/2+0.5], [A/2, -0.55, L/2+0.5], fmtCota(A), {labelOffset:[0,-0.28,0], escala:[0.6,0.19]});
+  cotaDim(parent, [A/2+0.5, -0.55, -L/2], [A/2+0.5, -0.55, L/2], fmtCota(L), {labelOffset:[0.38,0,0], escala:[0.6,0.19]});
+  cotaDim(parent, [A/2+0.5, 0, L/2+0.5], [A/2+0.5, H, L/2+0.5], fmtCota(H), {labelOffset:[0.40,0,0], escala:[0.6,0.19]});
+  // Indicador de ajuste (rack: x=largo, z=fondo, y=alto)
+  if(st){
+    const rd = _rackDims;
+    const cabe = (A >= rd.x - 0.01) && (L >= rd.z - 0.01) && (H >= rd.y - 0.01);
+    if(cabe){
+      st.innerHTML = '✓ Cabe · sobra '+fmtCota(A-rd.x)+' de ancho, '+fmtCota(L-rd.z)+' de largo y '+fmtCota(H-rd.y)+' de alto';
+      st.style.color = '#2e7d32';
+    } else {
+      const falta = [];
+      if(A < rd.x) falta.push('ancho ('+fmtCota(rd.x-A)+' de más)');
+      if(L < rd.z) falta.push('largo ('+fmtCota(rd.z-L)+' de más)');
+      if(H < rd.y) falta.push('alto ('+fmtCota(rd.y-H)+' de más)');
+      st.innerHTML = '⚠ NO cabe — falta '+falta.join(', ');
+      st.style.color = '#c62828';
+    }
+  }
+}
+
 function buildPicking(){
   const cfg = getConfigPic();
   // ── Renderizar cada línea con sus propias medidas; dobles = espalda con espalda pegadas ──
@@ -3425,6 +3477,7 @@ function buildSelectivo(){
       cotaDim(grupo, [xPas, -0.12, z0], [xPas, -0.12, z1], fmtCota(cfg.pasilloM), {labelOffset:[-0.34,0,0], escala:[0.42,0.13]});
     });
   }
+  _rackDims = {x: totalLen, z: profTotal, y: cfg.maxAltoM};   // para el cálculo de la bodega
   // Cotas de niveles (claros) SIEMPRE visibles en la esquina frontal del primer marco
   if(lineas[0]){
     const l0 = lineas[0];
@@ -3458,11 +3511,13 @@ function build(){
     scene.remove(obj);
   }
   grupo = new THREE.Group();
+  _rackDims = null;
   if(sistemaActual === 'selectivo') buildSelectivo();
   else if(sistemaActual === 'picking') buildPicking();
   else if(sistemaActual === 'mecano') buildMecano();
   else if(sistemaActual === 'cantilever') buildCantilever();
   else buildGondola();
+  try{ agregarBodega(grupo); }catch(e){}
   // Muñeco Isaac al lado izquierdo del rack (referencia de escala 1.75 m)
   // Con pasarela + escalera, se coloca junto a la base de la escalera
   let extremoIzq = 0.6;
