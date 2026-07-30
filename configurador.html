@@ -2510,6 +2510,7 @@ function getConfigSel(){
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB, altoIn: l.altoIn, fondoIn: l.fondoIn,
       vigaSku: l.vigaSku, vigaIn: vi.largoIn, vigaAltIn: vi.altIn, capKg: vi.capKg, capLb: vi.capLb,
       niveles: l.niveles, nivMod: !!l.nivMod, nivelesA: l.nivelesA||null, nivelesB: l.nivelesB||null,
+      tunel: (l.tunel || []),
       altoM, fondoM, vigaM,
       largoM: vigaM * cuerposMaxLn,
       profM: l.tipo==='doble' ? fondoM*2 + unionM : fondoM};
@@ -3174,6 +3175,10 @@ function agregarBodega(parent){
   const gv = id => parseFloat((document.getElementById(id)||{}).value) || 0;
   const A = gv('bodAncho'), L = gv('bodLargo'), H = gv('bodAlto');   // metros
   if(A<=0 || L<=0 || H<=0){ if(st){ st.innerHTML='Pon las 3 medidas de la bodega'; st.style.color='#888'; } return; }
+  // Encuadrar TODA la bodega (más grande que el rack) para que sus cotas se vean
+  // completas, sobre todo en el celular (pantalla más chica).
+  camDist = Math.max(camDist, A*0.72 + 2.2, L*0.72 + 2.2, H*1.5 + 1.6);
+  targetY = Math.max(targetY, H*0.46);
   // Piso semitransparente
   const piso = new THREE.Mesh(new THREE.PlaneGeometry(A, L),
     new THREE.MeshBasicMaterial({color:0xdfe3e8, transparent:true, opacity:0.22, side:THREE.DoubleSide, depthWrite:false}));
