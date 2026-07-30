@@ -3085,32 +3085,32 @@ function cotaDim(parent, a, b, texto, opts){
   const offArr = opts.labelOffset || [perp.x*0.24, perp.y*0.24, perp.z*0.24];
   s.position.set(mid.x + offArr[0], mid.y + offArr[1], mid.z + offArr[2]);
   const e = opts.escala || [0.5, 0.155];
-  s.scale.set(e[0], e[1], 1);
+  s.scale.set(e[0]*1.5, e[1]*1.5, 1);   // etiquetas 50% más grandes para que se lean
   parent.add(s);
 }
 
 function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
-  const margenLado = 0.25;
-  const xR = largoM/2 + margenLado;
-  const xL = -largoM/2;
-  const yBajo = -0.20;
-  // ALTO (vertical, lado derecho)
-  cotaDim(parent, [xR, 0, 0], [xR, altoM, 0], altoM.toFixed(2)+' M', {labelOffset:[0.34,0,0], escala:[0.55,0.17]});
-  // LARGO TOTAL (horizontal, debajo del rack)
-  cotaDim(parent, [xL, yBajo, 0], [largoM/2, yBajo, 0], largoM.toFixed(2)+' M', {labelOffset:[0,-0.20,0], escala:[0.55,0.17]});
-  // LARGO DE UN CUERPO (arriba del primer cuerpo)
-  if(largoVigaM && largoVigaM < largoM - 0.001){
-    const yCotaViga = altoM + 0.20;
-    cotaDim(parent, [xL, yCotaViga, 0], [xL + largoVigaM, yCotaViga, 0], largoVigaM.toFixed(2)+' M', {labelOffset:[0,0.20,0], escala:[0.45,0.14]});
-  }
-  // FONDO (al frente, abajo)
-  const xCotaFondo = xL - 0.10;
-  cotaDim(parent, [xCotaFondo, yBajo, -fondoM/2], [xCotaFondo, yBajo, fondoM/2], fondoM.toFixed(2)+' M', {labelOffset:[-0.38,0,0], escala:[0.45,0.14]});
+  // Estilo plano de ingeniería: TODAS las cotas van por FUERA del rack
+  // (frente / laterales), nunca cruzando por en medio de los planos.
+  const m = 0.22;                    // separación de la cota respecto al rack (pegada, sin flotar)
+  const zF = fondoM/2 + m;           // línea al FRENTE (fuera, +Z)
+  const xIzq = -largoM/2 - m;        // costado IZQUIERDO (fuera, -X)
+  const xDer = largoM/2 + m;         // costado DERECHO (fuera, +X)
+  const yBajo = -0.22;
+  // OJO cámara: el mundo -X se ve a la DERECHA en pantalla y +X a la izquierda.
+  // Las medidas verticales (alto + niveles) van del lado DERECHO del marco (mundo -X).
+  const yPiso = -0.45, zLargo = fondoM/2 + 0.55;
+  // LARGO TOTAL — al FRENTE, a ras de piso
+  cotaDim(parent, [-largoM/2, yPiso, zLargo], [largoM/2, yPiso, zLargo], largoM.toFixed(2)+' M', {labelOffset:[0,-0.26,0], escala:[0.55,0.17]});
+  // ALTO — lado DERECHO del marco (mundo -X), junto a los niveles
+  cotaDim(parent, [xIzq, 0, zF], [xIzq, altoM, zF], altoM.toFixed(2)+' M', {labelOffset:[-0.40,0,0], escala:[0.55,0.17]});
+  // FONDO / PROFUNDIDAD — lado izquierdo en pantalla (mundo +X), a ras de piso
+  cotaDim(parent, [xDer, yPiso, -fondoM/2], [xDer, yPiso, fondoM/2], fondoM.toFixed(2)+' M', {labelOffset:[0.34,0,0], escala:[0.50,0.16]});
   // Capacidad (KG)
   if(capacidadKg){
     const sCap = crearTextoSprite(capacidadKg+' KG', '#da6635');
-    sCap.position.set(0, altoM * 0.55, 0);
-    sCap.scale.set(0.7, 0.22, 1);
+    sCap.position.set(xIzq, altoM * 0.62, zF);   // lado derecho del marco (mundo -X), no en medio
+    sCap.scale.set(1.05, 0.33, 1);   // 50% más grande
     parent.add(sCap);
   }
 }
@@ -3394,8 +3394,8 @@ function buildSelectivo(){
       : '');
   const capSel = lineas[0].capKg;
   agregarCotas(grupo, totalLen, profTotal, cfg.maxAltoM, capSel, lineas[0].vigaM);
-  // Cotas de claros entre niveles (solo con 1 línea; con varias sería ambiguo)
-  if(lineas.length === 1){
+  // Cotas de niveles (claros) SIEMPRE visibles en la esquina frontal del primer marco
+  if(lineas[0]){
     const l0 = lineas[0];
     const alturasManSelC = getAlturasManualesM('selectivo');
     const alturasYSel = [];
@@ -3405,7 +3405,7 @@ function buildSelectivo(){
       const alturasDefC = alturasDefaultM(l0.altoM, l0.niveles);
       for(let n=0; n<l0.niveles; n++) alturasYSel.push(Math.min(alturasDefC[n], l0.altoM - 0.10));
     }
-    agregarCotasClaros(grupo, alturasYSel, -totalLen/2 - 0.30, profTotal/2 + 0.05);
+    agregarCotasClaros(grupo, alturasYSel, -totalLen/2 - 0.55, profTotal/2 + 0.10);
   }
 }
 
