@@ -3026,14 +3026,21 @@ function getAlturasManualesM(sistema){
 }
 
 // === Cotas dimensionales (sprites de texto + líneas) ===
-function crearTextoSprite(texto, color){
+function crearTextoSprite(texto, color, contorno){
   const c = document.createElement('canvas');
   c.width = 512; c.height = 160;   // doble resolución → texto nítido, no borroso
   const g = c.getContext('2d');
-  // Solo el número, sin recuadro ni contorno/aura
   g.font = 'bold 92px Arial, sans-serif';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
+  // Contorno opcional (ej. negro para el peso naranja); las cotas van sin contorno
+  if(contorno){
+    g.lineJoin = 'round';
+    g.miterLimit = 2;
+    g.strokeStyle = contorno;
+    g.lineWidth = 9;
+    g.strokeText(texto, 256, 84);
+  }
   g.fillStyle = color;
   g.fillText(texto, 256, 84);
   const tex = new THREE.CanvasTexture(c);
@@ -3120,7 +3127,7 @@ function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
   cotaDim(parent, [xFondo, yPiso, -fondoM/2], [xFondo, yPiso, fondoM/2], fmtCota(fondoM), {labelOffset:[-0.34,0,0], escala:[0.50,0.16]});
   // Capacidad (KG)
   if(capacidadKg){
-    const sCap = crearTextoSprite(capacidadKg+' KG', '#da6635');
+    const sCap = crearTextoSprite(capacidadKg+' KG', '#da6635', '#000000');
     sCap.position.set(xDer, altoM * 0.5, zF);   // costado izquierdo en pantalla, separado de las cotas
     sCap.scale.set(1.05, 0.33, 1);   // 50% más grande
     parent.add(sCap);
