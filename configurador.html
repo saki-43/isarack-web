@@ -116,6 +116,16 @@
     body.modo-visor #rotaMsg{display:flex;align-items:center;gap:6px;position:fixed;left:50%;bottom:40px;transform:translateX(-50%);z-index:60;background:rgba(20,22,26,.85);color:#fff;padding:8px 15px;border-radius:22px;font-size:12.5px;font-weight:500;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,.3);pointer-events:none;animation:rotaPulse 2.2s ease-in-out infinite}
   }
   @keyframes rotaPulse{0%,100%{opacity:.72}50%{opacity:1}}
+  /* Modo pantalla completa (al girar el cel): el plano tapa barra y pie,
+     como una foto abierta. El boton "Regresar" vuelve a la vista normal. */
+  #btnVisorBack{display:none}
+  body.visor-full #visorBar, body.visor-full #visorPie, body.visor-full #rotaMsg{display:none !important}
+  body.visor-full #cv{position:fixed !important;top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;width:auto !important;height:auto !important;inset:0 !important;z-index:45 !important}
+  body.visor-full #btnVisorBack{
+    display:flex;align-items:center;gap:5px;position:fixed;z-index:60;
+    top:calc(env(safe-area-inset-top,0px) + 10px);left:calc(env(safe-area-inset-left,0px) + 10px);
+    background:rgba(20,22,26,.82);color:#fff;border:none;padding:9px 16px 9px 12px;border-radius:22px;
+    font:600 14px system-ui,-apple-system,sans-serif;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.3);-webkit-tap-highlight-color:transparent}
 </style>
 <!-- Google Analytics 4 -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
@@ -140,6 +150,7 @@ gtag('config', 'G-XXXXXXXXXX');
 </div>
 <div id="cv"></div>
 <div id="rotaMsg">🔄 Gira tu teléfono para ver el plano completo</div>
+<button id="btnVisorBack" onclick="visorFullSalir(true)">‹ Regresar</button>
 
 <!-- Panel izquierdo: configuración -->
 <div class="panel" id="ctrl">
@@ -5018,8 +5029,8 @@ function addEvents(){
     setTimeout(()=>{ lb.textContent = '🔗 Copiar link para el cliente'; }, 2200);
   });
 
-  addEventListener('resize', ()=>{ requestAnimationFrame(resize3D); });
-  addEventListener('orientationchange', ()=>{ setTimeout(resize3D, 200); });
+  addEventListener('resize', ()=>{ requestAnimationFrame(resize3D); _visorChkOrient(); });
+  addEventListener('orientationchange', ()=>{ setTimeout(resize3D, 200); setTimeout(_visorChkOrient, 250); });
 
   // Deep-link: abrir en un sistema específico según hash (#selectivo, #picking, #gondola)
   const hash = (location.hash || '').replace('#','').toLowerCase();
@@ -5120,6 +5131,30 @@ function activarModoVisor(folio){
   const auto = document.getElementById('auto');
   if(auto) auto.checked = true;               // arranca girando solo
   setTimeout(resize3D, 60);
+  setTimeout(_visorChkOrient, 120);           // si ya está horizontal, abre completo
+}
+let _visorFullManual = false;
+function visorFullEntrar(){
+  if(!document.body.classList.contains('modo-visor')) return;
+  document.body.classList.add('visor-full');
+  setTimeout(resize3D, 70);
+}
+function visorFullSalir(manual){
+  document.body.classList.remove('visor-full');
+  if(manual) _visorFullManual = true;         // no re-abrir solo mientras siga horizontal
+  setTimeout(resize3D, 70);
+}
+function _visorChkOrient(){
+  if(!document.body.classList.contains('modo-visor')) return;
+  const mobil = Math.min(window.innerWidth, window.innerHeight) <= 820;
+  if(!mobil) return;
+  const horizontal = window.innerWidth > window.innerHeight;
+  if(horizontal){
+    if(!_visorFullManual) visorFullEntrar();
+  } else {
+    _visorFullManual = false;                 // al volver a vertical se rearma
+    visorFullSalir(false);
+  }
 }
 function resumenVisor(){
   const el = document.getElementById('medidasResumen');
