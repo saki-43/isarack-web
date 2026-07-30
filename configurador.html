@@ -3416,12 +3416,13 @@ function buildSelectivo(){
       : '');
   const capSel = lineas[0].capKg;
   agregarCotas(grupo, totalLen, profTotal, cfg.maxAltoM, capSel, lineas[0].vigaM);
-  // Cotas de PASILLOS (ancho entre líneas), al costado izquierdo en pantalla (mundo +X)
+  // Cotas de PASILLOS (ancho entre líneas), al mismo costado que las demás cotas
+  // (frente-derecha, mundo -X), afuera para que no se enciman ni floten.
   if(cfg.pasilloM && pasillosInfoSel.length){
-    const xPas = totalLen/2 + 0.35;
+    const xPas = -totalLen/2 - 1.6;
     pasillosInfoSel.forEach(function(p){
       const z0 = p.zCentro - cfg.pasilloM/2, z1 = p.zCentro + cfg.pasilloM/2;
-      cotaDim(grupo, [xPas, -0.12, z0], [xPas, -0.12, z1], fmtCota(cfg.pasilloM), {labelOffset:[0.34,0,0], escala:[0.42,0.13]});
+      cotaDim(grupo, [xPas, -0.12, z0], [xPas, -0.12, z1], fmtCota(cfg.pasilloM), {labelOffset:[-0.34,0,0], escala:[0.42,0.13]});
     });
   }
   // Cotas de niveles (claros) SIEMPRE visibles en la esquina frontal del primer marco
