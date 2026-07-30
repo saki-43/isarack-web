@@ -109,6 +109,13 @@
      para que el rack se vea completo y se pueda girar/mover con el dedo. */
   body.modo-visor{overflow:hidden !important}
   body.modo-visor #cv{position:fixed !important;top:52px !important;bottom:30px !important;left:0 !important;right:0 !important;width:auto !important;height:auto !important;inset:auto !important}
+  /* Aviso para girar el teléfono: solo en móvil vertical dentro del visor.
+     Al poner el cel horizontal la nave llena la pantalla como en la compu. */
+  #rotaMsg{display:none}
+  @media (max-width:900px) and (orientation:portrait){
+    body.modo-visor #rotaMsg{display:flex;align-items:center;gap:6px;position:fixed;left:50%;bottom:40px;transform:translateX(-50%);z-index:60;background:rgba(20,22,26,.85);color:#fff;padding:8px 15px;border-radius:22px;font-size:12.5px;font-weight:500;white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,.3);pointer-events:none;animation:rotaPulse 2.2s ease-in-out infinite}
+  }
+  @keyframes rotaPulse{0%,100%{opacity:.72}50%{opacity:1}}
 </style>
 <!-- Google Analytics 4 -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
@@ -132,6 +139,7 @@ gtag('config', 'G-XXXXXXXXXX');
   Arrastra para girar · rueda para acercar
 </div>
 <div id="cv"></div>
+<div id="rotaMsg">🔄 Gira tu teléfono para ver el plano completo</div>
 
 <!-- Panel izquierdo: configuración -->
 <div class="panel" id="ctrl">
@@ -4850,9 +4858,29 @@ function addEvents(){
     e.preventDefault();
     camDist += e.deltaY*0.0016; camDist = Math.max(1.6, Math.min(60, camDist));
   }, {passive:false});
-  dom.addEventListener('touchstart', e=>{isDrag=true; lpX=e.touches[0].clientX; lpY=e.touches[0].clientY;}, {passive:true});
-  addEventListener('touchend', ()=>isDrag=false);
+  let pinchDist = null;   // distancia entre dos dedos (para zoom pellizcando)
+  dom.addEventListener('touchstart', e=>{
+    if(e.touches.length >= 2){          // dos dedos → pellizco, no rotar
+      isDrag = false;
+      pinchDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    } else {
+      isDrag = true; pinchDist = null;
+      lpX=e.touches[0].clientX; lpY=e.touches[0].clientY;
+    }
+  }, {passive:true});
+  addEventListener('touchend', e=>{
+    if(!e.touches || e.touches.length < 2) pinchDist = null;
+    if(e.touches && e.touches.length === 1){ isDrag = true; lpX=e.touches[0].clientX; lpY=e.touches[0].clientY; }
+    else if(!e.touches || e.touches.length === 0) isDrag = false;
+  });
   dom.addEventListener('touchmove', e=>{
+    if(e.touches.length >= 2){          // pellizco → acercar/alejar
+      e.preventDefault();
+      const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+      if(pinchDist && d>0){ camDist *= pinchDist/d; camDist = Math.max(1.6, Math.min(60, camDist)); }
+      pinchDist = d;
+      return;
+    }
     if(!isDrag) return;
     e.preventDefault();
     rotY += (e.touches[0].clientX-lpX)*0.01;
@@ -5023,6 +5051,12 @@ function estadoConfigurador(){
   else if(sistemaActual === 'cantilever') st.l.can = lineasCantilever;
   try{ st.nb = {n: (typeof nivelesPorBahia !== 'undefined' ? nivelesPorBahia : null),
                 a: (typeof alturasPorBahia !== 'undefined' ? alturasPorBahia : null)}; }catch(e){}
+  // Bodega y unidad de cota (no tienen prefijo de sistema, se guardan aparte)
+  try{
+    const gv = id => parseFloat((document.getElementById(id)||{}).value) || 0;
+    st.bod = {on: bodegaOn, a: gv('bodAncho'), l: gv('bodLargo'), h: gv('bodAlto')};
+    st.u = unidadCota;
+  }catch(e){}
   return st;
 }
 function aplicarEstado(st){
@@ -5046,6 +5080,14 @@ function aplicarEstado(st){
   if(st.s){
     sistemaActual = st.s;
     document.querySelectorAll('#tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.sys === st.s));
+  }
+  if(st.u){ unidadCota = st.u; const su = document.getElementById('selUnidad'); if(su) su.value = st.u; }
+  if(st.bod){
+    bodegaOn = !!st.bod.on;
+    const setv = (id,v) => { const e = document.getElementById(id); if(e && v) e.value = v; };
+    setv('bodAncho', st.bod.a); setv('bodLargo', st.bod.l); setv('bodAlto', st.bod.h);
+    const chk = document.getElementById('bodChk'); if(chk) chk.checked = bodegaOn;
+    const box = document.getElementById('bodBox'); if(box) box.style.display = bodegaOn ? '' : 'none';
   }
 }
 function codificarEstado(st){
