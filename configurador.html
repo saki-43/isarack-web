@@ -2287,7 +2287,64 @@ function _optsDe(idOculto, fallback, val){
   return _opts(pairs, val);
 }
 
+// ── Niveles por módulo (opcional): cada cuerpo de una fila puede tener niveles distintos ──
+// Arreglo por cuerpo de una fila (A o B), con el valor de la fila como default de cada módulo.
+function _nivArrRaw(l, fila, n){
+  const src = (fila === 'B') ? (l.nivelesB || []) : (l.nivelesA || []);
+  const a = [];
+  for(let c = 0; c < n; c++) a.push(parseInt(src[c]) || l.niveles || 3);
+  return a;
+}
+// Devuelve escalar (modo parejo) o arreglo por cuerpo (modo por módulo) para el build.
+function _nivFila(l, fila, cuerpos){
+  if(!l.nivMod) return l.niveles;
+  return _nivArrRaw(l, fila, cuerpos);
+}
+// Suma total de niveles de todos los módulos (para el BOM). = niveles*cuerpos si es parejo.
+function _nivTotBom(l, cA, cB, esD){
+  if(!l.nivMod) return l.niveles * (esD ? (cA + cB) : cA);
+  let s = 0;
+  _nivArrRaw(l, 'A', cA).forEach(v => s += v);
+  if(esD) _nivArrRaw(l, 'B', cB).forEach(v => s += v);
+  return s;
+}
+// Mantiene los arreglos del tamaño de los cuerpos actuales (tras agregar/quitar módulos o cambiar tipo).
+function _nivNormaliza(l){
+  if(!l || !l.nivMod) return;
+  const cA = l.cuerpos, cB = (l.cuerposB == null ? l.cuerpos : l.cuerposB);
+  l.nivelesA = _nivArrRaw(l, 'A', cA);
+  if(l.tipo === 'doble') l.nivelesB = _nivArrRaw(l, 'B', cB); else l.nivelesB = null;
+}
+function _nivModEditor(l, i, esD, cA, cB){
+  const fila = (f, arr, n) => {
+    let h = esD ? '<div style="font-size:9px;color:#888;margin:4px 0 2px">Fila '+f+'</div>' : '';
+    h += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+    for(let c = 0; c < n; c++){
+      h += '<div style="text-align:center"><div style="font-size:8.5px;color:#999;margin-bottom:1px">M'+(c+1)+'</div>'
+        + '<input type="number" min="1" max="12" value="'+arr[c]+'" onchange="lnNivSet('+i+',\''+f+'\','+c+',this.value)" style="width:36px;padding:3px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:5px;text-align:center;background:#fff"></div>';
+    }
+    h += '</div>';
+    return h;
+  };
+  return '<div style="margin-top:4px">' + fila('A', _nivArrRaw(l,'A',cA), cA) + (esD ? fila('B', _nivArrRaw(l,'B',cB), cB) : '') + '</div>';
+}
+function lnNivMod(i, on){
+  const l = lineasAlmacen[i];
+  l.nivMod = !!on;
+  if(on) _nivNormaliza(l);
+  renderLineasAlmacen(); build();
+}
+function lnNivSet(i, fila, c, val){
+  const l = lineasAlmacen[i];
+  const v = Math.max(1, Math.min(12, parseInt(val) || 1));
+  const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
+  if(!Array.isArray(l[key])) l[key] = [];
+  l[key][c] = v;
+  build();
+  if(typeof lineasSync === 'function') lineasSync();
+}
 function renderLineasAlmacen(){
+  lineasAlmacen.forEach(_nivNormaliza);
   const cont = document.getElementById('selLineasList');
   cont.innerHTML = lineasAlmacen.map((l, i) => {
     const esD = l.tipo === 'doble';
@@ -2331,6 +2388,10 @@ function renderLineasAlmacen(){
         +'<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lnSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>'
         +(info.capKg ? '<div style="grid-column:1/3;color:#da6635;font-weight:600;font-size:9.5px">Capacidad: '+info.capKg.toLocaleString()+' kg / '+info.capLb.toLocaleString()+' lb por nivel</div>' : '')
         + filasAB
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lnNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+          + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB) : '')
+        + '</div>'
         +'</div>'
       : '';
     return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
@@ -2419,7 +2480,8 @@ function getConfigSel(){
     const cuerposMaxLn = Math.max(cuerposA, cuerposB);
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB, altoIn: l.altoIn, fondoIn: l.fondoIn,
       vigaSku: l.vigaSku, vigaIn: vi.largoIn, vigaAltIn: vi.altIn, capKg: vi.capKg, capLb: vi.capLb,
-      niveles: l.niveles, altoM, fondoM, vigaM,
+      niveles: l.niveles, nivMod: !!l.nivMod, nivelesA: l.nivelesA||null, nivelesB: l.nivelesB||null,
+      altoM, fondoM, vigaM,
       largoM: vigaM * cuerposMaxLn,
       profM: l.tipo==='doble' ? fondoM*2 + unionM : fondoM};
   });
@@ -2775,15 +2837,18 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
     }
   }
   for(let k=0; k<nMarcos; k++) marco(x0 + k * vigaM, k);
-  // Posición Y de cada nivel: manual (si está activo) o uniforme
-  const alturasManSel = getAlturasManualesM('selectivo');
-  const alturasDefSel = alturasDefaultM(altoM, niveles);
+  // Posición Y de cada nivel: manual (si está activo) o uniforme.
+  // `niveles` puede ser un número (parejo) o un arreglo por cuerpo (niveles por módulo).
+  const _nivArr = Array.isArray(niveles);
+  const alturasManSel = _nivArr ? null : getAlturasManualesM('selectivo'); // alturas manuales solo en modo parejo
   const bandas = bandasLibres || [];
   for(let c=0; c<cuerpos; c++){
     const xL = x0 + c * vigaM, xR = xL + vigaM;
     const cxV = (xL + xR) / 2;
-    for(let n=0; n<niveles; n++){
-      const y = alturasManSel ? Math.min(alturasManSel[n], altoM - 0.10) : Math.min(alturasDefSel[n], altoM - 0.10);
+    const nivC = _nivArr ? (parseInt(niveles[c])||parseInt(niveles[0])||1) : niveles;
+    const alturasC = alturasManSel || alturasDefaultM(altoM, nivC);
+    for(let n=0; n<nivC; n++){
+      const y = Math.min(alturasC[n], altoM - 0.10);
       // Solo se despejan los niveles por donde pasa la pasarela; arriba y abajo quedan normales
       // Un cuerpo puede venir como número, como {k, bandas} (rango de altura)
       // o como {k, niveles} (lista de niveles exactos, base 0)
@@ -3247,10 +3312,10 @@ function buildSelectivo(){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
       const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, l.niveles, l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, l.niveles, l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = Math.min(l.cuerposA, l.cuerposB) + 1;
@@ -3265,7 +3330,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, l.niveles, l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos));
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos));
     }
     // El rack se construye centrado en 0 → desplazar para que su borde izq. quede en xInicio
     gLin.position.x = xInicio + l.largoM/2;
@@ -3588,6 +3653,7 @@ function calcularBomSelectivo(){
     const esD = l.tipo === 'doble';
     const cA = l.cuerposA, cB = esD ? l.cuerposB : 0;
     const sumaCuerpos = esD ? cA + cB : cA;             // cuerpos de racking totales
+    const nivTot = _nivTotBom(l, cA, cB, esD);          // Σ niveles por módulo (A y B); = niveles*cuerpos si es parejo
     const nMarcos = esD ? (cA + 1) + (cB + 1) : (cA + 1);
     const marcoSku = MARCOS_SEL[l.altoIn] && MARCOS_SEL[l.altoIn][l.fondoIn];
     if(marcoSku) add(marcoSku, nMarcos);
@@ -3595,19 +3661,19 @@ function calcularBomSelectivo(){
     // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
     const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.vigaM, cA) : -1;
     const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'selectivo') * (esD ? 2 : 1) : 0;
-    add(l.vigaSku, 2 * (l.niveles * sumaCuerpos - nivQuitados));
+    add(l.vigaSku, 2 * (nivTot - nivQuitados));
     add(ANCLA_STD_SEL, 4 * nMarcos);
     if(cfg.rejilla){
       const rejSku = REJILLAS_SEL[l.fondoIn];
       const rejPorViga = REJILLAS_POR_VIGA_SEL[l.vigaIn];
-      if(rejSku && rejPorViga) add(rejSku, rejPorViga * l.niveles * sumaCuerpos);
+      if(rejSku && rejPorViga) add(rejSku, rejPorViga * nivTot);
     }
     if(cfg.panel){
       // Panel Beige por fondo (in): cada pieza es fondoIn × 8", cubre 8" de alto de viga
       const skuPanelSel = PANEL_BEIGE_SEL[l.fondoIn];
       if(skuPanelSel){
         const piezasPorNivel = Math.ceil(l.vigaIn / 8);
-        add(skuPanelSel, piezasPorNivel * l.niveles * sumaCuerpos);
+        add(skuPanelSel, piezasPorNivel * nivTot);
       }
     }
     if(cfg.botas) add(BOTA_SEL, 2 * nMarcos);
