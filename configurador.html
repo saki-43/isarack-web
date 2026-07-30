@@ -2372,6 +2372,31 @@ function lnNivSet(i, fila, c, val){
   build();
   if(typeof lineasSync === 'function') lineasSync();
 }
+// ── Túnel (paso de montacargas): en el/los cuerpo(s) elegido(s) se quitan las
+// vigas de los niveles bajos (hueco a ras de piso); arriba se conserva la carga.
+function _tunelNiveles(l){
+  const n = Math.max(1, l.niveles || 3);
+  const cuantos = Math.min(2, Math.max(1, n - 1));   // 1-2 niveles bajos, deja el de arriba
+  const arr = [];
+  for(let k = 0; k < cuantos; k++) arr.push(k);
+  return arr;
+}
+function lnTunel(i, c){
+  const l = lineasAlmacen[i];
+  if(!Array.isArray(l.tunel)) l.tunel = [];
+  const idx = l.tunel.indexOf(c);
+  if(idx >= 0) l.tunel.splice(idx, 1); else l.tunel.push(c);
+  renderLineasAlmacen(); build();
+}
+function _tunelChips(l, i, cuerpos){
+  const tun = l.tunel || [];
+  let h = '';
+  for(let c = 0; c < cuerpos; c++){
+    const on = tun.indexOf(c) >= 0;
+    h += '<button onclick="lnTunel('+i+','+c+')" title="Cuerpo '+(c+1)+'" style="border:1px solid '+(on?'#993C1D':'#ccc')+';background:'+(on?'#993C1D':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">'+(c+1)+'</button>';
+  }
+  return h;
+}
 function renderLineasAlmacen(){
   lineasAlmacen.forEach(_nivNormaliza);
   const cont = document.getElementById('selLineasList');
@@ -2420,6 +2445,10 @@ function renderLineasAlmacen(){
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lnNivMod('+i+',this.checked)"> Niveles por módulo</label>'
           + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB) : '')
+        + '</div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + '<div style="font-size:10px;color:#993C1D;font-weight:600;margin-bottom:3px">🚇 Túnel (paso montacargas) — toca el cuerpo</div>'
+          + '<div style="display:flex;flex-wrap:wrap;gap:4px">' + _tunelChips(l, i, cA) + '</div>'
         + '</div>'
         +'</div>'
       : '';
@@ -3379,11 +3408,20 @@ function buildSelectivo(){
   // La escalera y el corredor van por FUERA del rack: ya no se sacrifica ningún cuerpo
   // Solo la línea frontal pierde las vigas del módulo que cruza el ramal de acceso
   const skipDe = (nCuerpos, iLn) => {
-    // PS-2: la escalera interna se come los cuerpos por donde sube y donde remata
+    // base: escalera/pasarela
+    let base;
     const ksEsc = cuerposEscaleraPS2(cfg, iLn, xInicio, lineas[iLn].vigaM, nCuerpos);
-    if(ksEsc.length) return ksEsc;
-    if(iLn !== 0) return -1;
-    return cuerpoRamalPasarela(cfg, xInicio, lineas[0].vigaM, nCuerpos);
+    if(ksEsc.length) base = ksEsc;
+    else if(iLn === 0) base = cuerpoRamalPasarela(cfg, xInicio, lineas[0].vigaM, nCuerpos);
+    else base = -1;
+    let arr = Array.isArray(base) ? base.slice() : (typeof base === 'number' && base >= 0 ? [base] : []);
+    // TÚNELES: hueco a ras de piso (saltar niveles bajos) en los cuerpos elegidos
+    const tun = lineas[iLn].tunel || [];
+    if(tun.length){
+      const nivT = _tunelNiveles(lineas[iLn]);
+      tun.forEach(k => { if(k >= 0 && k < nCuerpos) arr.push({k: k, niveles: nivT}); });
+    }
+    return arr.length ? arr : -1;
   };
   lineas.forEach((l, iLn) => {
     const gLin = new THREE.Group();
@@ -3745,6 +3783,7 @@ function calcularBomSelectivo(){
     const cA = l.cuerposA, cB = esD ? l.cuerposB : 0;
     const sumaCuerpos = esD ? cA + cB : cA;             // cuerpos de racking totales
     const nivTot = _nivTotBom(l, cA, cB, esD);          // Σ niveles por módulo (A y B); = niveles*cuerpos si es parejo
+    const nivTunel = (l.tunel && l.tunel.length) ? l.tunel.length * _tunelNiveles(l).length * (esD ? 2 : 1) : 0; // niveles-cuerpo quitados por túneles
     const nMarcos = esD ? (cA + 1) + (cB + 1) : (cA + 1);
     const marcoSku = MARCOS_SEL[l.altoIn] && MARCOS_SEL[l.altoIn][l.fondoIn];
     if(marcoSku) add(marcoSku, nMarcos);
@@ -3752,19 +3791,19 @@ function calcularBomSelectivo(){
     // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
     const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.vigaM, cA) : -1;
     const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'selectivo') * (esD ? 2 : 1) : 0;
-    add(l.vigaSku, 2 * (nivTot - nivQuitados));
+    add(l.vigaSku, 2 * (nivTot - nivQuitados - nivTunel));
     add(ANCLA_STD_SEL, 4 * nMarcos);
     if(cfg.rejilla){
       const rejSku = REJILLAS_SEL[l.fondoIn];
       const rejPorViga = REJILLAS_POR_VIGA_SEL[l.vigaIn];
-      if(rejSku && rejPorViga) add(rejSku, rejPorViga * nivTot);
+      if(rejSku && rejPorViga) add(rejSku, rejPorViga * (nivTot - nivTunel));
     }
     if(cfg.panel){
       // Panel Beige por fondo (in): cada pieza es fondoIn × 8", cubre 8" de alto de viga
       const skuPanelSel = PANEL_BEIGE_SEL[l.fondoIn];
       if(skuPanelSel){
         const piezasPorNivel = Math.ceil(l.vigaIn / 8);
-        add(skuPanelSel, piezasPorNivel * nivTot);
+        add(skuPanelSel, piezasPorNivel * (nivTot - nivTunel));
       }
     }
     if(cfg.botas) add(BOTA_SEL, 2 * nMarcos);
