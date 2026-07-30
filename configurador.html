@@ -3015,17 +3015,15 @@ function crearTextoSprite(texto, color){
   const c = document.createElement('canvas');
   c.width = 256; c.height = 80;
   const g = c.getContext('2d');
-  // fondo blanco semitransparente con borde
-  g.fillStyle = 'rgba(255,255,255,0.92)';
-  g.fillRect(0, 0, 256, 80);
-  g.strokeStyle = color;
-  g.lineWidth = 3;
-  g.strokeRect(2, 2, 252, 76);
-  // texto
-  g.fillStyle = color;
+  // Sin recuadro: solo texto con halo blanco para que se lea sobre el rack
   g.font = 'bold 42px Arial, sans-serif';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
+  g.lineJoin = 'round';
+  g.strokeStyle = 'rgba(255,255,255,0.95)';
+  g.lineWidth = 8;
+  g.strokeText(texto, 128, 42);
+  g.fillStyle = color;
   g.fillText(texto, 128, 42);
   const tex = new THREE.CanvasTexture(c);
   tex.needsUpdate = true;
@@ -3099,7 +3097,7 @@ function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
   const yBajo = -0.22;
   // OJO cámara: el mundo -X se ve a la DERECHA en pantalla y +X a la izquierda.
   // Las medidas verticales (alto + niveles) van del lado DERECHO del marco (mundo -X).
-  const yPiso = -0.45, zLargo = fondoM/2 + 0.55;
+  const yPiso = -0.12, zLargo = fondoM/2 + 0.55;
   // LARGO TOTAL — al FRENTE, a ras de piso
   cotaDim(parent, [-largoM/2, yPiso, zLargo], [largoM/2, yPiso, zLargo], largoM.toFixed(2)+' M', {labelOffset:[0,-0.26,0], escala:[0.55,0.17]});
   // ALTO — lado DERECHO del marco (mundo -X), junto a los niveles
