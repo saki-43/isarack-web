@@ -3120,8 +3120,8 @@ function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
   // ALTO — lado DERECHO, MÁS AFUERA que los niveles (columna aparte, no encimada)
   const xAlto = -largoM/2 - 1.20;
   cotaDim(parent, [xAlto, 0, zF], [xAlto, altoM, zF], fmtCota(altoM), {labelOffset:[-0.42,0,0], escala:[0.55,0.17]});
-  // FONDO / PROFUNDIDAD — lado izquierdo en pantalla (mundo +X), a ras de piso
-  cotaDim(parent, [xDer, yPiso, -fondoM/2], [xDer, yPiso, fondoM/2], fmtCota(fondoM), {labelOffset:[0.34,0,0], escala:[0.50,0.16]});
+  // FONDO / PROFUNDIDAD — al FRENTE, por el pasillo central (donde está el supervisor), a ras de piso
+  cotaDim(parent, [0, yPiso, -fondoM/2], [0, yPiso, fondoM/2], fmtCota(fondoM), {labelOffset:[0,-0.22,0], escala:[0.50,0.16]});
   // Capacidad (KG)
   if(capacidadKg){
     const sCap = crearTextoSprite(capacidadKg+' KG', '#da6635');
