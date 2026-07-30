@@ -284,6 +284,14 @@ gtag('config', 'G-XXXXXXXXXX');
         <button type="button" onclick="lnAdd('doble')" style="flex:1;font-size:10.5px;padding:5px 4px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila doble</button>
       </div>
     </div>
+    <div class="row">
+      <label>Unidades de cota</label>
+      <select id="selUnidad" onchange="unidadCota=this.value; if(typeof build==='function') build();" style="width:100%">
+        <option value="m">Metros (m)</option>
+        <option value="cm">Centímetros (cm)</option>
+        <option value="in">Pulgadas (in)</option>
+      </select>
+    </div>
     <div class="row" id="selPasilloRow" style="display:none">
       <label>Pasillo entre líneas (m)</label>
       <input type="number" id="selPasillo" value="3.5" min="1" max="10" step="0.1" style="width:100%">
@@ -682,6 +690,13 @@ function calcularFlete(sub){
 // ───────── 3D ─────────
 let scene, camera, renderer, grupo, targetY=0.65, camDist=3.4;
 let rotY=0.7, rotX=0.32, isDrag=false, lpX, lpY;
+// Unidad de las cotas: 'm' (metros), 'cm' o 'in' (pulgadas)
+let unidadCota = 'm';
+function fmtCota(m){
+  if(unidadCota === 'cm') return Math.round(m*100) + ' CM';
+  if(unidadCota === 'in') return Math.round(m/0.0254) + '"';
+  return m.toFixed(2) + ' M';
+}
 
 const matMetal   = new THREE.MeshStandardMaterial({color:0xf6f3ec,metalness:0.18,roughness:0.5});
 const matCharola = new THREE.MeshStandardMaterial({color:0xf8f5ee,metalness:0.15,roughness:0.55});
@@ -2690,13 +2705,13 @@ function buildCantilever(){
   const zFrente = maxLargoZ/2 + 0.35;
   const yBajo = -0.20;
   // ANCHO TOTAL al frente
-  cotaDim(grupo, [-W/2, yBajo, zFrente], [W/2, yBajo, zFrente], W.toFixed(2)+' M', {labelOffset:[0,-0.20,0]});
+  cotaDim(grupo, [-W/2, yBajo, zFrente], [W/2, yBajo, zFrente], fmtCota(W), {labelOffset:[0,-0.20,0]});
   // LARGO al costado
   const xLargo = W/2 + 0.35;
-  cotaDim(grupo, [xLargo, yBajo, -maxLargoZ/2], [xLargo, yBajo, maxLargoZ/2], maxLargoZ.toFixed(2)+' M', {labelOffset:[0.42,0,0]});
+  cotaDim(grupo, [xLargo, yBajo, -maxLargoZ/2], [xLargo, yBajo, maxLargoZ/2], fmtCota(maxLargoZ), {labelOffset:[0.42,0,0]});
   // ALTO pegado a la primera torre
   const xTorre0 = -W/2 - (lineas[0].tipo === 'doble' ? -lineas[0].anchoBaseM/2 : -0.15);
-  cotaDim(grupo, [xTorre0, 0, zFrente], [xTorre0, cfg.maxAltoM, zFrente], cfg.maxAltoM.toFixed(2)+' M', {labelOffset:[0.38,0,0]});
+  cotaDim(grupo, [xTorre0, 0, zFrente], [xTorre0, cfg.maxAltoM, zFrente], fmtCota(cfg.maxAltoM), {labelOffset:[0.38,0,0]});
   // Claros entre brazos (solo 1 línea)
   if(lineas.length === 1 && alturasBrazosL0){
     agregarCotasClaros(grupo, alturasBrazosL0, xTorre0 + lineas[0].brazoM + 0.55, maxLargoZ/2 + 0.10);
@@ -3099,11 +3114,11 @@ function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
   // Las medidas verticales (alto + niveles) van del lado DERECHO del marco (mundo -X).
   const yPiso = -0.12, zLargo = fondoM/2 + 0.55;
   // LARGO TOTAL — al FRENTE, a ras de piso
-  cotaDim(parent, [-largoM/2, yPiso, zLargo], [largoM/2, yPiso, zLargo], largoM.toFixed(2)+' M', {labelOffset:[0,-0.26,0], escala:[0.55,0.17]});
+  cotaDim(parent, [-largoM/2, yPiso, zLargo], [largoM/2, yPiso, zLargo], fmtCota(largoM), {labelOffset:[0,-0.26,0], escala:[0.55,0.17]});
   // ALTO — lado DERECHO del marco (mundo -X), junto a los niveles
-  cotaDim(parent, [xIzq, 0, zF], [xIzq, altoM, zF], altoM.toFixed(2)+' M', {labelOffset:[-0.40,0,0], escala:[0.55,0.17]});
+  cotaDim(parent, [xIzq, 0, zF], [xIzq, altoM, zF], fmtCota(altoM), {labelOffset:[-0.40,0,0], escala:[0.55,0.17]});
   // FONDO / PROFUNDIDAD — lado izquierdo en pantalla (mundo +X), a ras de piso
-  cotaDim(parent, [xDer, yPiso, -fondoM/2], [xDer, yPiso, fondoM/2], fondoM.toFixed(2)+' M', {labelOffset:[0.34,0,0], escala:[0.50,0.16]});
+  cotaDim(parent, [xDer, yPiso, -fondoM/2], [xDer, yPiso, fondoM/2], fmtCota(fondoM), {labelOffset:[0.34,0,0], escala:[0.50,0.16]});
   // Capacidad (KG)
   if(capacidadKg){
     const sCap = crearTextoSprite(capacidadKg+' KG', '#da6635');
@@ -3124,7 +3139,7 @@ function agregarCotasClaros(parent, alturasYM, xPos, zPos){
   }
   for(const [yA, yB] of segmentos){
     if(yB - yA < 0.05) continue;
-    cotaDim(parent, [xPos, yA, zPos], [xPos, yB, zPos], (yB - yA).toFixed(2)+' M', {labelOffset:[-0.30,0,0], escala:[0.36,0.11]});
+    cotaDim(parent, [xPos, yA, zPos], [xPos, yB, zPos], fmtCota(yB - yA), {labelOffset:[-0.30,0,0], escala:[0.36,0.11]});
   }
 }
 
