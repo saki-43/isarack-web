@@ -3117,14 +3117,15 @@ function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
   const yPiso = -0.12, zLargo = fondoM/2 + 0.55;
   // LARGO TOTAL — al FRENTE, a ras de piso
   cotaDim(parent, [-largoM/2, yPiso, zLargo], [largoM/2, yPiso, zLargo], fmtCota(largoM), {labelOffset:[0,-0.26,0], escala:[0.55,0.17]});
-  // ALTO — lado DERECHO del marco (mundo -X), junto a los niveles
-  cotaDim(parent, [xIzq, 0, zF], [xIzq, altoM, zF], fmtCota(altoM), {labelOffset:[-0.40,0,0], escala:[0.55,0.17]});
+  // ALTO — lado DERECHO, MÁS AFUERA que los niveles (columna aparte, no encimada)
+  const xAlto = -largoM/2 - 1.20;
+  cotaDim(parent, [xAlto, 0, zF], [xAlto, altoM, zF], fmtCota(altoM), {labelOffset:[-0.42,0,0], escala:[0.55,0.17]});
   // FONDO / PROFUNDIDAD — lado izquierdo en pantalla (mundo +X), a ras de piso
   cotaDim(parent, [xDer, yPiso, -fondoM/2], [xDer, yPiso, fondoM/2], fmtCota(fondoM), {labelOffset:[0.34,0,0], escala:[0.50,0.16]});
   // Capacidad (KG)
   if(capacidadKg){
     const sCap = crearTextoSprite(capacidadKg+' KG', '#da6635');
-    sCap.position.set(xIzq, altoM * 0.62, zF);   // lado derecho del marco (mundo -X), no en medio
+    sCap.position.set(xDer, altoM * 0.5, zF);   // costado izquierdo en pantalla, separado de las cotas
     sCap.scale.set(1.05, 0.33, 1);   // 50% más grande
     parent.add(sCap);
   }
