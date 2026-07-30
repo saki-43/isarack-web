@@ -3115,8 +3115,9 @@ function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
   // ALTO — lado DERECHO, MÁS AFUERA que los niveles (columna aparte, no encimada)
   const xAlto = -largoM/2 - 1.20;
   cotaDim(parent, [xAlto, 0, zF], [xAlto, altoM, zF], fmtCota(altoM), {labelOffset:[-0.42,0,0], escala:[0.55,0.17]});
-  // FONDO / PROFUNDIDAD — por el costado (fuera del marco), a ras de piso; su extremo cercano queda al frente
-  cotaDim(parent, [xDer, yPiso, -fondoM/2], [xDer, yPiso, fondoM/2], fmtCota(fondoM), {labelOffset:[0.34,0,0], escala:[0.50,0.16]});
+  // FONDO / PROFUNDIDAD — en la esquina frontal DERECHA (mundo -X), a ras de piso, hacia atrás
+  const xFondo = -largoM/2 - 0.30;
+  cotaDim(parent, [xFondo, yPiso, -fondoM/2], [xFondo, yPiso, fondoM/2], fmtCota(fondoM), {labelOffset:[-0.34,0,0], escala:[0.50,0.16]});
   // Capacidad (KG)
   if(capacidadKg){
     const sCap = crearTextoSprite(capacidadKg+' KG', '#da6635');
