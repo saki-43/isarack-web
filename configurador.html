@@ -2381,6 +2381,12 @@ function _tunelNiveles(l){
   for(let k = 0; k < cuantos; k++) arr.push(k);
   return arr;
 }
+function lnTunelOn(i, on){
+  const l = lineasAlmacen[i];
+  l.tunelOn = !!on;
+  if(!on) l.tunel = [];   // al apagar, se quitan los túneles
+  renderLineasAlmacen(); build();
+}
 function lnTunel(i, c){
   const l = lineasAlmacen[i];
   if(!Array.isArray(l.tunel)) l.tunel = [];
@@ -2447,8 +2453,8 @@ function renderLineasAlmacen(){
           + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
-          + '<div style="font-size:10px;color:#993C1D;font-weight:600;margin-bottom:3px">🚇 Túnel (paso montacargas) — toca el cuerpo</div>'
-          + '<div style="display:flex;flex-wrap:wrap;gap:4px">' + _tunelChips(l, i, cA) + '</div>'
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#993C1D;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.tunelOn?'checked':'')+' onchange="lnTunelOn('+i+',this.checked)"> 🚇 Túnel (paso montacargas)</label>'
+          + (l.tunelOn ? ('<div style="font-size:9.5px;color:#888;margin:3px 0 2px">Toca el cuerpo donde va el paso:</div><div style="display:flex;flex-wrap:wrap;gap:4px">' + _tunelChips(l, i, cA) + '</div>') : '')
         + '</div>'
         +'</div>'
       : '';
@@ -2539,7 +2545,7 @@ function getConfigSel(){
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB, altoIn: l.altoIn, fondoIn: l.fondoIn,
       vigaSku: l.vigaSku, vigaIn: vi.largoIn, vigaAltIn: vi.altIn, capKg: vi.capKg, capLb: vi.capLb,
       niveles: l.niveles, nivMod: !!l.nivMod, nivelesA: l.nivelesA||null, nivelesB: l.nivelesB||null,
-      tunel: (l.tunel || []),
+      tunel: (l.tunelOn ? (l.tunel || []) : []),
       altoM, fondoM, vigaM,
       largoM: vigaM * cuerposMaxLn,
       profM: l.tipo==='doble' ? fondoM*2 + unionM : fondoM};
