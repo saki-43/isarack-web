@@ -3102,7 +3102,9 @@ function cotaDim(parent, a, b, texto, opts){
   const offArr = opts.labelOffset || [perp.x*0.24, perp.y*0.24, perp.z*0.24];
   s.position.set(mid.x + offArr[0], mid.y + offArr[1], mid.z + offArr[2]);
   const e = opts.escala || [0.5, 0.155];
-  s.scale.set(e[0]*1.5, e[1]*1.5, 1);   // etiquetas 50% más grandes para que se lean
+  // Escala dinámica: en layouts grandes (cámara lejos) las cotas crecen para no perderse.
+  const f = (typeof camDist === 'number' && camDist > 0) ? Math.max(1, Math.min(3, camDist/8)) : 1;
+  s.scale.set(e[0]*1.5*f, e[1]*1.5*f, 1);
   parent.add(s);
 }
 
@@ -3129,7 +3131,8 @@ function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
   if(capacidadKg){
     const sCap = crearTextoSprite(capacidadKg+' KG', '#da6635', '#000000');
     sCap.position.set(xDer, altoM * 0.5, zF);   // costado izquierdo en pantalla, separado de las cotas
-    sCap.scale.set(1.05, 0.33, 1);   // 50% más grande
+    const fc = (typeof camDist === 'number' && camDist > 0) ? Math.max(1, Math.min(3, camDist/8)) : 1;
+    sCap.scale.set(1.05*fc, 0.33*fc, 1);   // crece con el layout
     parent.add(sCap);
   }
 }
@@ -3413,6 +3416,14 @@ function buildSelectivo(){
       : '');
   const capSel = lineas[0].capKg;
   agregarCotas(grupo, totalLen, profTotal, cfg.maxAltoM, capSel, lineas[0].vigaM);
+  // Cotas de PASILLOS (ancho entre líneas), al costado izquierdo en pantalla (mundo +X)
+  if(cfg.pasilloM && pasillosInfoSel.length){
+    const xPas = totalLen/2 + 0.35;
+    pasillosInfoSel.forEach(function(p){
+      const z0 = p.zCentro - cfg.pasilloM/2, z1 = p.zCentro + cfg.pasilloM/2;
+      cotaDim(grupo, [xPas, -0.12, z0], [xPas, -0.12, z1], fmtCota(cfg.pasilloM), {labelOffset:[0.34,0,0], escala:[0.42,0.13]});
+    });
+  }
   // Cotas de niveles (claros) SIEMPRE visibles en la esquina frontal del primer marco
   if(lineas[0]){
     const l0 = lineas[0];
