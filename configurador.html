@@ -592,12 +592,12 @@ function tieneRejillaPicking(largoCm){ return REJILLAS_COMBO_PIC[largoCm] !== un
 
 // ─── Constantes RACK SELECTIVO ───
 const MARCOS_SEL = {
-  96:  { 36:'SEL-0198', 42:'SEL-0199', 48:'SEL-0201' },
-  144: { 36:'SEL-0097', 42:'SEL-0099', 48:'SEL-0101' },
-  192: { 36:'SEL-0117', 42:'SEL-0119', 48:'SEL-0122' },
-  240: { 36:'SEL-0133', 42:'SEL-0135', 48:'SEL-0137' },
-  288: { 36:'SEL-0151', 42:'SEL-0152', 48:'SEL-0158' },
-  336: { 36:null,       42:'SEL-0178', 48:'SEL-0180' }
+  96:  { 24:'SEL-0197', 36:'SEL-0198', 42:'SEL-0199', 48:'SEL-0201' },
+  144: { 24:'SEL-0096', 36:'SEL-0097', 42:'SEL-0099', 48:'SEL-0101' },
+  192: { 24:'SEL-0116', 36:'SEL-0117', 42:'SEL-0119', 48:'SEL-0122' },
+  240: { 24:'SEL-0132', 36:'SEL-0133', 42:'SEL-0135', 48:'SEL-0137' },
+  288: { 24:'SEL-0456', 36:'SEL-0151', 42:'SEL-0152', 48:'SEL-0158' },
+  336: { 24:'SEL-0457', 36:null,       42:'SEL-0178', 48:'SEL-0180' }
 };
 // Uniones para separar las 2 filas de un rack doble (medida = separación entre filas)
 const UNIONES_SEL = {
@@ -2327,7 +2327,7 @@ function lcToggle(i){ lineasCantilever[i].abierta = !lineasCantilever[i].abierta
 function lcSet(i,c,v){ lineasCantilever[i][c]=v; renderLineasCantilever(); build(); }
 
 const SEL_ALTOS  = [[96,'96" (2.44 m)'],[144,'144" (3.66 m)'],[192,'192" (4.88 m)'],[240,'240" (6.10 m)'],[288,'288" (7.32 m)'],[336,'336" (8.54 m)']];
-const SEL_FONDOS = [[36,'36" (0.91 m)'],[42,'42" (1.07 m)'],[48,'48" (1.22 m)']];
+const SEL_FONDOS = [[24,'24" (0.61 m)'],[36,'36" (0.91 m)'],[42,'42" (1.07 m)'],[48,'48" (1.22 m)']];
 const SEL_VIGAS  = [['SEL-0362','96" × 3"'],['SEL-0364','96" × 4"'],['SEL-0352','108" × 5.5"'],['SEL-0355','144" × 3.5"'],['SEL-0451','144" × 4"'],['SEL-0358','144" × 6.25"']];
 let lineasAlmacen = [{tipo:'sencilla', cuerpos:1, altoIn:192, fondoIn:42, vigaSku:'SEL-0362', niveles:3, abierta:true}];
 
