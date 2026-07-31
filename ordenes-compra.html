@@ -294,6 +294,23 @@
   }
   .add-row-btn:hover { background: var(--primary); color: white; }
 
+  /* Renglón dudoso (leído por IA, requiere revisión) */
+  table.items tbody tr.row-dudoso, table.items tbody tr.row-dudoso:nth-child(even) { background: #fff8c5; }
+  table.items tbody tr.row-dudoso td input { background: #fffdf0; }
+  .dudoso-tag { color: #92400e; font-size: 10px; font-weight: 700; margin-left: 6px; white-space: nowrap; }
+  #leer-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 5000;
+    display: none; align-items: center; justify-content: center;
+  }
+  #leer-overlay.show { display: flex; }
+  #leer-overlay .box {
+    background: #fff; border-radius: 10px; padding: 24px 28px; text-align: center;
+    max-width: 360px; font-size: 14px;
+  }
+  .spin { width: 34px; height: 34px; border: 3px solid #e5e7eb; border-top-color: #7c3aed;
+    border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .proveedor-select-row {
     display: flex;
     gap: 8px;
@@ -558,6 +575,29 @@
 </style>
 </head>
 <body>
+<div id="gate" style="position:fixed;inset:0;background:#da6635;z-index:9000;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:28px 30px;text-align:center;max-width:320px;width:90%">
+    <div style="font-size:17px;font-weight:700;color:#da6635;margin-bottom:4px">ISARACK · Órdenes de Compra</div>
+    <div style="font-size:13px;color:#555;margin-bottom:16px">Ingresa la clave de acceso</div>
+    <input type="password" id="gate-input" placeholder="Clave" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;text-align:center;margin-bottom:10px" autocomplete="off">
+    <button id="gate-btn" style="width:100%;padding:10px;background:#da6635;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Entrar</button>
+    <div id="gate-err" style="color:#dc2626;font-size:12px;margin-top:8px;height:14px"></div>
+  </div>
+</div>
+<script>
+(function(){
+  var CLAVE = 'isarack2026';   // clave de acceso — cámbiala aquí cuando quieras
+  var g = document.getElementById('gate');
+  function abrir(){ g.style.display='none'; try{ sessionStorage.setItem('oc_ok','1'); }catch(e){} }
+  if(sessionStorage.getItem('oc_ok')==='1'){ abrir(); }
+  function probar(){
+    if(document.getElementById('gate-input').value === CLAVE){ abrir(); }
+    else { document.getElementById('gate-err').textContent = 'Clave incorrecta'; }
+  }
+  document.getElementById('gate-btn').addEventListener('click', probar);
+  document.getElementById('gate-input').addEventListener('keydown', function(e){ if(e.key==='Enter') probar(); });
+})();
+</script>
 
 <div class="app-header">
   <div>
@@ -581,10 +621,13 @@
     <div class="actions no-print">
       <button class="btn btn-accent" id="btn-save">💾 Guardar Orden</button>
       <button class="btn btn-primary" id="btn-print">🖨️ Imprimir</button>
+      <button class="btn" id="btn-leer" style="background:#7c3aed;color:#fff;border-color:#7c3aed">📷 Leer nómina</button>
+      <input type="file" id="file-nomina" accept="image/*" multiple style="display:none">
       <button class="btn" id="btn-new">📄 Nueva Orden</button>
       <button class="btn" id="btn-reset-defaults">↻ Restablecer predeterminados</button>
       <button class="btn" id="btn-save-defaults">⭐ Guardar como predeterminado</button>
     </div>
+    <div id="leer-overlay"><div class="box"><div class="spin"></div><div id="leer-msg">Leyendo la nómina con IA…</div></div></div>
 
     <div class="document" id="document">
 
@@ -1192,9 +1235,10 @@ function renderItems() {
   tbody.innerHTML = '';
   currentOrder.items.forEach((item, idx) => {
     const tr = document.createElement('tr');
+    if (item._dudoso) tr.classList.add('row-dudoso');
     tr.innerHTML = `
       <td class="qty"><input type="number" step="any" value="${item.qty}" data-idx="${idx}" data-field="qty"></td>
-      <td><input type="text" value="${escapeHtml(item.desc)}" data-idx="${idx}" data-field="desc"></td>
+      <td><input type="text" value="${escapeHtml(item.desc)}" data-idx="${idx}" data-field="desc">${item._dudoso ? '<span class="dudoso-tag no-print" title="Revisa este dato, la IA no estaba segura">⚠ revisar</span>' : ''}</td>
       <td class="price"><input type="number" step="any" value="${item.price}" data-idx="${idx}" data-field="price"></td>
       <td class="amount">${fmtMoney((parseFloat(item.qty)||0) * (parseFloat(item.price)||0))}</td>
       <td class="no-print"><button class="del-btn" data-del="${idx}" title="Eliminar fila">✕</button></td>
@@ -1209,6 +1253,11 @@ function renderItems() {
       let val = e.target.value;
       if (field === 'qty' || field === 'price') val = parseFloat(val) || 0;
       currentOrder.items[idx][field] = val;
+      if (currentOrder.items[idx]._dudoso) {   // al corregirlo, deja de ser dudoso
+        currentOrder.items[idx]._dudoso = false;
+        const tr = e.target.closest('tr');
+        if (tr) { tr.classList.remove('row-dudoso'); const tg = tr.querySelector('.dudoso-tag'); if (tg) tg.remove(); }
+      }
       updateAmountsOnly();
     });
   });
@@ -1642,6 +1691,41 @@ document.getElementById('filter-search').addEventListener('input', renderHistory
 
 // header date
 document.getElementById('header-date').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+// ============ LECTOR DE NÓMINAS (IA visión) ============
+const LEER_URL = SB_URL + '/functions/v1/leer-nomina';
+function _fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
+async function leerImagenes(files){
+  const arr = Array.from(files).filter(f=>f && f.type && f.type.indexOf('image')===0).slice(0,6);
+  if(!arr.length){ showToast('No hay imágenes para leer', true); return; }
+  const ov = document.getElementById('leer-overlay'); ov.classList.add('show');
+  try{
+    const imagenes = [];
+    for(const f of arr){ imagenes.push({ media_type: f.type, data: await _fileToDataURL(f) }); }
+    const r = await fetch(LEER_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey: SB_KEY, Authorization:'Bearer '+SB_KEY },
+      body: JSON.stringify({ imagenes, persona: currentPerson })
+    });
+    const data = await r.json();
+    if(data.error){ showToast('No se pudo leer: '+data.error, true); return; }
+    const items = (data.items||[]).map(it=>({ qty:it.qty, desc:it.desc, price:it.price, _dudoso:!!it.dudoso }));
+    if(!items.length){ showToast('No saqué renglones. '+(data.notas||''), true); return; }
+    currentOrder.items = items;
+    renderItems();
+    const nDud = items.filter(i=>i._dudoso).length;
+    showToast('✓ '+items.length+' renglón(es) leídos'+(nDud?(' · '+nDud+' en amarillo por revisar'):''));
+    if(data.notas) console.log('Notas de la IA:', data.notas);
+  }catch(e){ showToast('Error al leer: '+e.message, true); }
+  finally{ ov.classList.remove('show'); }
+}
+document.getElementById('btn-leer').addEventListener('click', ()=> document.getElementById('file-nomina').click());
+document.getElementById('file-nomina').addEventListener('change', (e)=>{ if(e.target.files&&e.target.files.length) leerImagenes(e.target.files); e.target.value=''; });
+window.addEventListener('paste', (e)=>{
+  const its = (e.clipboardData&&e.clipboardData.items)||[]; const imgs=[];
+  for(const it of its){ if(it.type&&it.type.indexOf('image')===0){ const f=it.getAsFile(); if(f) imgs.push(f); } }
+  if(imgs.length){ e.preventDefault(); leerImagenes(imgs); }
+});
 
 // initial load
 populateProveedorSelect();
