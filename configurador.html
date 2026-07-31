@@ -2391,6 +2391,24 @@ function _nivTotBom(l, cA, cB, esD){
   if(esD) _nivArrRaw(l, 'B', cB).forEach(v => s += v);
   return s;
 }
+// Posiciones (cuerpo × nivel) que SÍ llevan carga (viga/rejilla/panel), descontando los
+// huecos del túnel CUERPO POR CUERPO. Respeta niveles por módulo: si un cuerpo tiene menos
+// niveles que los que abre el túnel, solo se quitan los que de verdad existen. Igual que el build.
+function _nivCargaSel(l, cA, cB, esD){
+  const tun  = (l.tunelOn && Array.isArray(l.tunel) && l.tunel.length) ? l.tunel : [];
+  const tunN = tun.length ? _tunelNiveles(l) : [];
+  const cuentaFila = (fila, nCuerpos) => {
+    const arr = l.nivMod ? _nivArrRaw(l, fila, nCuerpos) : null;
+    let s = 0;
+    for(let c = 0; c < nCuerpos; c++){
+      const nivC = arr ? arr[c] : l.niveles;
+      const quitados = (tun.indexOf(c) >= 0) ? tunN.filter(n => n < nivC).length : 0;
+      s += (nivC - quitados);
+    }
+    return s;
+  };
+  return cuentaFila('A', cA) + (esD ? cuentaFila('B', cB) : 0);
+}
 // Mantiene los arreglos del tamaño de los cuerpos actuales (tras agregar/quitar módulos o cambiar tipo).
 function _nivNormaliza(l){
   if(!l || !l.nivMod) return;
@@ -3863,8 +3881,7 @@ function calcularBomSelectivo(){
     const esD = l.tipo === 'doble';
     const cA = l.cuerposA, cB = esD ? l.cuerposB : 0;
     const sumaCuerpos = esD ? cA + cB : cA;             // cuerpos de racking totales
-    const nivTot = _nivTotBom(l, cA, cB, esD);          // Σ niveles por módulo (A y B); = niveles*cuerpos si es parejo
-    const nivTunel = (l.tunel && l.tunel.length) ? l.tunel.length * _tunelNiveles(l).length * (esD ? 2 : 1) : 0; // niveles-cuerpo quitados por túneles
+    const nivCarga = _nivCargaSel(l, cA, cB, esD);      // posiciones cuerpo×nivel con carga (respeta niveles por módulo y túnel, hueco por hueco)
     const nMarcos = esD ? (cA + 1) + (cB + 1) : (cA + 1);
     const marcoSku = MARCOS_SEL[l.altoIn] && MARCOS_SEL[l.altoIn][l.fondoIn];
     if(marcoSku) add(marcoSku, nMarcos);
@@ -3872,19 +3889,19 @@ function calcularBomSelectivo(){
     // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
     const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.vigaM, cA) : -1;
     const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'selectivo') * (esD ? 2 : 1) : 0;
-    add(l.vigaSku, 2 * (nivTot - nivQuitados - nivTunel));
+    add(l.vigaSku, 2 * (nivCarga - nivQuitados));
     add(ANCLA_STD_SEL, 4 * nMarcos);
     if(cfg.rejilla){
       const rejSku = REJILLAS_SEL[l.fondoIn];
       const rejPorViga = REJILLAS_POR_VIGA_SEL[l.vigaIn];
-      if(rejSku && rejPorViga) add(rejSku, rejPorViga * (nivTot - nivTunel));
+      if(rejSku && rejPorViga) add(rejSku, rejPorViga * nivCarga);
     }
     if(cfg.panel){
       // Panel Beige por fondo (in): cada pieza es fondoIn × 8", cubre 8" de alto de viga
       const skuPanelSel = PANEL_BEIGE_SEL[l.fondoIn];
       if(skuPanelSel){
         const piezasPorNivel = Math.ceil(l.vigaIn / 8);
-        add(skuPanelSel, piezasPorNivel * (nivTot - nivTunel));
+        add(skuPanelSel, piezasPorNivel * nivCarga);
       }
     }
     if(cfg.botas) add(BOTA_SEL, 2 * nMarcos);
