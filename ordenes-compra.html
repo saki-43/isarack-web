@@ -1705,6 +1705,21 @@ function _matchPersona(nombre){
   }
   return null;
 }
+// Empate DIFUSO de proveedor por palabras (tolera "YANET"/"YANETH", "JIMENEZ" extra, etc.)
+function _tok(s){
+  return (s||'').toUpperCase().normalize('NFD').replace(/[^A-Z0-9 ]/g,' ')
+    .split(/\s+/).filter(w=>w.length>=3 && ['DEL','LOS','LAS','RL'].indexOf(w)<0);
+}
+function _matchProveedor(nombre){
+  const pv = _tok(nombre); if(!pv.length) return null;
+  let best=null, bs=0;
+  for(const k of Object.keys(proveedores)){
+    const rs = _tok(proveedores[k].razonSocial||''); if(!rs.length) continue;
+    let inter=0; rs.forEach(w=>{ if(pv.indexOf(w)>=0) inter++; });
+    if(inter>bs){ bs=inter; best=k; }
+  }
+  return bs>=2 ? best : null;
+}
 function _fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
 async function leerImagenes(files){
   const arr = Array.from(files).filter(f=>f && f.type && f.type.indexOf('image')===0).slice(0,6);
@@ -1737,9 +1752,29 @@ async function leerImagenes(files){
       }
     }
     currentOrder.items = items;
-    // IVA/modo detectado del documento (facturas de proveedor; en nómina viene null y respeta a la persona)
-    const t = data.tax || {};
     let ivaMsg = '';
+    // Proveedor detectado: empate difuso con los guardados
+    let matchedKey = data.proveedor ? _matchProveedor(data.proveedor) : null;
+    if(data.proveedor){
+      if(matchedKey){
+        const p = proveedores[matchedKey];
+        currentOrder._proveedorKey = matchedKey;
+        currentOrder.razonSocial = p.razonSocial||''; currentOrder.contacto = p.contacto||'';
+        currentOrder.telefono = p.telefono||''; currentOrder.direccion = p.direccion||''; currentOrder.direccionEnvio = p.direccionEnvio||'ISARACK';
+      } else {
+        currentOrder._proveedorKey = null;
+        currentOrder.razonSocial = data.proveedor;
+      }
+    }
+    // IVA/modo: si el proveedor está ligado a una persona (mano de obra: Abel→retenciones, Brayan→16…),
+    // usa SU regla; si es empresa/material o no se conoce, usa el IVA que trae el documento.
+    let t = null;
+    if(matchedKey){
+      const p = proveedores[matchedKey];
+      const pk = _matchPersona(p.contacto) || _matchPersona(p.razonSocial);
+      if(pk){ const d = defaults[pk]; t = { taxMode:d.taxMode, ivaPct:d.ivaPct, isrPct:d.isrRetenidoPct, ivaRetPct:d.ivaRetenidoPct }; }
+    }
+    if(!t) t = data.tax || {};
     if(t.taxMode){
       currentOrder.taxMode = t.taxMode;
       if(t.ivaPct) currentOrder.ivaPct = t.ivaPct;
@@ -1748,24 +1783,6 @@ async function leerImagenes(files){
         if(t.ivaRetPct) currentOrder.ivaRetenidoPct = t.ivaRetPct;
       }
       ivaMsg = ' · IVA '+(t.ivaPct||currentOrder.ivaPct)+'% ('+(t.taxMode==='retentions'?'con retenciones':'simple')+')';
-    }
-    // Proveedor detectado: si coincide con uno guardado, lo selecciona; si no, pone el nombre
-    if(data.proveedor){
-      const pv = data.proveedor.toUpperCase();
-      let matched = null;
-      for(const k of Object.keys(proveedores)){
-        const rs = (proveedores[k].razonSocial||'').toUpperCase();
-        if(rs && (rs===pv || rs.indexOf(pv)>=0 || pv.indexOf(rs)>=0)){ matched = k; break; }
-      }
-      if(matched){
-        const p = proveedores[matched];
-        currentOrder._proveedorKey = matched;
-        currentOrder.razonSocial = p.razonSocial||''; currentOrder.contacto = p.contacto||'';
-        currentOrder.telefono = p.telefono||''; currentOrder.direccion = p.direccion||''; currentOrder.direccionEnvio = p.direccionEnvio||'ISARACK';
-      } else {
-        currentOrder._proveedorKey = null;
-        currentOrder.razonSocial = data.proveedor;
-      }
     }
     renderCurrentOrder();
     calculateTotals();
