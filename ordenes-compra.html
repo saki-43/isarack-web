@@ -1712,9 +1712,40 @@ async function leerImagenes(files){
     const items = (data.items||[]).map(it=>({ qty:it.qty, desc:it.desc, price:it.price, _dudoso:!!it.dudoso }));
     if(!items.length){ showToast('No saqué renglones. '+(data.notas||''), true); return; }
     currentOrder.items = items;
-    renderItems();
+    // IVA/modo detectado del documento (facturas de proveedor; en nómina viene null y respeta a la persona)
+    const t = data.tax || {};
+    let ivaMsg = '';
+    if(t.taxMode){
+      currentOrder.taxMode = t.taxMode;
+      if(t.ivaPct) currentOrder.ivaPct = t.ivaPct;
+      if(t.taxMode === 'retentions'){
+        if(t.isrPct) currentOrder.isrRetenidoPct = t.isrPct;
+        if(t.ivaRetPct) currentOrder.ivaRetenidoPct = t.ivaRetPct;
+      }
+      ivaMsg = ' · IVA '+(t.ivaPct||currentOrder.ivaPct)+'% ('+(t.taxMode==='retentions'?'con retenciones':'simple')+')';
+    }
+    // Proveedor detectado: si coincide con uno guardado, lo selecciona; si no, pone el nombre
+    if(data.proveedor){
+      const pv = data.proveedor.toUpperCase();
+      let matched = null;
+      for(const k of Object.keys(proveedores)){
+        const rs = (proveedores[k].razonSocial||'').toUpperCase();
+        if(rs && (rs===pv || rs.indexOf(pv)>=0 || pv.indexOf(rs)>=0)){ matched = k; break; }
+      }
+      if(matched){
+        const p = proveedores[matched];
+        currentOrder._proveedorKey = matched;
+        currentOrder.razonSocial = p.razonSocial||''; currentOrder.contacto = p.contacto||'';
+        currentOrder.telefono = p.telefono||''; currentOrder.direccion = p.direccion||''; currentOrder.direccionEnvio = p.direccionEnvio||'ISARACK';
+      } else {
+        currentOrder._proveedorKey = null;
+        currentOrder.razonSocial = data.proveedor;
+      }
+    }
+    renderCurrentOrder();
+    calculateTotals();
     const nDud = items.filter(i=>i._dudoso).length;
-    showToast('✓ '+items.length+' renglón(es) leídos'+(nDud?(' · '+nDud+' en amarillo por revisar'):''));
+    showToast('✓ '+items.length+' renglón(es) leídos'+ivaMsg+(nDud?(' · '+nDud+' en amarillo por revisar'):''));
     if(data.notas) console.log('Notas de la IA:', data.notas);
   }catch(e){ showToast('Error al leer: '+e.message, true); }
   finally{ ov.classList.remove('show'); }
