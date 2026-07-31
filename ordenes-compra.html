@@ -1694,6 +1694,17 @@ document.getElementById('header-date').textContent = new Date().toLocaleDateStri
 
 // ============ LECTOR DE NÓMINAS (IA visión) ============
 const LEER_URL = SB_URL + '/functions/v1/leer-nomina';
+// Empata el nombre leído (ej. "BRYAN ALEXIS") con una persona de la app (BRAYAN, GILBERTO…)
+function _matchPersona(nombre){
+  const n = (nombre||'').toUpperCase().trim();
+  if(!n) return null;
+  for(const k of Object.keys(defaults)){
+    const d = defaults[k] || {};
+    const cands = [k, d.contacto, d.razonSocial].map(s=>(s||'').toUpperCase().trim()).filter(Boolean);
+    for(const cand of cands){ if(cand.length>2 && (n.indexOf(cand)>=0 || cand.indexOf(n)>=0)) return k; }
+  }
+  return null;
+}
 function _fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
 async function leerImagenes(files){
   const arr = Array.from(files).filter(f=>f && f.type && f.type.indexOf('image')===0).slice(0,6);
@@ -1711,6 +1722,20 @@ async function leerImagenes(files){
     if(data.error){ showToast('No se pudo leer: '+data.error, true); return; }
     const items = (data.items||[]).map(it=>({ qty:it.qty, desc:it.desc, price:it.price, _dudoso:!!it.dudoso }));
     if(!items.length){ showToast('No saqué renglones. '+(data.notas||''), true); return; }
+    // Si es nómina y detectó de quién es, cambia a esa persona (proveedor + IVA correctos)
+    let personaMsg = '';
+    if(data.tipo !== 'factura' && data.persona){
+      const pk = _matchPersona(data.persona);
+      if(pk){
+        if(pk !== currentPerson){
+          const fol = currentOrder.folio, fec = currentOrder.fecha;
+          currentPerson = pk;
+          loadOrderFromDefaults(pk);
+          currentOrder.folio = fol; currentOrder.fecha = fec;
+        }
+        personaMsg = ' · ' + ((defaults[pk] && defaults[pk].razonSocial) ? defaults[pk].razonSocial : pk);
+      }
+    }
     currentOrder.items = items;
     // IVA/modo detectado del documento (facturas de proveedor; en nómina viene null y respeta a la persona)
     const t = data.tax || {};
@@ -1745,7 +1770,7 @@ async function leerImagenes(files){
     renderCurrentOrder();
     calculateTotals();
     const nDud = items.filter(i=>i._dudoso).length;
-    showToast('✓ '+items.length+' renglón(es) leídos'+ivaMsg+(nDud?(' · '+nDud+' en amarillo por revisar'):''));
+    showToast('✓ '+items.length+' renglón(es) leídos'+personaMsg+ivaMsg+(nDud?(' · '+nDud+' en amarillo por revisar'):''));
     if(data.notas) console.log('Notas de la IA:', data.notas);
   }catch(e){ showToast('Error al leer: '+e.message, true); }
   finally{ ov.classList.remove('show'); }
