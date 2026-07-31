@@ -3227,6 +3227,20 @@ function agregarCotasClaros(parent, alturasYM, xPos, zPos){
   }
 }
 
+// Cotas verticales de la ALTURA de cada piso de la pasarela (piso transitable),
+// medidas desde el suelo. Van por fuera del marco, al mismo costado que las demás
+// cotas (mundo -X = derecha en pantalla). Con 2 niveles, cada piso lleva su línea
+// un poco más afuera para que no se encimen.
+function agregarCotasPasarela(parent, alturaM, niveles, xBase, zPos){
+  if(!alturaM || alturaM <= 0) return;
+  const n = Math.max(1, niveles || 1);
+  for(let nv=1; nv<=n; nv++){
+    const h = alturaM * nv;
+    const xP = xBase - (nv-1)*0.75;
+    cotaDim(parent, [xP, 0, zPos], [xP, h, zPos], fmtCota(h), {labelOffset:[-0.36,0,0], escala:[0.5,0.16]});
+  }
+}
+
 // Bodega: dibuja un cuarto (piso + contorno) con sus medidas alrededor del rack,
 // y actualiza el indicador de si el rack cabe. El rack ya está centrado en el origen.
 function agregarBodega(parent){
@@ -3329,6 +3343,8 @@ function buildPicking(){
   if(cfg.pasarela.on) dibujarPasarela(cfg, pasillosInfo, xInicio, matVigaPic);
   // Cotas dimensionales en el modelo 3D
   agregarCotas(grupo, maxLen, profTotal, cfg.maxAltoM, 400, lineas[0].largoM);
+  // Cota(s) de la altura de la pasarela, por fuera del marco (mismo costado)
+  if(cfg.pasarela.on) agregarCotasPasarela(grupo, cfg.pasarela.alturaM, cfg.pasarela.niveles, -maxLen/2 - 2.0, profTotal/2 + 0.05);
   // Cotas de claros entre niveles (solo con 1 línea)
   if(lineas.length === 1){
     const l0 = lineas[0];
@@ -3551,6 +3567,8 @@ function buildSelectivo(){
       cotaDim(grupo, [xPas, -0.12, z0], [xPas, -0.12, z1], fmtCota(cfg.pasilloM), {labelOffset:[-0.34,0,0], escala:[0.42,0.13]});
     });
   }
+  // Cota(s) de la altura de la pasarela, más afuera que las de pasillo
+  if(cfg.pasarela.on) agregarCotasPasarela(grupo, cfg.pasarela.alturaM, cfg.pasarela.niveles, -totalLen/2 - 2.3, profTotal/2 + 0.10);
   _rackDims = {x: totalLen, z: profTotal, y: cfg.maxAltoM};   // para el cálculo de la bodega
   // Cotas de niveles (claros) SIEMPRE visibles en la esquina frontal del primer marco
   if(lineas[0]){
