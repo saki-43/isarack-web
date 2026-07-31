@@ -1087,14 +1087,17 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
     }
   }
   for(let k=0; k<nMarcos; k++) marco(x0 + k * largoM);
-  // Posición Y de cada nivel: manual (si está activo) o uniforme
-  const alturasManPic = getAlturasManualesM('picking');
-  const alturasDefPic = alturasDefaultM(altoM, niveles);
+  // Posición Y de cada nivel: manual (si está activo) o uniforme.
+  // `niveles` puede ser número (parejo) o arreglo por cuerpo (niveles por módulo).
+  const _nivArrPic = Array.isArray(niveles);
+  const alturasManPic = _nivArrPic ? null : getAlturasManualesM('picking');   // alturas manuales solo en modo parejo
   const bandasPic = bandasLibres || [];
   for(let c=0; c<cuerpos; c++){
     const cx = x0 + c * largoM + largoM/2;
-    for(let n=0; n<niveles; n++){
-      const y = alturasManPic ? Math.min(alturasManPic[n], altoM - 0.10) : Math.min(alturasDefPic[n], altoM - 0.10);
+    const nivC = _nivArrPic ? (parseInt(niveles[c])||parseInt(niveles[0])||1) : niveles;
+    const alturasC = alturasManPic || alturasDefaultM(altoM, nivC);
+    for(let n=0; n<nivC; n++){
+      const y = Math.min(alturasC[n], altoM - 0.10);
       // Solo se despejan los niveles por donde pasa la pasarela; arriba y abajo quedan normales
       if(c === skipCuerpo && bandasPic.some(b => y >= b[0] && y <= b[1])) continue;
       const usaRej    = tieneRejilla;
@@ -1155,6 +1158,7 @@ function getConfigPic(){
     const cuerposMaxLn = Math.max(cuerposA, cuerposB);
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB,
       altoIn: l.altoIn, fondoIn: l.fondoIn, largoCm: l.largoCm, niveles: l.niveles,
+      nivMod: !!l.nivMod, nivelesA: l.nivelesA || null, nivelesB: l.nivelesB || null,
       altoM, fondoM, largoM,
       largoTotM: largoM * cuerposMaxLn,
       profM: l.tipo==='doble' ? fondoM*2 : fondoM};
@@ -2075,6 +2079,7 @@ function lineasSyncPic(){
 }
 
 function renderLineasPicking(){
+  lineasPicking.forEach(_nivNormaliza);
   const cont = document.getElementById('picLineasList');
   cont.innerHTML = lineasPicking.map((l, i) => {
     const esD = l.tipo === 'doble';
@@ -2116,6 +2121,10 @@ function renderLineasPicking(){
         +'<div><div style="color:#666;margin-bottom:1px">Cuerpo (largo)</div><select onchange="lpSet('+i+',\'largoCm\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_optsDe('picLargo', PIC_LARGOS, l.largoCm)+'</select></div>'
         +'<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lpSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>'
         + filasAB
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lpNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+          + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB, 'lpNivSet') : '')
+        + '</div>'
         +'</div>'
       : '';
     return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
@@ -2125,7 +2134,7 @@ function renderLineasPicking(){
       +'<span onclick="lpCuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
       +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
       +'<span onclick="lpCuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
-      +'<span onclick="lpToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:0 3px;font-size:11px;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
+      +'<span onclick="lpToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 10px;font-size:23px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
       + btnDel
       +'</div>'
       + chip
@@ -2186,6 +2195,21 @@ function lpSet(i, campo, valor){
   try{ actualizarStockEnDropdowns(); }catch(e){}
   build();
 }
+// Niveles por módulo en Picking (reusa los helpers genéricos _niv* del Selectivo)
+function lpNivMod(i, on){
+  const l = lineasPicking[i];
+  l.nivMod = !!on;
+  if(on) _nivNormaliza(l);
+  renderLineasPicking(); build();
+}
+function lpNivSet(i, fila, c, val){
+  const l = lineasPicking[i];
+  const v = Math.max(1, Math.min(12, parseInt(val) || 1));
+  const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
+  if(!Array.isArray(l[key])) l[key] = [];
+  l[key][c] = v;
+  build();
+}
 
 
 // ── Distribución del almacén (Mecano): líneas con pasillo ──
@@ -2224,7 +2248,7 @@ function _cardLinea(pfx, i, l, extra){
     +'<span onclick="'+pfx+'Cuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
     +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && extra.abPermitido && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
     +'<span onclick="'+pfx+'Cuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
-    +'<span onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;color:'+tx+';padding:0 3px;font-size:11px;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
+    +'<span onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 10px;font-size:23px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
     + btnDel
     +'</div>'
     + chip
@@ -2369,13 +2393,14 @@ function _nivNormaliza(l){
   l.nivelesA = _nivArrRaw(l, 'A', cA);
   if(l.tipo === 'doble') l.nivelesB = _nivArrRaw(l, 'B', cB); else l.nivelesB = null;
 }
-function _nivModEditor(l, i, esD, cA, cB){
+function _nivModEditor(l, i, esD, cA, cB, setFn){
+  setFn = setFn || 'lnNivSet';
   const fila = (f, arr, n) => {
     let h = esD ? '<div style="font-size:9px;color:#888;margin:4px 0 2px">Fila '+f+'</div>' : '';
     h += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
     for(let c = 0; c < n; c++){
       h += '<div style="text-align:center"><div style="font-size:8.5px;color:#999;margin-bottom:1px">M'+(c+1)+'</div>'
-        + '<input type="number" min="1" max="12" value="'+arr[c]+'" onchange="lnNivSet('+i+',\''+f+'\','+c+',this.value)" style="width:36px;padding:3px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:5px;text-align:center;background:#fff"></div>';
+        + '<input type="number" min="1" max="12" value="'+arr[c]+'" onchange="'+setFn+'('+i+',\''+f+'\','+c+',this.value)" style="width:36px;padding:3px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:5px;text-align:center;background:#fff"></div>';
     }
     h += '</div>';
     return h;
@@ -2490,7 +2515,7 @@ function renderLineasAlmacen(){
       +'<span onclick="lnCuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
       +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
       +'<span onclick="lnCuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
-      +'<span onclick="lnToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:0 3px;font-size:11px;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
+      +'<span onclick="lnToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 10px;font-size:23px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
       + btnDel
       +'</div>'
       + chip
@@ -3306,16 +3331,16 @@ function buildPicking(){
     if(l.tipo === 'doble'){
       const lenA = l.largoM * l.cuerposA, lenB = l.largoM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildPickingScene(filaA, l.altoM, l.fondoM, l.largoM, l.niveles, l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg));
+      buildPickingScene(filaA, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg));
       filaA.position.set(-l.largoTotM/2 + lenA/2, 0, l.fondoM/2);
       gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildPickingScene(filaB, l.altoM, l.fondoM, l.largoM, l.niveles, l.cuerposB, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposB,true,iLn), bandasPasarela(cfg));
+      buildPickingScene(filaB, l.altoM, l.fondoM, l.largoM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposB,true,iLn), bandasPasarela(cfg));
       filaB.rotation.y = Math.PI;   // espalda con espalda: la fila B mira al otro lado
       filaB.position.set(-l.largoTotM/2 + lenB/2, 0, -l.fondoM/2);
       gLin.add(filaB);
     } else {
-      buildPickingScene(gLin, l.altoM, l.fondoM, l.largoM, l.niveles, l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg));
+      buildPickingScene(gLin, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg));
     }
     gLin.position.x = xInicio + l.largoTotM/2;
     gLin.position.z = zFrente - l.profM/2;
@@ -3790,6 +3815,7 @@ function calcularBomPicking(){
     const esD = l.tipo === 'doble';
     const cA = l.cuerposA, cB = esD ? l.cuerposB : 0;
     const sumaCuerpos = esD ? cA + cB : cA;
+    const nivTot = _nivTotBom(l, cA, cB, esD);   // Σ niveles por módulo; = niveles*cuerpos si es parejo
     const nMarcos = esD ? (cA + 1) + (cB + 1) : (cA + 1);
     // 1) Marcos picking (alto × fondo)
     const marcoSku = MARCOS_PIC[l.altoIn] && MARCOS_PIC[l.altoIn][l.fondoIn];
@@ -3799,18 +3825,18 @@ function calcularBomPicking(){
     // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
     const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.largoM, cA) : -1;
     const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'picking') * (esD ? 2 : 1) : 0;
-    add(VIGAS_PIC[l.largoCm], 2 * (l.niveles * sumaCuerpos - nivQuitados));
+    add(VIGAS_PIC[l.largoCm], 2 * (nivTot - nivQuitados));
     // 4) Carga del nivel
     if(cfg.rejilla && tieneRejillaPicking(l.largoCm)){
       const combo = REJILLAS_COMBO_PIC[l.largoCm];
       const skuRej = REJILLAS_PIC[combo.tipo] && REJILLAS_PIC[combo.tipo][l.fondoIn];
-      add(skuRej, combo.cantidad * l.niveles * sumaCuerpos);
+      add(skuRej, combo.cantidad * nivTot);
     } else if(cfg.panel || (cfg.rejilla && !tieneRejillaPicking(l.largoCm))){
       const skuPanel = PANELES_BEIGE_PIC[l.fondoIn];
-      add(skuPanel, l.niveles * sumaCuerpos);
+      add(skuPanel, nivTot);
     } else if(cfg.madera){
       const skuTam = TAM_PIC[l.largoCm] && TAM_PIC[l.largoCm][l.fondoIn];
-      if(skuTam) add(skuTam, l.niveles * sumaCuerpos);
+      if(skuTam) add(skuTam, nivTot);
     }
   });
   // ── Pasarela: piezas individuales (compartida) ──
