@@ -655,6 +655,7 @@
         <label>Proveedor:</label>
         <select id="proveedor-select"><option value="">— Seleccionar proveedor —</option><option value="ARTURO FERNANDEZ">ARTURO FERNANDEZ</option><option value="BRYAN ALEXIS">BRYAN ALEXIS</option><option value="CENTRAL DE ACEROS TIJUANA">CENTRAL DE ACEROS TIJUANA S.A. DE C.V.</option><option value="CLAUDIA YANETH LARES">CLAUDIA YANETH LARES</option><option value="FASTENER DEPOT">FASTENER DEPOT SA DE CV</option><option value="MANUEL RODRIGUEZ">MANUEL RODRIGUEZ</option><option value="SAMUEL GOMEZ">SAMUEL GOMEZ</option><option value="SURTIDORA MEXICANA DEL NOROESTE">SURTIDORA MEXICANA DEL NOROESTE S.A. DE C.V.</option></select>
         <button class="btn" id="btn-save-proveedor" title="Guardar datos actuales como nuevo proveedor">＋ Guardar nuevo</button>
+        <button class="btn btn-danger" id="btn-del-proveedor" title="Borrar el proveedor seleccionado">🗑</button>
       </div>
       <div class="proveedor-grid">
         <div class="field full">
@@ -1615,6 +1616,19 @@ document.getElementById('btn-save-proveedor').addEventListener('click', () => {
   saveProveedores(proveedores);
   populateProveedorSelect(key);
   showToast('✓ Proveedor "' + rs + '" guardado');
+});
+
+document.getElementById('btn-del-proveedor').addEventListener('click', async () => {
+  const key = document.getElementById('proveedor-select').value;
+  if (!key) { showToast('Selecciona el proveedor a borrar', true); return; }
+  if (typeof BASE_PROVEEDORES !== 'undefined' && BASE_PROVEEDORES[key]) { showToast('Ese es un proveedor de base, no se borra', true); return; }
+  const nom = (proveedores[key] && proveedores[key].razonSocial) || key;
+  const ok = await confirmModal('Borrar proveedor', '¿Borrar el proveedor "' + nom + '"? No afecta las órdenes ya guardadas.');
+  if (!ok) return;
+  delete proveedores[key];
+  saveProveedores(proveedores);
+  populateProveedorSelect('');
+  showToast('Proveedor borrado');
 });
 
 document.getElementById('btn-add-row').addEventListener('click', () => {
