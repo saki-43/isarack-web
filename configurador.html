@@ -689,6 +689,7 @@ const LOGO_ISARACK = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAGQCAIA
 // Caches
 let preciosCache = null;   // {producto: {sku, precio}}
 let inventarioArr = null;  // Array completo de items del inventario (para calcular fabricables)
+let bomByHijo = {};        // {hijo_sku:{padre,piezas}} — reglas BOM (corte de diagonales 42"→36"/24"/18")
 
 // BOM de marcos para calcular fabricables por componentes (idéntico a ISA-OS)
 // Formato: alto → {posteSize, postePartes, diagonalD, diagonalH, pie}
@@ -4134,6 +4135,14 @@ async function cargarPrecios(){
     inventarioArr.push(item);
   }
   preciosCache = map;
+  // Reglas BOM (corte de diagonales): la existencia de la hija (36"/24"/18") suma lo
+  // fabricable de su madre (42"). Mismo criterio que ISA-OS.
+  try{
+    const brs = await sbFetch("bom_rules?select=hijo_sku,padre_sku,hijos_por_padre");
+    const bh = {};
+    for(const r of (brs||[])){ bh[r.hijo_sku] = { padre:r.padre_sku, piezas:Number(r.hijos_por_padre||1) }; }
+    bomByHijo = bh;
+  }catch(e){ console.warn('bom_rules:', e); }
   // Cargar también el material comprometido en pedidos activos (no bloqueante)
   cargarComprometido().catch(e=>console.warn('comprometido:',e));
   try{ actualizarStockEnDropdowns(); }catch(e){ console.warn(e); }
@@ -4200,7 +4209,7 @@ function marcosFabricables(altoIn, fondoIn, color){
   const buscarDiag = (letra)=>inventarioArr.filter(p=>{
     const u = (p.producto||'').toUpperCase();
     return u.includes(letra + ' DIAGONAL') && u.includes(fondoStr+'"') && u.includes(colorUp);
-  }).reduce((s,p)=>s+dispReal(p),0);
+  }).reduce((s,p)=>s+(stockDisponibleDe(p.sku)||0),0); // incluye lo derivado de la madre (42")
   const diagD = buscarDiag('D');
   const diagH = buscarDiag('H');
 
@@ -4232,11 +4241,21 @@ function stockDe(sku){
   return item ? item.cantidad : null;
 }
 // Stock disponible = físico - comprometido (para SKUs sin fabricación desde componentes)
+function _dispPropioDe(sku){
+  const item = preciosCache ? preciosCache[sku] : null;
+  return item ? Math.max(0, Number(item.cantidad||0) - comprometidoDe(item)) : 0;
+}
 function stockDisponibleDe(sku){
   if(!preciosCache) return null;
   const item = preciosCache[sku];
   if(!item) return null;
-  return Math.max(0, Number(item.cantidad||0) - comprometidoDe(item));
+  let disp = Math.max(0, Number(item.cantidad||0) - comprometidoDe(item));
+  // Existencia derivada por reglas BOM: la madre (ej. diagonal 42") se corta en esta pieza
+  const regla = bomByHijo[sku];
+  if(regla && preciosCache[regla.padre]){
+    disp += _dispPropioDe(regla.padre) * (regla.piezas||1);
+  }
+  return disp;
 }
 function _fmtStockLabel(n){
   // Existencias a la vista (decisión de Isaac: mostrar a todos).
