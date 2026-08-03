@@ -381,7 +381,9 @@ gtag('config', 'G-XXXXXXXXXX');
         <option value="192" selected>192" (4.88 m)</option>
         <option value="240">240" (6.10 m)</option>
         <option value="288">288" (7.32 m)</option>
+        <option value="312">312" (7.92 m) · 26'</option>
         <option value="336">336" (8.54 m)</option>
+        <option value="360">360" (9.14 m) · 30'</option>
       </select>
       <select id="selFondo">
         <option value="24">24" (0.61 m)</option>
@@ -598,7 +600,9 @@ const MARCOS_SEL = {
   192: { 24:'SEL-0116', 36:'SEL-0117', 42:'SEL-0119', 48:'SEL-0122' },
   240: { 24:'SEL-0132', 36:'SEL-0133', 42:'SEL-0135', 48:'SEL-0137' },
   288: { 24:'SEL-0456', 36:'SEL-0151', 42:'SEL-0152', 48:'SEL-0158' },
-  336: { 24:'SEL-0457', 36:null,       42:'SEL-0178', 48:'SEL-0180' }
+  312: { 42:'SEL-0168', 48:'SEL-0171' },
+  336: { 24:'SEL-0457', 36:null,       42:'SEL-0178', 48:'SEL-0180' },
+  360: { 42:'SEL-0183', 48:'SEL-0185' }
 };
 // Uniones para separar las 2 filas de un rack doble (medida = separación entre filas)
 const UNIONES_SEL = {
@@ -2327,7 +2331,7 @@ function lcTipo(i){ lineasCantilever[i].tipo = lineasCantilever[i].tipo==='doble
 function lcToggle(i){ lineasCantilever[i].abierta = !lineasCantilever[i].abierta; renderLineasCantilever(); }
 function lcSet(i,c,v){ lineasCantilever[i][c]=v; renderLineasCantilever(); build(); }
 
-const SEL_ALTOS  = [[96,'96" (2.44 m)'],[144,'144" (3.66 m)'],[192,'192" (4.88 m)'],[240,'240" (6.10 m)'],[288,'288" (7.32 m)'],[336,'336" (8.54 m)']];
+const SEL_ALTOS  = [[96,'96" (2.44 m)'],[144,'144" (3.66 m)'],[192,'192" (4.88 m)'],[240,'240" (6.10 m)'],[288,'288" (7.32 m)'],[312,'312" (7.92 m) · 26\''],[336,'336" (8.54 m)'],[360,'360" (9.14 m) · 30\'']];
 const SEL_FONDOS = [[24,'24" (0.61 m)'],[36,'36" (0.91 m)'],[42,'42" (1.07 m)'],[48,'48" (1.22 m)']];
 const SEL_VIGAS  = [['SEL-0362','96" × 3"'],['SEL-0364','96" × 4"'],['SEL-0352','108" × 5.5"'],['SEL-0355','144" × 3.5"'],['SEL-0451','144" × 4"'],['SEL-0358','144" × 6.25"']];
 let lineasAlmacen = [{tipo:'sencilla', cuerpos:1, altoIn:192, fondoIn:42, vigaSku:'SEL-0362', niveles:3, abierta:true}];
@@ -4000,8 +4004,15 @@ function renderCotizacion(){
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
 
-  // Las existencias NO se muestran en el configurador público (se distribuye a terceros).
-  const badgeStock = () => '';
+  // Existencias a la vista (decisión de Isaac: mostrar a todos).
+  const badgeStock = (l) => {
+    if(!preciosCache || !l || !l.sku || typeof stockDisponibleDe!=='function') return '';
+    const disp = stockDisponibleDe(l.sku);
+    if(disp===null||disp===undefined) return '';
+    const need = parseFloat(l.cantidad)||0;
+    const cls = disp<=0 ? 'stk-no' : (disp<need ? 'stk-par' : 'stk-ok');
+    return ` <span class="stk ${cls}">${disp} disp</span>`;
+  };
   document.getElementById('lista').innerHTML = lineas.map(l=>`
     <div class="li">
       <div>
@@ -4228,10 +4239,9 @@ function stockDisponibleDe(sku){
   return Math.max(0, Number(item.cantidad||0) - comprometidoDe(item));
 }
 function _fmtStockLabel(n){
-  // Sin cantidades a la vista: el configurador se comparte con distribuidores.
-  // Solo se avisa cuando algo está agotado, sin revelar existencias.
+  // Existencias a la vista (decisión de Isaac: mostrar a todos).
   if(n===null||n===undefined) return '';
-  return (n<=0) ? ' · agotado' : '';
+  return (n<=0) ? ' · agotado' : ' · ' + n + ' disp';
 }
 
 // Repinta cada dropdown clave con la existencia de su SKU asociado
