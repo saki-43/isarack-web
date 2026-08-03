@@ -4206,10 +4206,18 @@ function marcosFabricables(altoIn, fondoIn, color){
 
   // Diagonales D y H — el nombre real es "D DIAGONAL" y "H DIAGONAL" (letra primero)
   // Además filtramos por medida del fondo (36, 42, 48)
-  const buscarDiag = (letra)=>inventarioArr.filter(p=>{
-    const u = (p.producto||'').toUpperCase();
-    return u.includes(letra + ' DIAGONAL') && u.includes(fondoStr+'"') && u.includes(colorUp);
-  }).reduce((s,p)=>s+(stockDisponibleDe(p.sku)||0),0); // incluye lo derivado de la madre (42")
+  const buscarDiag = (letra)=>{
+    const items = inventarioArr.filter(p=>{
+      const u = (p.producto||'').toUpperCase();
+      return u.includes(letra + ' DIAGONAL') && u.includes(fondoStr+'"');
+    });
+    // Preferir las del color del marco; si no hay de ese color en esa medida (ej. las
+    // de 24" solo existen en picking, sin color), usar las neutras. stockDisponibleDe
+    // ya suma lo cortable de la madre 42", así que no marca "sin marcos" de más.
+    const conColor = items.filter(p=>(p.producto||'').toUpperCase().includes(colorUp));
+    const usar = conColor.length ? conColor : items;
+    return usar.reduce((s,p)=>s+(stockDisponibleDe(p.sku)||0),0);
+  };
   const diagD = buscarDiag('D');
   const diagH = buscarDiag('H');
 
