@@ -4227,12 +4227,14 @@ function marcosFabricables(altoIn, fondoIn, color){
     return (u.includes('PIE BASE') || u.includes('PIE ')) && u.includes(colorUp);
   }).reduce((s,p)=>s+dispReal(p),0);
 
-  const maxPostes = Math.floor((postes * bom.postePartes) / 1);
+  // 2 postes por marco (ISARACK: 300 marcos = 600 postes). Los cortes a la mitad
+  // (96←192, 42←96, 120←240) ya vienen en postePartes. El pie no limita: si hay
+  // poste y diagonales del color/medida, el marco cuenta como armable.
+  const maxPostes = Math.floor((postes * bom.postePartes) / 2);
   const maxDiagD  = bom.diagonalD > 0 ? Math.floor(diagD / bom.diagonalD) : Infinity;
   const maxDiagH  = bom.diagonalH > 0 ? Math.floor(diagH / bom.diagonalH) : Infinity;
-  const maxPies   = bom.pie      > 0 ? Math.floor(pies  / bom.pie)      : Infinity;
 
-  return Math.max(0, Math.min(maxPostes, maxDiagD, maxDiagH, maxPies));
+  return Math.max(0, Math.min(maxPostes, maxDiagD, maxDiagH));
 }
 
 function disponibleMarco(sku, altoIn, fondoIn, color){
