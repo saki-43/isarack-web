@@ -2023,7 +2023,8 @@ function bomPasarela(cfg, add, lineasInfo){
   const nNiveles = cfg.pasarela.niveles || 1;
   const escActiva = cfg.pasarela.escalera !== 'no';
   if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); return; }
-  const skuVigaCruce = cfg.pasarela.vigaCm === 122 ? PASARELA_VIGA_48 : PASARELA_VIGA_1M;
+  // La pasarela SIEMPRE cruza con viga selectivo de carga (SEL-0360), nunca picking.
+  const skuVigaCruce = PASARELA_VIGA_48;
   for(let i=0; i<lineasInfo.length-1; i++){
     const a = lineasInfo[i], b = lineasInfo[i+1];
     const largoM = Math.min(a.largoTotM || a.largoM, b.largoTotM || b.largoM);
