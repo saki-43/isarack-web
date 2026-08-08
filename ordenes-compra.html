@@ -621,13 +621,13 @@
     <div class="actions no-print">
       <button class="btn btn-accent" id="btn-save">💾 Guardar Orden</button>
       <button class="btn btn-primary" id="btn-print">🖨️ Imprimir</button>
-      <button class="btn" id="btn-leer" style="background:#7c3aed;color:#fff;border-color:#7c3aed">📷 Leer nómina</button>
-      <input type="file" id="file-nomina" accept="image/*" multiple style="display:none">
+      <button class="btn" id="btn-leer" style="background:#7c3aed;color:#fff;border-color:#7c3aed" title="Sube o pega (Ctrl+V) una imagen o PDF de la nómina/factura y la IA la lee">📷 Leer nómina/PDF</button>
+      <input type="file" id="file-nomina" accept="image/*,application/pdf" multiple style="display:none">
       <button class="btn" id="btn-new">📄 Nueva Orden</button>
       <button class="btn" id="btn-reset-defaults">↻ Restablecer predeterminados</button>
       <button class="btn" id="btn-save-defaults">⭐ Guardar como predeterminado</button>
     </div>
-    <div id="leer-overlay"><div class="box"><div class="spin"></div><div id="leer-msg">Leyendo la nómina con IA…</div></div></div>
+    <div id="leer-overlay"><div class="box"><div class="spin"></div><div id="leer-msg">Leyendo el documento con IA…</div></div></div>
 
     <div class="document" id="document">
 
@@ -1736,9 +1736,12 @@ function _matchProveedor(nombre){
 }
 function _fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
 async function leerImagenes(files){
-  const arr = Array.from(files).filter(f=>f && f.type && f.type.indexOf('image')===0).slice(0,6);
-  if(!arr.length){ showToast('No hay imágenes para leer', true); return; }
+  const arr = Array.from(files).filter(f=>f && f.type && (f.type.indexOf('image')===0 || f.type==='application/pdf')).slice(0,6);
+  if(!arr.length){ showToast('No hay imágenes ni PDFs para leer', true); return; }
   const ov = document.getElementById('leer-overlay'); ov.classList.add('show');
+  const msg = document.getElementById('leer-msg');
+  const nPdf = arr.filter(f=>f.type==='application/pdf').length;
+  msg.textContent = nPdf ? ('Leyendo '+(nPdf===arr.length?nPdf+' PDF'+(nPdf>1?'s':''):arr.length+' archivo(s)')+' con IA…') : 'Leyendo la imagen con IA…';
   try{
     const imagenes = [];
     for(const f of arr){ imagenes.push({ media_type: f.type, data: await _fileToDataURL(f) }); }
@@ -1809,9 +1812,24 @@ async function leerImagenes(files){
 document.getElementById('btn-leer').addEventListener('click', ()=> document.getElementById('file-nomina').click());
 document.getElementById('file-nomina').addEventListener('change', (e)=>{ if(e.target.files&&e.target.files.length) leerImagenes(e.target.files); e.target.value=''; });
 window.addEventListener('paste', (e)=>{
-  const its = (e.clipboardData&&e.clipboardData.items)||[]; const imgs=[];
-  for(const it of its){ if(it.type&&it.type.indexOf('image')===0){ const f=it.getAsFile(); if(f) imgs.push(f); } }
-  if(imgs.length){ e.preventDefault(); leerImagenes(imgs); }
+  const its = (e.clipboardData&&e.clipboardData.items)||[]; const files=[];
+  for(const it of its){ if(it.type && (it.type.indexOf('image')===0 || it.type==='application/pdf')){ const f=it.getAsFile(); if(f) files.push(f); } }
+  const pdfFiles = (e.clipboardData&&e.clipboardData.files) ? Array.from(e.clipboardData.files).filter(f=>f.type==='application/pdf') : [];
+  for(const f of pdfFiles){ if(!files.includes(f)) files.push(f); }
+  if(files.length){ e.preventDefault(); leerImagenes(files); }
+});
+// Drag & drop de PDFs/imágenes sobre toda la página
+['dragover','drop'].forEach(evt=>{
+  window.addEventListener(evt, (e)=>{
+    if(!e.dataTransfer) return;
+    const has = Array.from(e.dataTransfer.items||[]).some(it=>it.kind==='file' && (String(it.type).indexOf('image')===0 || it.type==='application/pdf'));
+    if(!has) return;
+    e.preventDefault();
+    if(evt==='drop'){
+      const files = Array.from(e.dataTransfer.files||[]).filter(f=>f.type && (f.type.indexOf('image')===0 || f.type==='application/pdf'));
+      if(files.length) leerImagenes(files);
+    }
+  });
 });
 
 // initial load
