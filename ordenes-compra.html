@@ -439,6 +439,70 @@
   .history-view.active { display: block; }
   .form-view { display: block; }
   .form-view.hidden { display: none; }
+  .tablero-view { display: none; }
+  .tablero-view.active { display: block; }
+
+  /* ============ TABLERO SEMANAL ============ */
+  .tb-head { display:flex; align-items:baseline; justify-content:space-between; gap:20px; padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid #E5E5E5; }
+  .tb-head h2 { margin:0; font-size:22px; font-weight:700; letter-spacing:-0.01em; color:#1F1B18; }
+  .tb-head h2 .eyebrow { display:block; text-transform:uppercase; font-size:10.5px; font-weight:600; color:#DA6635; letter-spacing:0.14em; margin-bottom:4px; }
+  .tb-nav { display:flex; align-items:center; gap:8px; }
+  .tb-nav button { background:#fff; color:#1F1B18; border:1px solid #E5E5E5; border-radius:8px; padding:7px 11px; font-size:13px; cursor:pointer; font-family:inherit; }
+  .tb-nav button:hover { border-color:#DA6635; color:#DA6635; }
+  .tb-nav .month { padding:7px 14px; font-weight:600; background:#fff; border:1px solid #E5E5E5; border-radius:8px; font-variant-numeric:tabular-nums; min-width:150px; text-align:center; text-transform:capitalize; }
+  .tb-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
+  .tb-stat { background:#fff; border:1px solid #E5E5E5; border-radius:10px; padding:12px 14px; }
+  .tb-stat .l { font-size:10.5px; text-transform:uppercase; letter-spacing:0.1em; color:#8B837D; font-weight:600; margin-bottom:6px; }
+  .tb-stat .v { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .tb-stat.accent .v { color:#DA6635; }
+  .tb-stat.warn .v { color:#B26C00; }
+  .tb-stat .s { font-size:11.5px; color:#8B837D; margin-top:2px; }
+  .tb-shell { background:#fff; border:1px solid #E5E5E5; border-radius:12px; box-shadow:0 1px 2px rgba(31,27,24,.04), 0 8px 24px rgba(31,27,24,.05); overflow:hidden; }
+  .tb-scroll { overflow-x:auto; max-width:100%; }
+  table.tb-matrix { border-collapse:separate; border-spacing:0; width:100%; min-width:1050px; table-layout:fixed; }
+  table.tb-matrix th, table.tb-matrix td { padding:0; text-align:left; vertical-align:top; }
+  table.tb-matrix th.week-h, table.tb-matrix td.week-c { position:sticky; left:0; z-index:2; background:#fff; width:120px; min-width:120px; }
+  table.tb-matrix th.week-h { z-index:3; }
+  table.tb-matrix thead th { position:sticky; top:0; background:#fff; border-bottom:1px solid #E5E5E5; padding:12px; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#8B837D; z-index:1; }
+  table.tb-matrix thead th.week-h { text-align:left; color:#DA6635; background:#fff; }
+  table.tb-matrix thead th .col-sub { display:block; font-size:9.5px; color:#8B837D; font-weight:500; letter-spacing:0.04em; text-transform:none; margin-top:2px; line-height:1.2; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  table.tb-matrix td.week-c { padding:14px 12px; border-bottom:1px solid #EFEBE5; border-right:1px solid #E5E5E5; font-variant-numeric:tabular-nums; }
+  table.tb-matrix td.week-c .wd { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.09em; color:#8B837D; }
+  table.tb-matrix td.week-c .dt { font-size:15px; font-weight:700; margin-top:2px; color:#1F1B18; }
+  table.tb-matrix td.week-c .wk-total { margin-top:8px; font-size:11px; color:#8B837D; }
+  table.tb-matrix td.week-c .wk-total b { display:block; font-size:12.5px; color:#1F1B18; font-weight:600; margin-top:1px; }
+  table.tb-matrix td.cell { border-bottom:1px solid #EFEBE5; border-right:1px solid #EFEBE5; height:96px; position:relative; }
+  table.tb-matrix td.cell:last-child { border-right:none; }
+  .tb-oc { height:100%; padding:8px 10px; display:flex; flex-direction:column; justify-content:space-between; gap:4px; cursor:pointer; transition:background 90ms ease; }
+  .tb-oc:hover { background:#FDEEE5; }
+  .tb-oc .top { display:flex; align-items:center; gap:8px; }
+  .tb-oc .thumb { width:40px; height:40px; border-radius:6px; background:#EFEBE5; border:1px solid #E5E5E5; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:16px; color:#8B837D; overflow:hidden; font-weight:700; }
+  .tb-oc .thumb.img { background:linear-gradient(135deg,#F3E8D8 0%,#E5CFA5 100%); color:#7A5A2E; }
+  .tb-oc .thumb.pdf { background:#FBE3E0; color:#A6392C; font-size:10px; letter-spacing:0.05em; }
+  .tb-oc .meta { flex:1; min-width:0; line-height:1.2; }
+  .tb-oc .folio { font-size:10px; color:#8B837D; letter-spacing:0.06em; text-transform:uppercase; font-weight:600; }
+  .tb-oc .total { font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:1px; color:#1F1B18; }
+  .tb-oc .status { display:flex; align-items:center; gap:5px; font-size:10.5px; color:#3B6D11; font-weight:600; }
+  .tb-oc .status .dot { width:6px; height:6px; border-radius:50%; background:#3B6D11; }
+  .tb-oc.dudoso .status { color:#B26C00; }
+  .tb-oc.dudoso .status .dot { background:#B26C00; }
+  .tb-empty { height:100%; margin:6px; border:1.5px dashed #B8B0A8; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:#8B837D; font-size:11px; cursor:copy; transition:all 120ms ease; background:transparent; outline:none; }
+  .tb-empty:hover, .tb-empty:focus { border-color:#DA6635; background:#FDEEE5; color:#8A3A15; }
+  .tb-empty.active { border-color:#DA6635; background:#FDEEE5; color:#8A3A15; border-style:solid; box-shadow:0 0 0 3px rgba(218,102,53,0.18); }
+  .tb-empty.dragover { border-color:#DA6635; background:#FDEEE5; border-style:solid; }
+  .tb-empty .plus { font-size:18px; font-weight:300; line-height:1; }
+  .tb-empty .hint { font-size:10px; letter-spacing:0.02em; text-align:center; }
+  .tb-loading { height:100%; margin:6px; border-radius:8px; background:#FDEEE5; border:1.5px solid #DA6635; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#8A3A15; font-size:11px; font-weight:600; }
+  .tb-spin { width:18px; height:18px; border:2px solid #DA6635; border-top-color:transparent; border-radius:50%; animation:tbsp 0.9s linear infinite; }
+  @keyframes tbsp { to { transform:rotate(360deg); } }
+  .tb-legend { display:flex; gap:20px; flex-wrap:wrap; font-size:11.5px; color:#8B837D; padding:14px 16px; border-top:1px solid #E5E5E5; background:#FBFAF8; }
+  .tb-legend .it { display:flex; align-items:center; gap:6px; }
+  .tb-legend .sw { width:14px; height:14px; border-radius:4px; display:inline-block; }
+  .tb-legend .sw.empty { border:1.5px dashed #B8B0A8; background:transparent; }
+  .tb-legend .sw.done { background:#3B6D11; }
+  .tb-legend .sw.load { background:#FDEEE5; border:1.5px solid #DA6635; }
+  .tb-legend .sw.dudoso { background:#B26C00; }
+  @media (max-width:720px) { .tb-summary { grid-template-columns:repeat(2,1fr); } .tb-head { flex-direction:column; align-items:stretch; gap:12px; } }
 
   .history-card {
     background: white;
@@ -610,6 +674,7 @@
 </div>
 
 <nav class="tabs">
+  <button class="tab tablero-tab" data-view="tablero" style="margin-left:auto">📅 TABLERO</button>
   <button class="tab history-tab" data-view="history">📋 HISTORIAL</button>
 </nav>
 
@@ -776,6 +841,41 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ============ TABLERO VIEW ============ -->
+  <div class="tablero-view" id="tablero-view">
+    <div class="actions" style="margin-bottom:14px">
+      <button class="btn" id="btn-back-form-tb">← Regresar</button>
+    </div>
+    <div class="tb-head">
+      <h2>
+        <span class="eyebrow">Órdenes de compra · ISARACK</span>
+        Tablero semanal
+      </h2>
+      <div class="tb-nav">
+        <button id="tb-prev" title="Mes anterior">◀</button>
+        <div class="month" id="tb-month">—</div>
+        <button id="tb-next" title="Mes siguiente">▶</button>
+      </div>
+    </div>
+    <div class="tb-summary" id="tb-summary">
+      <div class="tb-stat"><div class="l">Capturadas</div><div class="v" id="tb-s-cap">0<span style="color:#8B837D;font-weight:500">/0</span></div><div class="s" id="tb-s-cap-sub">— semanas × — proveedores</div></div>
+      <div class="tb-stat"><div class="l">Pendientes</div><div class="v" id="tb-s-pen">0</div><div class="s">Celdas vacías</div></div>
+      <div class="tb-stat warn"><div class="l">Para revisar</div><div class="v" id="tb-s-dud">0</div><div class="s">Renglones marcados dudosos</div></div>
+      <div class="tb-stat accent"><div class="l">Total del mes</div><div class="v" id="tb-s-tot">$0</div><div class="s">Suma de OCs capturadas</div></div>
+    </div>
+    <div class="tb-shell">
+      <div class="tb-scroll">
+        <table class="tb-matrix" id="tb-matrix"><thead id="tb-thead"></thead><tbody id="tb-tbody"></tbody></table>
+      </div>
+      <div class="tb-legend">
+        <div class="it"><span class="sw empty"></span> Vacía · clic + Ctrl+V o arrastra</div>
+        <div class="it"><span class="sw load"></span> Procesando con IA</div>
+        <div class="it"><span class="sw done"></span> Guardada en Supabase</div>
+        <div class="it"><span class="sw dudoso"></span> Revisar (IA marcó dudoso)</div>
+      </div>
     </div>
   </div>
 
@@ -1470,6 +1570,7 @@ function switchPerson(person) {
 function showFormView() {
   document.getElementById('form-view').classList.remove('hidden');
   document.getElementById('history-view').classList.remove('active');
+  const tv = document.getElementById('tablero-view'); if(tv) tv.classList.remove('active');
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   const tab = document.querySelector(`.tab[data-person="${currentPerson}"]`);
   if (tab) tab.classList.add('active');
@@ -1478,6 +1579,7 @@ function showFormView() {
 function showHistoryView() {
   document.getElementById('form-view').classList.add('hidden');
   document.getElementById('history-view').classList.add('active');
+  const tv = document.getElementById('tablero-view'); if(tv) tv.classList.remove('active');
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelector('.tab.history-tab').classList.add('active');
   renderHistory();
@@ -1548,10 +1650,355 @@ function renderHistory() {
   });
 }
 
+// ============ TABLERO SEMANAL ============
+let tbYearMonth = null;  // {y, m} — mes visible actualmente
+let tbActiveCell = null; // {provKey, fecha, td} — celda seleccionada para Ctrl+V
+
+// Etiquetas cortas para columnas (fallback: primera palabra del key)
+const TB_SHORT_LABELS = {
+  'CLAUDIA YANETH LARES': 'Abel',
+  'MANUEL RODRIGUEZ': 'Gilberto',
+  'BRYAN ALEXIS': 'Brayan',
+  'SAMUEL GOMEZ': 'Samuel',
+  'ARTURO FERNANDEZ': 'Arturo',
+  'SURTIDORA MEXICANA DEL NOROESTE': 'MDE',
+  'CENTRAL DE ACEROS TIJUANA': 'Aceros',
+  'FASTENER DEPOT': 'Fastener'
+};
+// Mapa proveedor→persona (para saber qué defaults usar al crear la OC)
+const TB_PROV_TO_PERSON = {
+  'CLAUDIA YANETH LARES': 'ABEL',
+  'MANUEL RODRIGUEZ': 'GILBERTO',
+  'BRYAN ALEXIS': 'BRAYAN',
+  'SAMUEL GOMEZ': 'SAMUEL'
+};
+const TB_PERSON_ORDER = ['CLAUDIA YANETH LARES','SAMUEL GOMEZ','MANUEL RODRIGUEZ','BRYAN ALEXIS'];
+
+function tbShort(key){ return TB_SHORT_LABELS[key] || (key||'').split(' ')[0]; }
+
+function tbGetProvColumns(){
+  const keys = Object.keys(proveedores);
+  const personas = TB_PERSON_ORDER.filter(k => keys.indexOf(k)>=0);
+  const otros = keys.filter(k => personas.indexOf(k)<0).sort((a,b)=>a.localeCompare(b));
+  return personas.concat(otros);
+}
+
+function tbFridaysOfMonth(y, m){
+  const fridays = [];
+  const d = new Date(y, m, 1, 12);
+  while (d.getDay() !== 5) d.setDate(d.getDate() + 1);
+  while (d.getMonth() === m) {
+    fridays.push(new Date(d));
+    d.setDate(d.getDate() + 7);
+  }
+  return fridays;
+}
+function tbISODate(d){
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function tbFridayOf(dateStr){
+  if(!dateStr) return null;
+  const d = new Date(dateStr + 'T12:00:00');
+  if(isNaN(d)) return null;
+  const shift = 5 - d.getDay(); // 0=dom … 5=vie … 6=sab
+  const fri = new Date(d);
+  fri.setDate(d.getDate() + shift);
+  return tbISODate(fri);
+}
+function tbMonthName(y, m){
+  const nombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return nombres[m] + ' ' + y;
+}
+function tbFmtDay(d){
+  const p = n => String(n).padStart(2,'0');
+  return p(d.getDate())+'/'+p(d.getMonth()+1);
+}
+// Empata una OC guardada con una columna del tablero por _proveedorKey o razonSocial
+function tbMatchProvKey(order, provKeys){
+  if(order && order._proveedorKey && provKeys.indexOf(order._proveedorKey)>=0) return order._proveedorKey;
+  if(order && order.razonSocial){
+    const rs = order.razonSocial.toUpperCase().trim();
+    for(const k of provKeys){
+      const p = proveedores[k];
+      if(p && (p.razonSocial||'').toUpperCase().trim() === rs) return k;
+    }
+  }
+  return null;
+}
+
+function showTableroView(){
+  document.getElementById('form-view').classList.add('hidden');
+  document.getElementById('history-view').classList.remove('active');
+  document.getElementById('tablero-view').classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.tab.tablero-tab').classList.add('active');
+  if(!tbYearMonth){
+    const n = new Date();
+    tbYearMonth = { y: n.getFullYear(), m: n.getMonth() };
+  }
+  ocSincronizarNube().then(()=> renderTablero());
+  renderTablero();
+}
+
+function renderTablero(){
+  if(!tbYearMonth){ const n = new Date(); tbYearMonth = { y:n.getFullYear(), m:n.getMonth() }; }
+  const { y, m } = tbYearMonth;
+  document.getElementById('tb-month').textContent = tbMonthName(y, m);
+
+  const fridays = tbFridaysOfMonth(y, m);
+  const cols = tbGetProvColumns();
+
+  // Header
+  const thead = document.getElementById('tb-thead');
+  let hh = '<tr><th class="week-h">Semana</th>';
+  for(const k of cols){
+    const p = proveedores[k] || {};
+    const sub = (p.razonSocial || k);
+    hh += '<th>' + escapeHtml(tbShort(k).toUpperCase()) + '<span class="col-sub">' + escapeHtml(sub) + '</span></th>';
+  }
+  hh += '</tr>';
+  thead.innerHTML = hh;
+
+  // Load orders and index by (friday, provKey)
+  const orders = loadOrders();
+  const idx = {}; // key: fri + '|' + provKey → order
+  for(const o of orders){
+    const fri = tbFridayOf(o.fecha);
+    if(!fri) continue;
+    const pk = tbMatchProvKey(o, cols);
+    if(!pk) continue;
+    idx[fri + '|' + pk] = o;
+  }
+
+  // Body
+  const tbody = document.getElementById('tb-tbody');
+  tbody.innerHTML = '';
+  let filled = 0, dudosos = 0, totalMes = 0;
+  const totalCells = fridays.length * cols.length;
+
+  for(const fri of fridays){
+    const friISO = tbISODate(fri);
+    const tr = document.createElement('tr');
+    let weekTotal = 0;
+    let weekHTML = '<td class="week-c"><div class="wd">Vie</div><div class="dt">' + tbFmtDay(fri) + '</div><div class="wk-total" data-wk-total="' + friISO + '">Semana<b>—</b></div></td>';
+    tr.innerHTML = weekHTML;
+    for(const pk of cols){
+      const td = document.createElement('td');
+      td.className = 'cell';
+      td.dataset.friday = friISO;
+      td.dataset.provkey = pk;
+      const o = idx[friISO + '|' + pk];
+      if(o){
+        filled++;
+        weekTotal += parseFloat(o._total) || 0;
+        totalMes += parseFloat(o._total) || 0;
+        const hasDudoso = Array.isArray(o.items) && o.items.some(it => it._dudoso || it.dudoso);
+        if(hasDudoso) dudosos++;
+        td.innerHTML = _tbFilledCellHTML(o, hasDudoso);
+      } else {
+        td.innerHTML = _tbEmptyCellHTML();
+      }
+      tr.appendChild(td);
+    }
+    // Update wk-total inline in the row's first td text
+    const wt = tr.querySelector('[data-wk-total]');
+    if(wt) wt.innerHTML = 'Semana<b>' + (weekTotal ? fmtMoney(weekTotal) : '—') + '</b>';
+    tbody.appendChild(tr);
+  }
+
+  // Summary
+  document.getElementById('tb-s-cap').innerHTML = filled + '<span style="color:#8B837D;font-weight:500">/' + totalCells + '</span>';
+  document.getElementById('tb-s-cap-sub').textContent = fridays.length + ' semanas × ' + cols.length + ' proveedores';
+  document.getElementById('tb-s-pen').textContent = (totalCells - filled);
+  document.getElementById('tb-s-dud').textContent = dudosos;
+  document.getElementById('tb-s-tot').textContent = fmtMoney(totalMes);
+
+  // Bind cell interactions
+  _tbBindCells();
+}
+
+function _tbFilledCellHTML(o, hasDudoso){
+  const isPdf = (o._adjuntoTipo === 'application/pdf');
+  const thumb = isPdf
+    ? '<div class="thumb pdf">PDF</div>'
+    : '<div class="thumb img">📷</div>';
+  return '<div class="tb-oc' + (hasDudoso ? ' dudoso' : '') + '" data-open="' + escapeHtml(o.id) + '">' +
+    '<div class="top">' + thumb + '<div class="meta"><div class="folio">Folio ' + escapeHtml(o.folio) + '</div><div class="total">' + fmtMoney(o._total || 0) + '</div></div></div>' +
+    '<div class="status"><span class="dot"></span>' + (hasDudoso ? 'Revisar renglones' : 'Guardada') + '</div>' +
+  '</div>';
+}
+function _tbEmptyCellHTML(){
+  return '<div class="tb-empty" tabindex="0"><div class="plus">+</div><div class="hint">Clic + Ctrl+V<br>o arrastra PDF/imagen</div></div>';
+}
+
+function _tbBindCells(){
+  document.querySelectorAll('#tb-tbody td.cell').forEach(td => {
+    const provKey = td.dataset.provkey;
+    const fecha = td.dataset.friday;
+
+    // Filled → open in form view
+    const openEl = td.querySelector('.tb-oc[data-open]');
+    if(openEl){
+      openEl.addEventListener('click', () => {
+        const id = openEl.dataset.open;
+        const o = loadOrders().find(x => x.id === id);
+        if(o){ loadOrderFromSaved(o); showFormView(); }
+      });
+    }
+
+    // Empty → drop zone + click-to-arm-paste
+    const empty = td.querySelector('.tb-empty');
+    if(empty){
+      empty.addEventListener('click', () => _tbActivateCell(td, provKey, fecha));
+      empty.addEventListener('focus', () => _tbActivateCell(td, provKey, fecha));
+      empty.addEventListener('dragover', (e) => {
+        if(!e.dataTransfer) return;
+        const has = Array.from(e.dataTransfer.items||[]).some(it => it.kind==='file' && (String(it.type).indexOf('image')===0 || it.type==='application/pdf'));
+        if(!has) return;
+        e.preventDefault();
+        empty.classList.add('dragover');
+      });
+      empty.addEventListener('dragleave', () => empty.classList.remove('dragover'));
+      empty.addEventListener('drop', (e) => {
+        empty.classList.remove('dragover');
+        if(!e.dataTransfer) return;
+        const files = Array.from(e.dataTransfer.files||[]).filter(f => f.type && (f.type.indexOf('image')===0 || f.type==='application/pdf'));
+        if(!files.length) return;
+        e.preventDefault(); e.stopPropagation();
+        _tbActivateCell(td, provKey, fecha);
+        tbProcesarCelda(files, provKey, fecha, td);
+      });
+    }
+  });
+}
+
+function _tbActivateCell(td, provKey, fecha){
+  // Clear previous active
+  document.querySelectorAll('.tb-empty.active').forEach(e => e.classList.remove('active'));
+  tbActiveCell = { provKey, fecha, td };
+  const e = td.querySelector('.tb-empty');
+  if(e) e.classList.add('active');
+}
+
+async function tbProcesarCelda(files, provKey, fecha, td){
+  const arr = Array.from(files).filter(f => f && f.type && (f.type.indexOf('image')===0 || f.type==='application/pdf')).slice(0, 6);
+  if(!arr.length){ showToast('No hay imágenes ni PDFs válidos', true); return; }
+
+  // Muestra spinner en la celda
+  td.innerHTML = '<div class="tb-loading"><div class="tb-spin"></div><div>Leyendo con IA…</div></div>';
+  tbActiveCell = null;
+
+  try{
+    const imagenes = [];
+    for(const f of arr){ imagenes.push({ media_type: f.type, data: await _fileToDataURL(f) }); }
+    const person = TB_PROV_TO_PERSON[provKey] || currentPerson;
+    const r = await fetch(LEER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', apikey: SB_KEY, Authorization:'Bearer '+SB_KEY },
+      body: JSON.stringify({ imagenes, persona: person })
+    });
+    const data = await r.json();
+    if(data.error){ showToast('IA: ' + data.error, true); renderTablero(); return; }
+    const items = (data.items||[]).map(it => ({ qty:it.qty, desc:it.desc, price:it.price, _dudoso:!!it.dudoso }));
+    if(!items.length){ showToast('No saqué renglones. ' + (data.notas||''), true); renderTablero(); return; }
+
+    // Construye la OC usando defaults + IA + celda (fecha/proveedor)
+    const d = defaults[person] || {};
+    const p = proveedores[provKey] || {};
+    const oc = {
+      person: person,
+      folio: getNextFolio(),
+      fecha: fecha,
+      razonSocial: p.razonSocial || d.razonSocial || '',
+      contacto: p.contacto || d.contacto || '',
+      telefono: p.telefono || d.telefono || '',
+      direccion: p.direccion || d.direccion || '',
+      direccionEnvio: p.direccionEnvio || d.direccionEnvio || 'ISARACK',
+      _proveedorKey: provKey,
+      items: items,
+      _adjuntoTipo: arr[0].type
+    };
+
+    // Aplica IVA/retenciones — si el proveedor está ligado a persona, usa SU regla; si no, la del documento
+    let tax = null;
+    if(TB_PROV_TO_PERSON[provKey] && d.taxMode){
+      tax = { taxMode:d.taxMode, ivaPct:d.ivaPct, isrPct:d.isrRetenidoPct, ivaRetPct:d.ivaRetenidoPct };
+    } else if(data.tax){
+      tax = data.tax;
+    }
+    if(tax && tax.taxMode){
+      oc.taxMode = tax.taxMode;
+      oc.ivaPct = tax.ivaPct || (tax.taxMode==='retentions' ? 8 : 16);
+      if(tax.taxMode === 'retentions'){
+        oc.isrRetenidoPct = tax.isrPct != null ? tax.isrPct : 1.25;
+        oc.ivaRetenidoPct = tax.ivaRetPct != null ? tax.ivaRetPct : 4;
+      }
+    } else {
+      oc.taxMode = d.taxMode || 'simple';
+      oc.ivaPct = d.ivaPct != null ? d.ivaPct : 16;
+      oc.isrRetenidoPct = d.isrRetenidoPct != null ? d.isrRetenidoPct : 1.25;
+      oc.ivaRetenidoPct = d.ivaRetenidoPct != null ? d.ivaRetenidoPct : 4;
+    }
+
+    // Calcula totales (sin tocar el DOM del formulario)
+    _tbCalcTotalsInto(oc);
+
+    // Guarda: localStorage + Supabase
+    const orders = loadOrders();
+    const id = 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const now = new Date().toISOString();
+    const nuevo = { ...oc, id, savedAt: now };
+    orders.push(nuevo);
+    saveOrders(orders);
+    const ok = await ocCloudUpsert(nuevo);
+    if(!ok) showToast('⚠ OC #' + oc.folio + ' guardada local, no subió a la nube', true);
+    else showToast('✓ OC #' + oc.folio + ' guardada (' + fmtMoney(oc._total) + ')');
+    setLastFolio(oc.folio);
+    renderTablero();
+  }catch(e){
+    console.error('tbProcesarCelda', e);
+    showToast('Error: ' + (e.message || e), true);
+    renderTablero();
+  }
+}
+
+function _tbCalcTotalsInto(oc){
+  const subtotal = oc.items.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0);
+  oc._subtotal = subtotal;
+  if(oc.taxMode === 'retentions'){
+    const iva = subtotal * ((parseFloat(oc.ivaPct)||0)/100);
+    const isr = subtotal * ((parseFloat(oc.isrRetenidoPct)||0)/100);
+    const ivaRet = subtotal * ((parseFloat(oc.ivaRetenidoPct)||0)/100);
+    oc._iva = iva; oc._isrRet = isr; oc._ivaRet = ivaRet;
+    oc._total = subtotal + iva - isr - ivaRet;
+  } else {
+    const iva = subtotal * ((parseFloat(oc.ivaPct)||0)/100);
+    oc._iva = iva;
+    oc._total = subtotal + iva;
+  }
+}
+
 // ============ EVENT BINDINGS ============
 // Person tabs removed — person defaults loaded on init
 document.querySelector('.tab.history-tab').addEventListener('click', () => showHistoryView());
+document.querySelector('.tab.tablero-tab').addEventListener('click', () => showTableroView());
 document.getElementById('btn-back-form').addEventListener('click', () => showFormView());
+document.getElementById('btn-back-form-tb').addEventListener('click', () => showFormView());
+document.getElementById('tb-prev').addEventListener('click', () => {
+  if(!tbYearMonth) return;
+  let { y, m } = tbYearMonth;
+  m--; if(m < 0){ m = 11; y--; }
+  tbYearMonth = { y, m };
+  renderTablero();
+});
+document.getElementById('tb-next').addEventListener('click', () => {
+  if(!tbYearMonth) return;
+  let { y, m } = tbYearMonth;
+  m++; if(m > 11){ m = 0; y++; }
+  tbYearMonth = { y, m };
+  renderTablero();
+});
 
 // top-level field listeners
 ['folio','fecha','razon-social','contacto','telefono','direccion','direccion-envio'].forEach(id => {
@@ -1816,11 +2263,20 @@ window.addEventListener('paste', (e)=>{
   for(const it of its){ if(it.type && (it.type.indexOf('image')===0 || it.type==='application/pdf')){ const f=it.getAsFile(); if(f) files.push(f); } }
   const pdfFiles = (e.clipboardData&&e.clipboardData.files) ? Array.from(e.clipboardData.files).filter(f=>f.type==='application/pdf') : [];
   for(const f of pdfFiles){ if(!files.includes(f)) files.push(f); }
-  if(files.length){ e.preventDefault(); leerImagenes(files); }
+  if(!files.length) return;
+  e.preventDefault();
+  // Si estamos en el tablero con una celda activa → va a esa celda
+  if(document.getElementById('tablero-view').classList.contains('active') && tbActiveCell){
+    const { provKey, fecha, td } = tbActiveCell;
+    tbProcesarCelda(files, provKey, fecha, td);
+  } else {
+    leerImagenes(files);
+  }
 });
-// Drag & drop de PDFs/imágenes sobre toda la página
+// Drag & drop de PDFs/imágenes sobre toda la página (skip: en tablero cada celda tiene su propio drop)
 ['dragover','drop'].forEach(evt=>{
   window.addEventListener(evt, (e)=>{
+    if(document.getElementById('tablero-view').classList.contains('active')) return;
     if(!e.dataTransfer) return;
     const has = Array.from(e.dataTransfer.items||[]).some(it=>it.kind==='file' && (String(it.type).indexOf('image')===0 || it.type==='application/pdf'));
     if(!has) return;
