@@ -1323,14 +1323,21 @@ function dibujarPasarelaEntrepiso(cfg, pasillosInfo, xInicio, matVigaLocal){
           const piso = box(anchoT, grosorPiso, profT, matPisoPas);
           piso.position.set(xc, y, zCenT);
           grupo.add(piso);
-          // Vigas de 48" del marco de la fila al marco del pasillo
-          ejesFilas.forEach(f => {
-            [f.z - f.prof/2, f.z + f.prof/2].forEach(zv => {
-              const vg = box(anchoT, 0.10, 0.065, matVigaLocal);
-              vg.position.set(xc, y - grosorPiso/2 - 0.05, zv);
+          // Vigas ESPECIALES para pasarela (SEL-0454): longitudinales a lo largo
+          // del pasillo peatonal, una en cada orilla del piso (pegadas al marco
+          // del rack y al marco propio del pasillo), por segmento entre marcos.
+          const xInterior = 2*xc - xExt;
+          for(let iF=0; iF<ejesFilas.length-1; iF++){
+            const zIni = ejesFilas[iF].z - ejesFilas[iF].prof/2;
+            const zFin = ejesFilas[iF+1].z + ejesFilas[iF+1].prof/2;
+            const largoSeg = Math.abs(zIni - zFin);
+            const zMid = (zIni + zFin)/2;
+            [xInterior, xExt].forEach(xV => {
+              const vg = box(0.065, 0.10, largoSeg, matVigaLocal);
+              vg.position.set(xV, y - grosorPiso/2 - 0.05, zMid);
               grupo.add(vg);
             });
-          });
+          }
           // Barandal solo en los claros: los marcos cierran su propio tramo
           claros.forEach(([cA, cB]) => {
             const largoC = cB - cA;
@@ -1809,15 +1816,23 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
     const altoMarco = altoMarcoPasarela(cfg) * IN_TO_M;
     ejesFilas.forEach(f => {
       grupo.add(marcoPasarela3D(xCorExt, f.z, f.prof, altoMarco, 'z', matMarcoSel));
-      // Viga de 48" del marco de la fila al marco del corredor, en cada nivel
-      for(let nv=1; nv<=nNiveles; nv++){
-        [f.z - f.prof/2, f.z + f.prof/2].forEach(zV => {
-          const vg = box(ANCHO_COR, 0.10, 0.065, matVigaLocal);
-          vg.position.set(xCorCentro, yNivel*nv - grosorPiso/2 - 0.05, zV);
+    });
+    // Vigas ESPECIALES para pasarela (SEL-0454): longitudinales a lo largo del
+    // corredor exterior, una en cada orilla del piso (pegadas al marco del rack
+    // y al marco del corredor), por segmento entre marcos, por nivel.
+    for(let nv=1; nv<=nNiveles; nv++){
+      for(let iF=0; iF<ejesFilas.length-1; iF++){
+        const zIni = ejesFilas[iF].z - ejesFilas[iF].prof/2;
+        const zFin = ejesFilas[iF+1].z + ejesFilas[iF+1].prof/2;
+        const largoSeg = Math.abs(zIni - zFin);
+        const zMid = (zIni + zFin)/2;
+        [xCorInt, xCorExt].forEach(xV => {
+          const vg = box(0.065, 0.10, largoSeg, matVigaLocal);
+          vg.position.set(xV, yNivel*nv - grosorPiso/2 - 0.05, zMid);
           grupo.add(vg);
         });
       }
-    });
+    }
 
     // ── ESCALERA: al FRENTE del rack, en línea, fuera del perímetro ──
     // Sube paralela a la cara del rack y desemboca en un RELLANO continuo con el corredor.
@@ -2013,10 +2028,11 @@ function bomPasarelaEntrepiso(cfg, add, lineasInfo){
     }
   }
 
-  // 2) Pasillos exteriores: marcos, vigas de 48", piso y barandal — POR LOS DOS EXTREMOS
+  // 2) Pasillos exteriores: marcos, vigas ESPECIALES SEL-0454, piso y barandal — POR LOS DOS EXTREMOS
+  // Soporte del piso: longitudinales, 2 por segmento entre marcos, por extremo, por nivel.
   if(skuMarco) add(skuMarco, nFilas * EXTREMOS);
   for(let nv=1; nv<=nNiveles; nv++){
-    add(skuViga, nFilas * 2 * EXTREMOS);                                   // 2 postes por fila
+    add(PASARELA_VIGA_ESP, 2 * Math.max(0, nFilas - 1) * EXTREMOS);
     add(PASARELA_PISO_3M, Math.ceil(anchoCor / 0.20) * Math.ceil(profTotal / 3) * EXTREMOS);
     // Barandal solo en los claros (los pasillos entre filas) + remate en los 2 extremos
     const clarosM = Math.max(0, nFilas - 1) * cfg.pasilloM;
@@ -2074,8 +2090,9 @@ function bomPasarela(cfg, add, lineasInfo){
       const nFilas = lineasInfo.length;
       const nMarcosCorredor = nFilas;
       add(skuMarco, nMarcosCorredor);
-      // Vigas de 48" que amarran cada poste de la fila con el marco del corredor
-      add(skuVigaCorredor(cfg), nFilas * 2 * nNiveles);
+      // Vigas ESPECIALES para pasarela (SEL-0454) que corren a lo largo del corredor,
+      // dos por segmento entre marcos, por nivel.
+      add(PASARELA_VIGA_ESP, 2 * Math.max(0, nFilas - 1) * nNiveles);
       if(nNiveles >= 2){
         // El pasillo de acceso se refuerza con puntales de 3"×3" en las esquinas, sin marcos
         add(skuVigaCorredor(cfg), 4);        // vigas del pasillo y del ramal
