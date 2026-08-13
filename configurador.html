@@ -2141,12 +2141,12 @@ function renderLineasPicking(){
     return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
       +'<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;font-size:10.5px">'
       +'<span onclick="lpTipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';white-space:nowrap" title="Clic para cambiar tipo">'+(i+1)+'· '+lbl+'</span>'
+      + btnDel
       +'<span style="flex:1"></span>'
       +'<span onclick="lpCuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
       +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
       +'<span onclick="lpCuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
       +'<span onclick="lpToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
-      + btnDel
       +'</div>'
       + chip
       + detalle
@@ -2255,12 +2255,12 @@ function _cardLinea(pfx, i, l, extra){
   return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
     +'<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;font-size:10.5px">'
     +'<span onclick="'+pfx+'Tipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';white-space:nowrap" title="Clic para cambiar tipo">'+(i+1)+'· '+lbl+'</span>'
+    + btnDel
     +'<span style="flex:1"></span>'
     +'<span onclick="'+pfx+'Cuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
     +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && extra.abPermitido && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
     +'<span onclick="'+pfx+'Cuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
     +'<span onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
-    + btnDel
     +'</div>'
     + chip
     + detalle
@@ -2540,12 +2540,12 @@ function renderLineasAlmacen(){
     return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
       +'<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;font-size:10.5px">'
       +'<span onclick="lnTipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';white-space:nowrap" title="Clic para cambiar tipo">'+(i+1)+'· '+lbl+'</span>'
+      + btnDel
       +'<span style="flex:1"></span>'
       +'<span onclick="lnCuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
       +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
       +'<span onclick="lnCuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
       +'<span onclick="lnToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
-      + btnDel
       +'</div>'
       + chip
       + detalle
