@@ -1200,7 +1200,8 @@ const PIC_ALTOS  = [[73,'6\' (73")'],[84,'7\' (84")'],[96,'8\' (96")'],[120,'10\
 const PIC_FONDOS = [[18,'18" (46 cm)'],[24,'24" (61 cm)'],[36,'36" (91 cm)']];
 const PIC_LARGOS = [[100,'100 cm'],[120,'120 cm'],[150,'150 cm'],[180,'180 cm'],[200,'200 cm'],[230,'230 cm']];
 // ── Pasarela (2° piso sobre pasillos de picking) ──
-const PASARELA_VIGA_1M   = 'PIC-0082';   // viga picking 100 cm cruzando el pasillo
+const PASARELA_VIGA_1M   = 'PIC-0082';   // viga picking 100 cm cruzando el pasillo (obsoleto: reemplazada por longitudinal SEL-0454)
+const PASARELA_VIGA_ESP  = 'SEL-0454';   // viga especial para pasarela — longitudinal a lo largo del pasillo, soporta el piso
 const PASARELA_PISO_3M   = 'SEL-0388';   // piso ranurado 20 cm × 3 m
 const PASARELA_POSTE_BAR = 'SEL-0239';   // poste barandal 4 tubos
 const PASARELA_BARANDAL  = 'SEL-0008';   // barandal 4 tubos galv. (metro lineal)
@@ -1256,11 +1257,22 @@ function dibujarPasarelaEntrepiso(cfg, pasillosInfo, xInicio, matVigaLocal){
   // Piso transitable en CADA pasillo (entre filas) y en CADA nivel
   pasillosInfo.forEach(pas => {
     const largoP = pas.largoM;
+    const anchoCuerpoP = largoP / Math.max(pas.cuerposAdj || 1, 1);
     for(let nv=1; nv<=nNiveles; nv++){
       const y = yNivel*nv;
       const piso = box(largoP, grosorPiso, cfg.pasilloM, matPisoPas);
       piso.position.set(xInicio + largoP/2, y, pas.zCentro);
       grupo.add(piso);
+      // Vigas ESPECIALES para pasarela (SEL-0454): longitudinales, dos por bahia
+      // (una en cada orilla del piso, pegadas a los marcos de las dos filas).
+      for(let kk=0; kk<(pas.cuerposAdj || 1); kk++){
+        const xCen = xInicio + anchoCuerpoP*(kk + 0.5);
+        [pas.zCentro - cfg.pasilloM/2, pas.zCentro + cfg.pasilloM/2].forEach(zV => {
+          const vg = box(anchoCuerpoP, 0.10, 0.065, matVigaLocal);
+          vg.position.set(xCen, y - grosorPiso/2 - 0.05, zV);
+          grupo.add(vg);
+        });
+      }
     }
   });
 
@@ -1646,14 +1658,16 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
       const piso = box(largoPiso, grosorPiso, cfg.pasilloM, matPisoPas);
       piso.position.set(xInicio + largoPiso/2, yPas, p.zCentro);
       grupo.add(piso);
-      // Vigas de 48" cruzando el pasillo: una en cada marco, solo al nivel del piso
-      const nV = p.cuerposAdj + 1;
+      // Vigas ESPECIALES para pasarela (SEL-0454): longitudinales a lo largo del pasillo,
+      // dos por bahia (una en cada orilla del piso, pegadas a los marcos de las dos filas).
       const anchoCuerpoP = largoPiso / Math.max(p.cuerposAdj, 1);
-      for(let kk=0; kk<nV; kk++){
-        const xV = xInicio + anchoCuerpoP * kk;
-        const vg = box(0.065, 0.10, cfg.pasilloM + 0.06, matVigaLocal);
-        vg.position.set(Math.min(Math.max(xV, xInicio+0.033), xInicio+largoPiso-0.033), yPas - grosorPiso/2 - 0.05, p.zCentro);
-        grupo.add(vg);
+      for(let kk=0; kk<p.cuerposAdj; kk++){
+        const xCen = xInicio + anchoCuerpoP*(kk + 0.5);
+        [p.zCentro - cfg.pasilloM/2, p.zCentro + cfg.pasilloM/2].forEach(zV => {
+          const vg = box(anchoCuerpoP, 0.10, 0.065, matVigaLocal);
+          vg.position.set(xCen, yPas - grosorPiso/2 - 0.05, zV);
+          grupo.add(vg);
+        });
       }
       // Barandal en los extremos del pasillo — abierto del lado del corredor (todos los niveles)
       const xLadoCorredor = dir === 1 ? xInicio + largoPiso : xInicio;
@@ -1986,13 +2000,15 @@ function bomPasarelaEntrepiso(cfg, add, lineasInfo){
     if(i < nFilas - 1) profTotal += cfg.pasilloM;
   });
 
-  // 1) Pisos y vigas de los pasillos entre filas
+  // 1) Pisos y vigas de los pasillos entre filas.
+  // Soporte del piso: VIGAS ESPECIALES para pasarela (SEL-0454) longitudinales,
+  // dos por bahia (una a cada orilla del piso), por nivel.
   for(let i=0; i<nFilas-1; i++){
     const a = lineasInfo[i], b = lineasInfo[i+1];
     const largoM = Math.min(a.largoTotM || a.largoM, b.largoTotM || b.largoM);
     const cuerposAdj = Math.max(a.cuerpos, b.cuerpos);
     for(let nv=1; nv<=nNiveles; nv++){
-      add(skuViga, cuerposAdj + 1);
+      add(PASARELA_VIGA_ESP, 2 * cuerposAdj);
       add(PASARELA_PISO_3M, Math.ceil(cfg.pasilloM / 0.20) * Math.ceil(largoM / 3));
     }
   }
@@ -2023,14 +2039,14 @@ function bomPasarela(cfg, add, lineasInfo){
   const nNiveles = cfg.pasarela.niveles || 1;
   const escActiva = cfg.pasarela.escalera !== 'no';
   if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); return; }
-  // La pasarela SIEMPRE cruza con viga selectivo de carga (SEL-0360), nunca picking.
-  const skuVigaCruce = PASARELA_VIGA_48;
+  // El piso del pasillo se soporta con VIGAS ESPECIALES para pasarela (SEL-0454)
+  // longitudinales: dos por bahia (una a cada orilla del piso), por nivel.
   for(let i=0; i<lineasInfo.length-1; i++){
     const a = lineasInfo[i], b = lineasInfo[i+1];
     const largoM = Math.min(a.largoTotM || a.largoM, b.largoTotM || b.largoM);
     const cuerposAdj = Math.max(a.cuerpos, b.cuerpos);
     for(let nv=1; nv<=nNiveles; nv++){
-      add(skuVigaCruce, cuerposAdj + 1);
+      add(PASARELA_VIGA_ESP, 2 * cuerposAdj);
       add(PASARELA_PISO_3M, Math.ceil(cfg.pasilloM / 0.20) * Math.ceil(largoM / 3));
       // El corredor abre un extremo de cada pasillo en cada nivel
       const extremos = escActiva ? 1 : 2;
