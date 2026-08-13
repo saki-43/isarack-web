@@ -2099,7 +2099,7 @@ function renderLineasPicking(){
     const tx = esD ? '#993C1D' : '#185FA5';
     const lbl = esD ? 'Doble' : 'Sencilla';
     const btnDel = lineasPicking.length > 1
-      ? '<span onclick="lpDel('+i+')" style="cursor:pointer;color:#999;font-size:12px;padding:0 2px" title="Quitar línea">✕</span>'
+      ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lpDel('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
       : '';
     const chip = !l.abierta
       ? '<div onclick="lpToggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.altoIn+'" × '+l.fondoIn+'" · cuerpo '+l.largoCm+' cm · '+l.niveles+' niv</div>'
@@ -2244,7 +2244,7 @@ function _cardLinea(pfx, i, l, extra){
   const lbl = esD ? 'Doble' : (l.tipo === 'sencillo' ? 'Sencillo' : 'Sencilla');
   const cA = l.cuerpos, cB = (l.cuerposB==null ? l.cuerpos : l.cuerposB);
   const btnDel = extra.total > 1
-    ? '<span onclick="'+pfx+'Del('+i+')" style="cursor:pointer;color:#999;font-size:12px;padding:0 2px" title="Quitar línea">✕</span>'
+    ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))'+pfx+'Del('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
     : '';
   const chip = !l.abierta
     ? '<div onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+extra.chip+'</div>'
@@ -2493,7 +2493,7 @@ function renderLineasAlmacen(){
     const lbl = esD ? 'Doble' : 'Sencilla';
     const info = VIGAS_INFO[l.vigaSku] || {};
     const btnDel = lineasAlmacen.length > 1
-      ? '<span onclick="lnDel('+i+')" style="cursor:pointer;color:#999;font-size:12px;padding:0 2px" title="Quitar línea">✕</span>'
+      ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lnDel('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
       : '';
     const chip = !l.abierta
       ? '<div onclick="lnToggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.altoIn+'" × '+l.fondoIn+'" · viga '+(info.largoIn||'')+'" · '+l.niveles+' niv</div>'
