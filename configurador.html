@@ -2099,7 +2099,7 @@ function renderLineasPicking(){
     const tx = esD ? '#993C1D' : '#185FA5';
     const lbl = esD ? 'Doble' : 'Sencilla';
     const btnDel = lineasPicking.length > 1
-      ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lpDel('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
+      ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lpDel('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
       : '';
     const chip = !l.abierta
       ? '<div onclick="lpToggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.altoIn+'" × '+l.fondoIn+'" · cuerpo '+l.largoCm+' cm · '+l.niveles+' niv</div>'
@@ -2145,7 +2145,7 @@ function renderLineasPicking(){
       +'<span onclick="lpCuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
       +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
       +'<span onclick="lpCuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
-      +'<span onclick="lpToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 10px;font-size:23px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
+      +'<span onclick="lpToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
       + btnDel
       +'</div>'
       + chip
@@ -2244,7 +2244,7 @@ function _cardLinea(pfx, i, l, extra){
   const lbl = esD ? 'Doble' : (l.tipo === 'sencillo' ? 'Sencillo' : 'Sencilla');
   const cA = l.cuerpos, cB = (l.cuerposB==null ? l.cuerpos : l.cuerposB);
   const btnDel = extra.total > 1
-    ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))'+pfx+'Del('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
+    ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))'+pfx+'Del('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
     : '';
   const chip = !l.abierta
     ? '<div onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+extra.chip+'</div>'
@@ -2259,7 +2259,7 @@ function _cardLinea(pfx, i, l, extra){
     +'<span onclick="'+pfx+'Cuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
     +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && extra.abPermitido && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
     +'<span onclick="'+pfx+'Cuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
-    +'<span onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 10px;font-size:23px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
+    +'<span onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
     + btnDel
     +'</div>'
     + chip
@@ -2493,7 +2493,7 @@ function renderLineasAlmacen(){
     const lbl = esD ? 'Doble' : 'Sencilla';
     const info = VIGAS_INFO[l.vigaSku] || {};
     const btnDel = lineasAlmacen.length > 1
-      ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lnDel('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
+      ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lnDel('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
       : '';
     const chip = !l.abierta
       ? '<div onclick="lnToggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.altoIn+'" × '+l.fondoIn+'" · viga '+(info.largoIn||'')+'" · '+l.niveles+' niv</div>'
@@ -2544,7 +2544,7 @@ function renderLineasAlmacen(){
       +'<span onclick="lnCuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
       +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
       +'<span onclick="lnCuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
-      +'<span onclick="lnToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 10px;font-size:23px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
+      +'<span onclick="lnToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
       + btnDel
       +'</div>'
       + chip
