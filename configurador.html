@@ -1108,8 +1108,20 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
     const alturasC = alturasManPic || alturasDefaultM(altoM, nivC);
     for(let n=0; n<nivC; n++){
       const y = Math.min(alturasC[n], altoM - 0.10);
-      // Solo se despejan los niveles por donde pasa la pasarela; arriba y abajo quedan normales
-      if(c === skipCuerpo && bandasPic.some(b => y >= b[0] && y <= b[1])) continue;
+      // Solo se despejan los niveles por donde pasa la pasarela; arriba y abajo quedan normales.
+      // skipCuerpo puede ser:
+      //   - número: cuerpo a despejar con bandas por defecto (bandasLibres)
+      //   - array de números u objetos {k, bandas} — bandas custom por cuerpo
+      {
+        let _bandasPicC = null, _skipPic = false;
+        if(Array.isArray(skipCuerpo)){
+          for(const it of skipCuerpo){
+            if(typeof it === 'object' && it && it.k === c){ _skipPic = true; _bandasPicC = it.bandas; break; }
+            if(it === c){ _skipPic = true; break; }
+          }
+        } else _skipPic = (c === skipCuerpo);
+        if(_skipPic && (_bandasPicC || bandasPic).some(b => y >= b[0] && y <= b[1])) continue;
+      }
       const usaRej    = tieneRejilla;
       const usaPanel  = tienePanel && !tieneRejilla;
       const usaMadera = tieneMadera && !tieneRejilla && !tienePanel;
@@ -1464,9 +1476,26 @@ function bandasPasarela(cfg){
   return b;
 }
 
-// Cuántos niveles del módulo del ramal quedan sin viga (para el BOM)
-function nivelesSinVigaPasarela(cfg, altoM, niveles, sistema){
-  const bandas = bandasPasarela(cfg);
+// Banda ESTRECHA alrededor de cada piso de pasarela: alrededor de ese nivel
+// choca físicamente con la SEL-0454 longitudinal o con el piso ranurado, así que
+// la viga de carga del rack no se arma. A diferencia de bandasPasarela (para el
+// cuerpo del ramal, que abre TODO el paso hasta el siguiente nivel), esta se
+// aplica al resto de los cuerpos de las filas vecinas al pasillo con pasarela.
+function bandasPisoPasarela(cfg){
+  const nNiveles = cfg.pasarela.niveles || 1;
+  const yN = cfg.pasarela.alturaM;
+  const b = [];
+  if(idModeloPasarela(cfg) === 'PS-2') return [];
+  for(let nv=1; nv<=nNiveles; nv++){
+    b.push([yN*nv - 0.15, yN*nv + 0.25]);
+  }
+  return b;
+}
+
+// Cuántos niveles caen dentro de una banda de despeje de la pasarela (para el BOM).
+// Si no se pasan bandas se usa bandasPasarela (comportamiento anterior: cuerpo del ramal).
+function nivelesSinVigaPasarela(cfg, altoM, niveles, sistema, bandasArg){
+  const bandas = bandasArg || bandasPasarela(cfg);
   const man = getAlturasManualesM(sistema);
   const def = alturasDefaultM(altoM, niveles);
   let n = 0;
@@ -1847,10 +1876,11 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
       const rell = box(ANCHO_COR, grosorPiso, anchoEsc, matPisoPas);
       rell.position.set(xCorCentro, yPas, zEsc);
       grupo.add(rell);
-      // Vigas de apoyo del rellano
-      [zFrente + 0.05, zRellano - 0.05].forEach(zV => {
-        const vg = box(ANCHO_COR + 0.06, 0.10, 0.065, matVigaLocal);
-        vg.position.set(xCorCentro, yPas - grosorPiso/2 - 0.05, zV);
+      // Vigas ESPECIALES SEL-0454 del rellano: longitudinales, una en cada
+      // orilla del piso (pegadas al marco del rack y al marco del corredor).
+      [xCorInt, xCorExt].forEach(xV => {
+        const vg = box(0.065, 0.10, anchoEsc, matVigaLocal);
+        vg.position.set(xV, yPas - grosorPiso/2 - 0.05, zEsc);
         grupo.add(vg);
       });
       // Barandal del rellano: costado exterior y frente (el lado del rack queda abierto a la escalera)
@@ -1946,12 +1976,19 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
           grupo.add(pie);
         });
       });
-      // Vigas de 48" que cargan el piso del pasillo y del ramal
-      [zEsc, zFrente, (zFrente + zBordePas)/2, zBordePas].forEach(zV => {
-        const vg = box(LARGO_ACC, 0.10, 0.065, matVigaLocal);
-        vg.position.set(xAccCen, yNivel - grosorPiso/2 - 0.05, zV);
-        grupo.add(vg);
-      });
+      // Vigas ESPECIALES SEL-0454 que cargan el piso del pasillo y del ramal:
+      // dos longitudinales, una en cada orilla (pegadas a los marcos), corridas
+      // de zEsc hasta zBordePas (todo lo que abarca el acceso + ramal).
+      {
+        const _z0 = Math.min(zEsc, zBordePas), _z1 = Math.max(zEsc, zBordePas);
+        const _lg = _z1 - _z0;
+        const _zc = (_z0 + _z1)/2;
+        [xAccCen - LARGO_ACC/2, xAccCen + LARGO_ACC/2].forEach(xV => {
+          const vg = box(0.065, 0.10, _lg, matVigaLocal);
+          vg.position.set(xV, yNivel - grosorPiso/2 - 0.05, _zc);
+          grupo.add(vg);
+        });
+      }
 
       // d) Barandales SOLO en los costados, y SIN invadir el carril de la escalera:
       //    el barandal va a altura fija y la escalera sube, así que si entra al carril la cruza.
@@ -2070,16 +2107,19 @@ function bomPasarela(cfg, add, lineasInfo){
       add(PASARELA_BARANDAL, Math.ceil(extremos * cfg.pasilloM));
     }
   }
-  // Corredor transversal de 48" (cruza todas las líneas por el extremo)
+  // Corredor exterior (se soporta con las SEL-0454 longitudinales que se
+  // agregan mas abajo con los marcos del corredor; ya no lleva vigas
+  // transversales de 48" — antes SEL-0360, se quitaron con el cambio).
   if(escActiva && cfg.profTotalM){
     const profT = cfg.profTotalM;
     for(let nv=1; nv<=nNiveles; nv++){
-      add(skuVigaCorredor(cfg), Math.max(2, Math.round(profT / 1.5) + 1));       // vigas 48 del corredor
       add(PASARELA_PISO_3M, Math.ceil(anchoCorredorM(cfg) / 0.20) * Math.ceil(profT / 3)); // piso del corredor
       // Barandal exterior SOLO en los claros entre marcos (los pasillos)
       const clarosB = Math.max(0, lineasInfo.length - 1);
       add(PASARELA_BARANDAL, Math.ceil(clarosB * cfg.pasilloM) + 1);   // tramos de claro + tope del fondo
       add(PASARELA_POSTE_BAR, clarosB * 2);
+      // Rellano de la escalera: 2 SEL-0454 longitudinales por nivel
+      add(PASARELA_VIGA_ESP, 2);
     }
     add(PASARELA_ESCALERAS[cfg.pasarela.alturaIn] || PASARELA_ESCALERAS[96], nNiveles);
 
@@ -3380,13 +3420,28 @@ function buildPicking(){
   let zFrente = profTotal/2;
   const pasillosInfo = [];   // para la pasarela
     const escLat = cfg.pasarela.on && cfg.pasarela.escalera !== 'no' && lineas.length > 1;
-  // La escalera y el corredor van por FUERA del rack: ya no se sacrifica ningún cuerpo
-  // Solo la línea frontal pierde las vigas del módulo que cruza el ramal de acceso
+  // La escalera y el corredor van por FUERA del rack: ya no se sacrifica ningún cuerpo.
+  // El piso de la pasarela toca físicamente la viga de carga del rack al nivel yN:
+  // se despeja UNA viga por cuerpo por nivel donde va el piso (banda estrecha) en
+  // TODAS las filas vecinas a un pasillo con pasarela. El cuerpo del ramal además
+  // abre TODO el paso a la escalera (banda ancha, hasta el siguiente nivel).
+  const _bPiso = bandasPisoPasarela(cfg);
+  const _hasPas = cfg.pasarela && cfg.pasarela.on && lineas.length > 1;
   const skipDe = (nCuerpos, invertido, iLn) => {
-    if(iLn !== 0) return -1;
-    const idx = cuerpoRamalPasarela(cfg, xInicio, lineas[0].largoM, nCuerpos);
-    if(idx < 0) return -1;
-    return invertido ? (nCuerpos - 1 - idx) : idx;   // la fila B va girada 180°
+    const arr = [];
+    if(_hasPas){
+      for(let k=0; k<nCuerpos; k++) arr.push({k: k, bandas: _bPiso});
+    }
+    if(iLn === 0){
+      const idx = cuerpoRamalPasarela(cfg, xInicio, lineas[0].largoM, nCuerpos);
+      if(idx >= 0){
+        const kRamal = invertido ? (nCuerpos - 1 - idx) : idx;
+        // Sobreescribir el cuerpo del ramal para usar bandas anchas (paso completo)
+        const i = arr.findIndex(it => it.k === kRamal);
+        if(i >= 0) arr[i] = kRamal; else arr.push(kRamal);
+      }
+    }
+    return arr.length ? arr : -1;
   };
   lineas.forEach((l, iLn) => {
     const gLin = new THREE.Group();
@@ -3540,21 +3595,40 @@ function buildSelectivo(){
   let zFrente = profTotal/2;
   const pasillosInfoSel = [];
     const escLat = cfg.pasarela.on && cfg.pasarela.escalera !== 'no' && lineas.length > 1;
-  // La escalera y el corredor van por FUERA del rack: ya no se sacrifica ningún cuerpo
-  // Solo la línea frontal pierde las vigas del módulo que cruza el ramal de acceso
+  // La escalera y el corredor van por FUERA del rack: ya no se sacrifica ningún cuerpo.
+  // El piso de la pasarela toca físicamente la viga de carga del rack al nivel yN:
+  // se despeja UNA viga por cuerpo por nivel donde va el piso (banda estrecha) en
+  // TODAS las filas vecinas a un pasillo con pasarela. El cuerpo del ramal además
+  // abre TODO el paso a la escalera (banda ancha, hasta el siguiente nivel).
+  const _bPisoSel = bandasPisoPasarela(cfg);
+  const _hasPasSel = cfg.pasarela && cfg.pasarela.on && lineas.length > 1;
   const skipDe = (nCuerpos, iLn) => {
-    // base: escalera/pasarela
-    let base;
+    let arr = [];
+    if(_hasPasSel){
+      for(let k=0; k<nCuerpos; k++) arr.push({k: k, bandas: _bPisoSel});
+    }
+    // Sobreescrituras: banda ancha del ramal / cuerpos de la escalera PS-2
     const ksEsc = cuerposEscaleraPS2(cfg, iLn, xInicio, lineas[iLn].vigaM, nCuerpos);
-    if(ksEsc.length) base = ksEsc;
-    else if(iLn === 0) base = cuerpoRamalPasarela(cfg, xInicio, lineas[0].vigaM, nCuerpos);
-    else base = -1;
-    let arr = Array.isArray(base) ? base.slice() : (typeof base === 'number' && base >= 0 ? [base] : []);
+    let baseAncha = [];
+    if(ksEsc.length) baseAncha = ksEsc;
+    else if(iLn === 0){
+      const idxR = cuerpoRamalPasarela(cfg, xInicio, lineas[0].vigaM, nCuerpos);
+      if(idxR >= 0) baseAncha = [idxR];
+    }
+    baseAncha.forEach(kA => {
+      const i = arr.findIndex(it => (typeof it === 'object' ? it.k : it) === kA);
+      if(i >= 0) arr[i] = kA; else arr.push(kA);
+    });
     // TÚNELES: hueco a ras de piso (saltar niveles bajos) en los cuerpos elegidos
     const tun = lineas[iLn].tunel || [];
     if(tun.length){
       const nivT = _tunelNiveles(lineas[iLn]);
-      tun.forEach(k => { if(k >= 0 && k < nCuerpos) arr.push({k: k, niveles: nivT}); });
+      tun.forEach(k => {
+        if(k >= 0 && k < nCuerpos){
+          const i = arr.findIndex(it => (typeof it === 'object' ? it.k : it) === k);
+          if(i >= 0) arr[i] = {k: k, niveles: nivT}; else arr.push({k: k, niveles: nivT});
+        }
+      });
     }
     return arr.length ? arr : -1;
   };
@@ -3887,7 +3961,17 @@ function calcularBomPicking(){
     // 3) Vigas/travesaños: 2 por nivel por cuerpo (frente + atrás)
     // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
     const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.largoM, cA) : -1;
-    const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'picking') * (esD ? 2 : 1) : 0;
+    // Vigas de carga del rack quitadas por chocar con el piso de la pasarela:
+    //   - Cuerpo del ramal (si aplica): banda ancha (paso a escalera).
+    //   - Todos los demás cuerpos de filas vecinas al pasillo: banda estrecha (solo al piso).
+    const _hasPasBom = cfg.pasarela && cfg.pasarela.on && cfg.lineas.length > 1;
+    let nivQuitados = 0;
+    if(_hasPasBom){
+      const nivQPiso  = nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'picking', bandasPisoPasarela(cfg));
+      const nivQRamal = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'picking') : 0;
+      const cRamal = idxRamal >= 0 ? 1 : 0;
+      nivQuitados = (nivQPiso * (cA - cRamal) + nivQRamal * cRamal) * (esD ? 2 : 1);
+    }
     add(VIGAS_PIC[l.largoCm], 2 * (nivTot - nivQuitados));
     // 4) Carga del nivel
     if(cfg.rejilla && tieneRejillaPicking(l.largoCm)){
@@ -3927,7 +4011,17 @@ function calcularBomSelectivo(){
     // Cuerpo de acceso de la escalera (línea frontal): va sin vigas de carga
     // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
     const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.vigaM, cA) : -1;
-    const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'selectivo') * (esD ? 2 : 1) : 0;
+    // Vigas de carga del rack quitadas por chocar con el piso de la pasarela:
+    //   - Cuerpo del ramal (si aplica): banda ancha (paso a escalera).
+    //   - Todos los demás cuerpos de filas vecinas al pasillo: banda estrecha (solo al piso).
+    const _hasPasBomSel = cfg.pasarela && cfg.pasarela.on && cfg.lineas.length > 1;
+    let nivQuitados = 0;
+    if(_hasPasBomSel){
+      const nivQPiso  = nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'selectivo', bandasPisoPasarela(cfg));
+      const nivQRamal = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'selectivo') : 0;
+      const cRamal = idxRamal >= 0 ? 1 : 0;
+      nivQuitados = (nivQPiso * (cA - cRamal) + nivQRamal * cRamal) * (esD ? 2 : 1);
+    }
     add(l.vigaSku, 2 * (nivCarga - nivQuitados));
     add(ANCLA_STD_SEL, 4 * nMarcos);
     if(cfg.rejilla){
