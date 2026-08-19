@@ -630,7 +630,19 @@ const VIGAS_INFO = {
 const ANCLA_STD_SEL = 'SEL-0001';  // Anclaje 1/2" x 4 1/4" expansible (wedge anchor)
 const ANCLA_QUI_SEL = 'SEL-0003';
 const BOTA_SEL = 'SEL-0021';
-const REJILLAS_SEL = { 36:'SEL-0273', 42:'SEL-0275', 48:'SEL-0277' };
+// REGLA DE OBRA (ISARACK): la rejilla electrosoldada viene en 2 anchos, uno
+// por cada largo de viga. NO se puede poner rejilla 46" en viga 108" — quedan
+// huecos y no cargan bien. La combinacion correcta es:
+//   Viga 96"  → rejilla ancho 46"  (SEL-0273 / SEL-0275 / SEL-0277 segun fondo)
+//   Viga 108" → rejilla ancho 52"  (SEL-0274 / SEL-0276 / SEL-0279 segun fondo)
+//   Viga 144" → rejilla ancho 46"  (SEL-0273 / SEL-0275 / SEL-0277 segun fondo)
+// Fondo del marco (36/42/48 in) elige la fila; el largo de viga elige el ancho.
+const REJILLAS_SEL = {
+  36: { 46:'SEL-0273', 52:'SEL-0274' },
+  42: { 46:'SEL-0275', 52:'SEL-0276' },
+  48: { 46:'SEL-0277', 52:'SEL-0279' }
+};
+const REJILLA_ANCHO_POR_VIGA = { 96:46, 108:52, 144:46 };
 const REJILLAS_POR_VIGA_SEL = { 96:2, 108:2, 144:3 };
 const SOPORTE_TRIPLAY_SEL = 'SEL-0322';
 const TRIPLAY_SEL = 'SEL-0338';
@@ -3898,7 +3910,10 @@ function calcularBomSelectivo(){
     add(l.vigaSku, 2 * (nivCarga - nivQuitados));
     add(ANCLA_STD_SEL, 4 * nMarcos);
     if(cfg.rejilla){
-      const rejSku = REJILLAS_SEL[l.fondoIn];
+      // La rejilla se elige por (fondo del marco, ancho de rejilla que exige la viga).
+      // Ver comentario "REGLA DE OBRA (ISARACK)" arriba, junto a REJILLAS_SEL.
+      const anchoRej = REJILLA_ANCHO_POR_VIGA[l.vigaIn] || 46;
+      const rejSku = (REJILLAS_SEL[l.fondoIn] || {})[anchoRej];
       const rejPorViga = REJILLAS_POR_VIGA_SEL[l.vigaIn];
       if(rejSku && rejPorViga) add(rejSku, rejPorViga * nivCarga);
     }
