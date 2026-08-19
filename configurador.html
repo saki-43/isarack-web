@@ -4102,6 +4102,21 @@ async function sbFetch(path){
   if(!r.ok) throw new Error('Supabase '+r.status);
   return r.json();
 }
+// Cache de contactos de ISA-OS para el autocompletado del modal de cotizacion.
+// Trae la lista completa de la tabla 'contactos' UNA vez por sesion.
+let _contactosISACache = null;
+async function _cargarContactosISA(){
+  if(_contactosISACache) return _contactosISACache;
+  try{
+    const rows = await sbFetch('contactos?select=nombre,razon,rfc,tel,cel,email,dir,contacto&order=nombre.asc&limit=5000');
+    _contactosISACache = Array.isArray(rows) ? rows.filter(r=>r&&r.nombre) : [];
+    return _contactosISACache;
+  }catch(e){
+    console.warn('cargar contactos ISA:', e);
+    _contactosISACache = [];
+    return [];
+  }
+}
 
 async function sbInsertVenta(body){
   const r = await fetch(SB_URL+'/rest/v1/ventas', {
@@ -4433,7 +4448,7 @@ function abrirFormCliente(){
   mBody.innerHTML = `
     <div style="margin-bottom:14px"><span class="badge">Configuración</span>
       <div style="margin-top:6px;font-size:13px;color:#555">${configResumen().txt}</div></div>
-    <div class="row"><label>Cliente *</label><input id="f_cliente" placeholder="Nombre o empresa" maxlength="80" autocomplete="organization"></div>
+    <div class="row"><label>Cliente * <span id="f_cli_hint" style="font-size:11px;color:#999;font-weight:400">— empieza a escribir para buscar en la base</span></label><input id="f_cliente" placeholder="Nombre o empresa" maxlength="80" autocomplete="off" list="f_cli_list"><datalist id="f_cli_list"></datalist></div>
     <div class="grid2">
       <div class="row"><label>Razón social</label><input id="f_razon" placeholder="Opcional" maxlength="120"></div>
       <div class="row"><label>RFC</label><input id="f_rfc" placeholder="Opcional" maxlength="13" style="text-transform:uppercase"></div>
@@ -4455,6 +4470,41 @@ function abrirFormCliente(){
   document.getElementById('f_rfc').addEventListener('input', e=>{
     e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9&Ñ]/g,'').substring(0,13);
   });
+  // Autocompletar con contactos de ISA-OS: al abrir el modal, cargar la lista
+  // (una sola vez por sesion) y al escribir un nombre que coincida, autollenar
+  // los demas campos.
+  _cargarContactosISA().then(list=>{
+    if(!list||!list.length)return;
+    var dl=document.getElementById('f_cli_list');
+    if(dl){
+      dl.innerHTML=list.slice(0,500).map(function(c){return '<option value="'+String(c.nombre||'').replace(/"/g,'&quot;')+'"></option>';}).join('');
+    }
+    var hint=document.getElementById('f_cli_hint');
+    if(hint)hint.textContent='— '+list.length+' contactos disponibles';
+    var cli=document.getElementById('f_cliente');
+    var _autoFill=function(){
+      var val=(cli.value||'').trim().toUpperCase();
+      if(!val)return;
+      // Coincidencia exacta (case-insensitive)
+      var match=list.find(function(c){return (String(c.nombre||'').trim().toUpperCase())===val;});
+      if(!match)return;
+      var set=function(id,v){var el=document.getElementById(id);if(el && !el.value && v){el.value=v;}};
+      set('f_razon', match.razon||'');
+      set('f_rfc', (match.rfc||'').toUpperCase());
+      set('f_contacto', match.contacto||'');
+      // tel puede venir en 'tel' o 'cel'
+      var tel=String(match.tel||match.cel||'').replace(/\D/g,'').slice(0,10);
+      set('f_tel', tel);
+      set('f_email', match.email||'');
+      set('f_dir', match.dir||'');
+    };
+    cli.addEventListener('change', _autoFill);
+    cli.addEventListener('blur', _autoFill);
+    cli.addEventListener('input', function(){
+      // Auto-fill inmediato si el input matches exactamente (caso del click en datalist)
+      _autoFill();
+    });
+  }).catch(function(e){console.warn('contactos ISA:',e);});
   mFoot.innerHTML = '<button class="sec" id="bCancel">Cancelar</button><button class="prm" id="bPdf">⬇ Descargar PDF</button>';
   document.getElementById('bCancel').onclick = cerrarModal;
   document.getElementById('bPdf').onclick = ()=>{
