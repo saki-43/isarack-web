@@ -1630,6 +1630,11 @@ function anchoCorredorM(cfg){ return vigaCorredorIn(cfg) * IN_TO_M; }
 function skuVigaCorredor(cfg){ return VIGAS_CORREDOR[vigaCorredorIn(cfg)]; }
 
 const PASARELA_VIGA_48 = 'SEL-0360';   // VIGA DE CARGA 48"x3" — pasillo peatonal de 1.22 m  // 8'→10 steps 9", 9'→12 steps 9"
+// La viga del rack que da al pasillo, en el nivel donde se apoya el piso, se refuerza
+// (4" en lugar de 3"). Solo se fabrica en 96", por eso las pasarelas van únicamente
+// con racks de viga 96". Solo la viga del lado del pasillo cambia; la de enfrente
+// del mismo cuerpo sigue siendo la 3" normal.
+const VIGA_PASARELA_LADO = 'SEL-0454';   // VIGA DE CARGA 96"x4" Especial para pasarela
 
 // ── Pasarela compartida (Picking y Selectivo): dibujo 3D ──
 function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
@@ -2362,6 +2367,26 @@ function lineasSync(){
     const chkPasS = document.getElementById('selChkPasarela');
     if(chkPasS) chkPasS.checked = false;
     document.getElementById('selPasarelaOpts').style.display = 'none';
+  }
+  // Pasarela solo se fabrica con viga 96" (SEL-0454 96"x4" no existe en otros largos).
+  // Si alguna fila tiene 108"/144", bloqueamos el checkbox y desactivamos si estaba on.
+  {
+    const chkPasS = document.getElementById('selChkPasarela');
+    if(chkPasS && lineasAlmacen.length > 1){
+      const vigasNoSonDe96 = lineasAlmacen.some(l => {
+        const vi = VIGAS_INFO[l.vigaSku];
+        return vi && vi.largoIn !== 96;
+      });
+      const lblPas = chkPasS.closest('label');
+      if(vigasNoSonDe96){
+        if(chkPasS.checked){ chkPasS.checked = false; document.getElementById('selPasarelaOpts').style.display = 'none'; }
+        chkPasS.disabled = true;
+        if(lblPas){ lblPas.style.opacity = '0.5'; lblPas.title = 'Las pasarelas solo se fabrican con viga de 96". Cambia las vigas de 108"/144" para poder activarla.'; }
+      } else {
+        chkPasS.disabled = false;
+        if(lblPas){ lblPas.style.opacity = ''; lblPas.title = ''; }
+      }
+    }
   }
   // Personalizar claros solo aplica con 1 línea
   const chkClaros = document.getElementById('selAlturaManual');
@@ -3949,7 +3974,26 @@ function calcularBomSelectivo(){
     // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
     const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.vigaM, cA) : -1;
     const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'selectivo') * (esD ? 2 : 1) : 0;
-    add(l.vigaSku, 2 * (nivCarga - nivQuitados));
+    // Vigas SEL-0454 (96"x4" especial pasarela) que reemplazan a la 3" del lado del pasillo,
+    // en el nivel donde se apoya el piso. Solo aplica si hay pasarela activa y la viga es de 96".
+    let vigasPasarelaEspecial = 0;
+    if(cfg.pasarela && cfg.pasarela.on && cfg.lineas.length > 1 && l.vigaIn === 96){
+      const nNivP = cfg.pasarela.niveles || 1;
+      const esFilaPrim = iLn === 0;
+      const esFilaUlt = iLn === cfg.lineas.length - 1;
+      if(esD){
+        // Doble: la sub-fila A da al pasillo delantero, la sub-fila B al trasero.
+        if(esFilaPrim && !esFilaUlt)      vigasPasarelaEspecial = cB * nNivP;              // solo pasillo atrás
+        else if(!esFilaPrim && esFilaUlt) vigasPasarelaEspecial = cA * nNivP;              // solo pasillo adelante
+        else                              vigasPasarelaEspecial = (cA + cB) * nNivP;       // 2 pasillos adyacentes
+      } else {
+        const pasillosAdy = (esFilaPrim && esFilaUlt) ? 0 : ((esFilaPrim || esFilaUlt) ? 1 : 2);
+        vigasPasarelaEspecial = cA * pasillosAdy * nNivP;
+      }
+    }
+    const vigasNormales = 2 * (nivCarga - nivQuitados) - vigasPasarelaEspecial;
+    if(vigasNormales > 0) add(l.vigaSku, vigasNormales);
+    if(vigasPasarelaEspecial > 0) add(VIGA_PASARELA_LADO, vigasPasarelaEspecial);
     add(ANCLA_STD_SEL, 4 * nMarcos);
     if(cfg.rejilla){
       // La rejilla se elige por (fondo del marco, ancho de rejilla que exige la viga).
