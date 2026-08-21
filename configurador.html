@@ -1662,15 +1662,8 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
       const piso = box(largoPiso, grosorPiso, cfg.pasilloM, matPisoPas);
       piso.position.set(xInicio + largoPiso/2, yPas, p.zCentro);
       grupo.add(piso);
-      // Vigas de 48" cruzando el pasillo: una en cada marco, solo al nivel del piso
-      const nV = p.cuerposAdj + 1;
-      const anchoCuerpoP = largoPiso / Math.max(p.cuerposAdj, 1);
-      for(let kk=0; kk<nV; kk++){
-        const xV = xInicio + anchoCuerpoP * kk;
-        const vg = box(0.065, 0.10, cfg.pasilloM + 0.06, matVigaLocal);
-        vg.position.set(Math.min(Math.max(xV, xInicio+0.033), xInicio+largoPiso-0.033), yPas - grosorPiso/2 - 0.05, p.zCentro);
-        grupo.add(vg);
-      }
+      // Piso apoyado directo en las vigas de carga de los racks (naranjas), sin vigas extra
+      // de 48" cruzando el pasillo. Referencia: proyecto real del cliente (imagen SketchUp).
       // Barandal en los extremos del pasillo — abierto del lado del corredor (todos los niveles)
       const xLadoCorredor = dir === 1 ? xInicio + largoPiso : xInicio;
       [xInicio, xInicio + largoPiso].forEach(xExtremo => {
@@ -2039,14 +2032,12 @@ function bomPasarela(cfg, add, lineasInfo){
   const nNiveles = cfg.pasarela.niveles || 1;
   const escActiva = cfg.pasarela.escalera !== 'no';
   if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); return; }
-  // La pasarela SIEMPRE cruza con viga selectivo de carga (SEL-0360), nunca picking.
-  const skuVigaCruce = PASARELA_VIGA_48;
+  // El piso del pasillo se apoya directo en las vigas de carga de los racks (naranjas).
+  // No se cotiza viga extra de 48" por marco: no van en obra (referencia proyecto real).
   for(let i=0; i<lineasInfo.length-1; i++){
     const a = lineasInfo[i], b = lineasInfo[i+1];
     const largoM = Math.min(a.largoTotM || a.largoM, b.largoTotM || b.largoM);
-    const cuerposAdj = Math.max(a.cuerpos, b.cuerpos);
     for(let nv=1; nv<=nNiveles; nv++){
-      add(skuVigaCruce, cuerposAdj + 1);
       add(PASARELA_PISO_3M, Math.ceil(cfg.pasilloM / 0.20) * Math.ceil(largoM / 3));
       // El corredor abre un extremo de cada pasillo en cada nivel
       const extremos = escActiva ? 1 : 2;
