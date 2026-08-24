@@ -3938,7 +3938,11 @@ function calcularBomPicking(){
       add(skuRej, combo.cantidad * nivTot);
     } else if(cfg.panel || (cfg.rejilla && !tieneRejillaPicking(l.largoCm))){
       const skuPanel = PANELES_BEIGE_PIC[l.fondoIn];
-      add(skuPanel, nivTot);
+      // Panel picking beige: 8" (20.32 cm) de ancho util. Se colocan en fila a lo
+      // largo del cuerpo para cubrir todo el nivel; el ultimo se corta a medida.
+      // Ej: cuerpo 120 cm → ceil(120/20.32)=6 paneles por nivel; 200 cm → 10.
+      const piezasPorNivel = Math.ceil(l.largoCm / (8 * 2.54));
+      add(skuPanel, piezasPorNivel * nivTot);
     } else if(cfg.madera){
       const skuTam = TAM_PIC[l.largoCm] && TAM_PIC[l.largoCm][l.fondoIn];
       if(skuTam) add(skuTam, nivTot);
