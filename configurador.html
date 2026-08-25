@@ -4225,6 +4225,28 @@ async function _cargarContactosISA(){
   }
 }
 
+// Devuelve el siguiente folio consecutivo para el prefijo dado (RW-/GW-/PW-).
+// Antes se usaba Date.now().slice(-5) que producia numeros pseudo-aleatorios,
+// y como ISA-OS los ordena por num desc, el orden en pantalla no coincidia con
+// el orden por fecha. Con consecutivo, el mayor numero SIEMPRE es el mas nuevo.
+async function siguienteFolio(prefix){
+  try {
+    const r = await fetch(SB_URL+'/rest/v1/ventas?select=num&num=like.'+encodeURIComponent(prefix+'%')+'&order=created_at.desc&limit=200', {
+      headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }
+    });
+    const rows = r.ok ? await r.json() : [];
+    let max = 0;
+    for(const row of rows){
+      const m = String(row.num||'').match(/^[A-Z]{2}-(\d+)/);
+      if(m){ const n = parseInt(m[1],10); if(n > max) max = n; }
+    }
+    return prefix + String(max + 1).padStart(5,'0');
+  } catch(e){
+    console.warn('siguienteFolio fallback timestamp:', e);
+    return prefix + (''+Date.now()).slice(-5);
+  }
+}
+
 async function sbInsertVenta(body){
   const r = await fetch(SB_URL+'/rest/v1/ventas', {
     method:'POST',
@@ -4724,7 +4746,7 @@ function captura3D(){
   } catch(e){ console.error('captura3D:', e); return null; }
 }
 
-function generarPDF(datos){
+async function generarPDF(datos){
   if(!preciosCache){ alert('Aún cargando precios.'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'pt', format:'letter'});
@@ -4806,7 +4828,7 @@ function generarPDF(datos){
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
   const folioPrefix = sistemaActual==='selectivo' ? 'RW-' : (sistemaActual==='picking' ? 'PW-' : 'GW-');
-  const folio = folioPrefix + (''+Date.now()).slice(-5);
+  const folio = await siguienteFolio(folioPrefix);
   const fechaHoy = new Date();
   const fechaVenc = new Date(fechaHoy.getTime() + 15*24*60*60*1000);
   const dFmt = d => d.toLocaleDateString('es-MX', {day:'2-digit',month:'2-digit',year:'numeric'});
