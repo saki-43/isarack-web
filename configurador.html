@@ -4711,13 +4711,10 @@ function captura3D(){
     r2.setSize(cW, cH);
     r2.setPixelRatio(1);
 
-    // Vista lateral 3/4 fija — misma orientacion que la web (rotY inicial = 0.7,
-    // rotX inicial = 0.32), pero rY invertido para que la camara vea el rack
-    // desde el lado izquierdo. Asi las cotas quedan al frente (visibles) en
-    // vez de al fondo (tapadas por vigas).
+    // Vista lateral 3/4 fija
     const FOV = 35;
     const cam2 = new THREE.PerspectiveCamera(FOV, cW/cH, 0.1, 100);
-    const rY = -Math.PI * 0.22;
+    const rY = Math.PI * 0.22;
     const rX = 0.22;
 
     // Silueta proyectada del bounding box rotado (independiente del tamaño de góndola)
@@ -4725,7 +4722,7 @@ function captura3D(){
     const projY = alto + (xExt * Math.sin(rY) + zExt * Math.cos(rY)) * Math.sin(rX);
     const fovRad = FOV * Math.PI / 180;
     const aspect = cW / cH;
-    const FILL = 0.45;  // la góndola ocupa ~45% del frame (margen amplio para que quepan racks grandes)
+    const FILL = 0.70;  // la góndola ocupa ~70% del frame (deja margen)
     const distY = projY / (2 * Math.tan(fovRad/2) * FILL);
     const distX = projX / (2 * Math.tan(fovRad/2) * aspect * FILL);
     const dist = Math.max(distY, distX, 1.2);
