@@ -4898,18 +4898,24 @@ function generarPDF(datos){
   // ── CONFIGURACIÓN (franja gris con la config actual) ──
   y = y + boxH + 10;
   const cfg = configResumen();
-  doc.setFillColor(...GREY_BG);
-  doc.rect(M, y, W - M*2, 22, 'F');
-  doc.setFont('helvetica','bold');
+  doc.setFont('helvetica','normal');
   doc.setFontSize(9);
+  // Hacer wrap del texto de configuracion para que no se corte (ej. "... 50 cuerpos"
+  // que antes se salia). Si necesita mas de una linea, la franja gris se expande.
+  const cfgMaxW = W - M - 110 - 8;
+  const cfgLines = doc.splitTextToSize(cfg.txt, cfgMaxW);
+  const cfgRectH = cfgLines.length > 1 ? 8 + 12 * cfgLines.length : 22;
+  doc.setFillColor(...GREY_BG);
+  doc.rect(M, y, W - M*2, cfgRectH, 'F');
+  doc.setFont('helvetica','bold');
   doc.setTextColor(...ORANGE);
   doc.text('CONFIGURACIÓN', M + 8, y + 14);
   doc.setTextColor(...DARK);
   doc.setFont('helvetica','normal');
-  doc.text(cfg.txt, M + 110, y + 14);
+  doc.text(cfgLines, M + 110, y + 14);
 
   // ── TABLA ──
-  y = y + 32;
+  y = y + cfgRectH + 10;
   doc.autoTable({
     startY: y,
     head: [['DESCRIPCIÓN','CANTIDAD','PRECIO UNITARIO','IMPUESTOS','IMPORTE']],
@@ -4971,10 +4977,11 @@ function generarPDF(datos){
   let fy = doc.lastAutoTable.finalY + 16;
 
   // ── RENDER 3D (izq) + TOTALES (der) ──
+  // imgH aumentado 30% (110 → 143) para que el diseno se vea mas grande en el PDF.
   const totW = 250;
   const totX = W - M - totW;
   const imgW = totX - M - 20;
-  const imgH = 110;
+  const imgH = 143;
 
   const img3D = captura3D();
   if(img3D){ try{ doc.addImage(img3D, 'PNG', M, fy, imgW, imgH); } catch(e){} }
