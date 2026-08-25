@@ -4718,14 +4718,14 @@ function captura3D(){
     const FOV = 35;
     const cam2 = new THREE.PerspectiveCamera(FOV, cW/cH, 0.1, 100);
     const rY = -Math.PI * 0.22;
-    const rX = 0.32;
+    const rX = 0.22;
 
     // Silueta proyectada del bounding box rotado (independiente del tamaño de góndola)
     const projX = xExt * Math.cos(rY) + zExt * Math.sin(rY);
     const projY = alto + (xExt * Math.sin(rY) + zExt * Math.cos(rY)) * Math.sin(rX);
     const fovRad = FOV * Math.PI / 180;
     const aspect = cW / cH;
-    const FILL = 0.55;  // la góndola ocupa ~55% del frame (mas margen para que entre todo el disenno)
+    const FILL = 0.45;  // la góndola ocupa ~45% del frame (margen amplio para que quepan racks grandes)
     const distY = projY / (2 * Math.tan(fovRad/2) * FILL);
     const distX = projX / (2 * Math.tan(fovRad/2) * aspect * FILL);
     const dist = Math.max(distY, distX, 1.2);
