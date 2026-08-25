@@ -4977,11 +4977,11 @@ function generarPDF(datos){
   let fy = doc.lastAutoTable.finalY + 16;
 
   // ── RENDER 3D (izq) + TOTALES (der) ──
-  // imgH aumentado 30% (110 → 143) para que el diseno se vea mas grande en el PDF.
+  // imgH aumentado 50% sobre el anterior (143 → 215) para que el diseno se vea grande.
   const totW = 250;
   const totX = W - M - totW;
   const imgW = totX - M - 20;
-  const imgH = 143;
+  const imgH = 215;
 
   const img3D = captura3D();
   if(img3D){ try{ doc.addImage(img3D, 'PNG', M, fy, imgW, imgH); } catch(e){} }
