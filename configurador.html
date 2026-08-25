@@ -4725,7 +4725,7 @@ function captura3D(){
     const projY = alto + (xExt * Math.sin(rY) + zExt * Math.cos(rY)) * Math.sin(rX);
     const fovRad = FOV * Math.PI / 180;
     const aspect = cW / cH;
-    const FILL = 0.70;  // la góndola ocupa ~70% del frame (deja margen)
+    const FILL = 0.55;  // la góndola ocupa ~55% del frame (mas margen para que entre todo el disenno)
     const distY = projY / (2 * Math.tan(fovRad/2) * FILL);
     const distX = projX / (2 * Math.tan(fovRad/2) * aspect * FILL);
     const dist = Math.max(distY, distX, 1.2);
