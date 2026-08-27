@@ -512,6 +512,7 @@ gtag('config', 'G-XXXXXXXXXX');
   <div class="head">
     <button id="pdfBtn">📄 Solicitar cotización (PDF)</button>
     <button id="linkBtn" style="margin-top:4px">🔗 Copiar link para el cliente</button>
+    <a id="pdfInternoBtn" href="#" onclick="event.preventDefault();generarPDFInterno();return false;" style="display:block;margin-top:6px;font-size:10.5px;color:#888;text-align:center;text-decoration:none;cursor:pointer" title="Solo para uso interno — con desglose de SKUs">📋 Descargar desglose interno</a>
   </div>
   <div class="ttl">
     <h2>Lista de materiales</h2>
@@ -5048,13 +5049,21 @@ function captura3D(){
   } catch(e){ console.error('captura3D:', e); return null; }
 }
 
-async function generarPDF(datos){
+// Descarga rápida del PDF interno (con desglose de SKUs). No pide datos del cliente,
+// no sube nada a Storage, no crea venta — solo baja el PDF al equipo del vendedor.
+function generarPDFInterno(){
+  generarPDF({ cliente:'INTERNO', razon:'', rfc:'', contacto:'', tel:'', email:'', dir:'' }, { interno:true });
+}
+
+async function generarPDF(datos, opts){
+  opts = opts || {};
+  const soloInterno = !!opts.interno;   // true = PDF con desglose, no sube ni crea venta
   if(!preciosCache){ alert('Aún cargando precios.'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'pt', format:'letter'});
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const M = 40;
+  const M = 48;   // margen general (~17mm) — antes 40, se veia muy pegado al borde al imprimir
   const ORANGE = [218,102,53];
   const ORANGE_SOFT = [251,224,207];
   const DARK = [38,41,44];
@@ -5254,8 +5263,8 @@ async function generarPDF(datos){
     }
   });
 
-  // ── DESGLOSE DE MATERIALES (solo para góndola) ──
-  if(desgloseGondola && desgloseGondola.length){
+  // ── DESGLOSE DE MATERIALES (solo para góndola, y solo en el PDF interno) ──
+  if(soloInterno && desgloseGondola && desgloseGondola.length){
     const yAfter = doc.lastAutoTable.finalY + 18;
     doc.setFontSize(9);
     doc.setTextColor(...ORANGE);
@@ -5288,7 +5297,7 @@ async function generarPDF(datos){
     });
   }
 
-  let fy = doc.lastAutoTable.finalY + 16;
+  let fy = doc.lastAutoTable.finalY + 22;
 
   // ── RENDER 3D (izq) + TOTALES (der) ──
   // imgH aumentado 50% sobre el anterior (143 → 215) para que el diseno se vea grande.
@@ -5325,7 +5334,7 @@ async function generarPDF(datos){
   doc.text(fmt(totalUSD), totX + totW - 14, ty + 20, {align:'right'});
   ty += 32;
 
-  fy = Math.max(fy + imgH, ty) + 18;
+  fy = Math.max(fy + imgH, ty) + 26;
 
   // ── CONDICIONES (PIE) ──
   if(fy > H - 140){ doc.addPage(); fy = M; }
@@ -5362,10 +5371,22 @@ async function generarPDF(datos){
 
   // Nombre limpio para el archivo
   const clienteSafe = (datos.cliente||'cliente').replace(/[^a-z0-9]/gi,'_').substring(0,40);
-  const pdfFileName = 'Cotizacion_' + folio + '_' + clienteSafe + '.pdf';
+  const pdfFileName = (soloInterno ? 'Desglose_INTERNO_' : 'Cotizacion_') + folio + '_' + clienteSafe + '.pdf';
   const storagePath = 'cotizaciones-web/' + folio + '_' + clienteSafe + '.pdf';
 
   const pdfBlob = doc.output('blob');
+
+  // El PDF interno solo se descarga (no sube a storage, no crea venta).
+  if(soloInterno){
+    try{
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = blobUrl; a.download = pdfFileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(blobUrl), 5000);
+    }catch(e){ console.error('Deliver PDF interno:', e); }
+    return;
+  }
 
   const btnSubmit = document.querySelector('#modalCliente button.primary, #modalCliente button.btn-primary');
   const submitTxt = btnSubmit ? btnSubmit.textContent : '';
