@@ -2497,7 +2497,11 @@ function renderLineasGondola(){
 }
 
 function lnAddGon(tipo){
-  lineasGondola.push(_gonDefaultFila(tipo));
+  // Colapsar todas las filas existentes para que la nueva se vea sin scroll.
+  lineasGondola.forEach(l => { l.abierta = false; });
+  const nueva = _gonDefaultFila(tipo);
+  nueva.abierta = true;
+  lineasGondola.push(nueva);
   renderLineasGondola();
   if(typeof build === 'function') build();
   if(typeof renderCotizacion === 'function') renderCotizacion();
