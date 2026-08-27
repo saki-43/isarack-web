@@ -2425,6 +2425,7 @@ function _gonDefaultFila(tipo){
     niveles: 4,
     modulos: 1,
     cabeceras: 0,
+    volteada: false,                          // solo aplica a pared: gira la fila 180°
     abierta: true
   };
 }
@@ -2435,6 +2436,7 @@ function _gonNormaliza(l){
   if(!l.niveles) l.niveles = 4;
   if(!l.modulos) l.modulos = 1;
   if(l.cabeceras == null) l.cabeceras = 0;
+  if(l.volteada == null) l.volteada = false;
   return l;
 }
 
@@ -2470,6 +2472,9 @@ function renderLineasGondola(){
     const btnDel = nFilas > 1
       ? '<span onclick="event.stopPropagation();if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lnDelGon('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
       : '';
+    const btnFlip = l.tipoGon === 'pared'
+      ? '<span onclick="event.stopPropagation();lnFlipGon('+i+')" style="cursor:pointer;color:'+tx+';font-size:12px;font-weight:700;padding:1px 4px;line-height:1;flex-shrink:0" title="Voltear: charolas al otro lado">'+(l.volteada?'⇐':'⇒')+'</span>'
+      : '';
     const chip = !l.abierta
       ? '<div onclick="lnToggleGon('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tipoLbl+' · '+l.medida+' · '+l.niveles+' niv · '+l.modulos+' mód'+(l.cabeceras?' + '+l.cabeceras+' cab':'')+'</div>'
       : '';
@@ -2486,7 +2491,7 @@ function renderLineasGondola(){
       + '<div style="display:flex;align-items:center;gap:4px;padding:3px 6px;cursor:pointer" onclick="lnToggleGon('+i+')">'
       + '<span style="background:'+tx+';color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;flex-shrink:0">L'+(i+1)+'</span>'
       + '<span style="font-size:10px;color:'+tx+';font-weight:600;flex:1">'+tipoLbl+'</span>'
-      + btnUp + btnDn
+      + btnFlip + btnUp + btnDn
       + '<span style="font-size:10px;color:'+tx+'">'+(l.abierta?'▲':'▼')+'</span>'
       + btnDel
       + '</div>'
@@ -2568,6 +2573,13 @@ function _gonLineasAgrupadas(materialUSD){
   });
 }
 
+function lnFlipGon(i){
+  const l = lineasGondola[i];
+  if(!l || l.tipoGon !== 'pared') return;
+  l.volteada = !l.volteada;
+  renderLineasGondola();
+  if(typeof build === 'function') build();
+}
 function lnMoveGon(i, delta){
   const j = i + delta;
   if(j < 0 || j >= lineasGondola.length) return;
@@ -3338,6 +3350,8 @@ function buildGondola(){
     } else {
       _gonBuildFila(gLin, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
     }
+    // Solo aplica a pared: voltear 180° para que las charolas queden al otro lado.
+    if(l.tipoGon === 'pared' && l.volteada) gLin.rotation.y = Math.PI;
     gLin.position.z = zFrente - profM/2;
     grupo.add(gLin);
     zFrente -= profM + pasilloM;
