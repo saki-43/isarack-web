@@ -4996,14 +4996,33 @@ function captura3D(){
       zExt = cfg.maxLargoZM;
       alto = cfg.maxAltoM;
     } else {
-      const m = MED[document.getElementById('medida').value];
-      const mods = parseInt(document.getElementById('modulos').value);
-      const cabs = parseInt(document.getElementById('cabeceras').value);
-      const central = document.getElementById('tipo').value === 'central';
-      const totalW = m.ancho * mods;
-      zExt = cabs ? CAB.ancho : (central ? m.fondo*1.75 : m.fondo);
-      xExt = totalW + (cabs ? CAB.fondo*2 : 0);
-      alto = m.alto;
+      // Góndola: usa las medidas reales del layout multi-fila (mismo cálculo que buildGondola).
+      const filas = (typeof lineasGondola !== 'undefined' && lineasGondola.length)
+        ? lineasGondola.map(_gonNormaliza)
+        : [{
+            tipo:'sencilla',
+            tipoGon: document.getElementById('tipo').value,
+            medida:  document.getElementById('medida').value,
+            niveles: parseInt(document.getElementById('niveles').value),
+            modulos: parseInt(document.getElementById('modulos').value),
+            cabeceras: parseInt(document.getElementById('cabeceras').value)
+          }];
+      const pasilloM = 1.6;
+      let maxLargo = 0, maxAlto = 0, profTotal = 0;
+      filas.forEach(l => {
+        const m = MED[l.medida];
+        const central = l.tipoGon === 'central';
+        const largoTotM = m.ancho * l.modulos + (l.cabeceras ? CAB.fondo*2 : 0);
+        const profBase = central ? m.fondo*2 : m.fondo;
+        const profM = l.tipo === 'doble' ? profBase*2 : profBase;
+        maxLargo = Math.max(maxLargo, largoTotM);
+        maxAlto  = Math.max(maxAlto,  m.alto);
+        profTotal += profM;
+      });
+      profTotal += pasilloM * (filas.length - 1);
+      xExt = maxLargo;
+      zExt = profTotal;
+      alto = maxAlto;
     }
 
     // Renderer offscreen dedicado
