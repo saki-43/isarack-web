@@ -183,8 +183,7 @@ gtag('config', 'G-XXXXXXXXXX');
       <label>Distribución del almacén</label>
       <div id="gonLineasList" style="display:flex;flex-direction:column;gap:4px;margin:4px 0"></div>
       <div style="display:flex;gap:6px;margin-top:4px">
-        <button id="btnAddGonSen" onclick="lnAddGon('sencilla')" style="flex:1;padding:6px 8px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">+ Fila sencilla</button>
-        <button id="btnAddGonDob" onclick="lnAddGon('doble')" style="flex:1;padding:6px 8px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">+ Fila doble</button>
+        <button id="btnAddGonSen" onclick="lnAddGon('sencilla')" style="flex:1;padding:6px 8px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">+ Fila</button>
       </div>
     </div>
     <!-- Selects espejo (ocultos) — reflejan la fila 1 de lineasGondola. Las funciones
@@ -2459,14 +2458,17 @@ function renderLineasGondola(){
   _gonEspejar();
   const cont = document.getElementById('gonLineasList'); if(!cont) return;
   cont.innerHTML = lineasGondola.map((l, i) => {
-    const esD = l.tipo === 'doble';
-    const bg = esD ? '#faf0ea' : '#eef4fb';
-    const bd = esD ? '#f0c4ae' : '#b5d4f4';
-    const tx = esD ? '#993C1D' : '#185FA5';
-    const lbl = esD ? 'Doble' : 'Sencilla';
+    const bg = '#eef4fb', bd = '#b5d4f4', tx = '#185FA5';
     const tipoLbl = l.tipoGon === 'central' ? 'Central' : 'Pared';
-    const btnDel = lineasGondola.length > 1
-      ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lnDelGon('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
+    const nFilas = lineasGondola.length;
+    const btnUp = i > 0
+      ? '<span onclick="event.stopPropagation();lnMoveGon('+i+',-1)" style="cursor:pointer;color:'+tx+';font-size:11px;font-weight:700;padding:1px 4px;line-height:1;flex-shrink:0" title="Subir esta fila">▲</span>'
+      : '<span style="width:16px;flex-shrink:0"></span>';
+    const btnDn = i < nFilas - 1
+      ? '<span onclick="event.stopPropagation();lnMoveGon('+i+',1)" style="cursor:pointer;color:'+tx+';font-size:11px;font-weight:700;padding:1px 4px;line-height:1;flex-shrink:0" title="Bajar esta fila">▼</span>'
+      : '<span style="width:16px;flex-shrink:0"></span>';
+    const btnDel = nFilas > 1
+      ? '<span onclick="event.stopPropagation();if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lnDelGon('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
       : '';
     const chip = !l.abierta
       ? '<div onclick="lnToggleGon('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tipoLbl+' · '+l.medida+' · '+l.niveles+' niv · '+l.modulos+' mód'+(l.cabeceras?' + '+l.cabeceras+' cab':'')+'</div>'
@@ -2483,7 +2485,8 @@ function renderLineasGondola(){
     return '<div style="border:1px solid '+bd+';border-radius:6px;background:'+bg+';overflow:hidden">'
       + '<div style="display:flex;align-items:center;gap:4px;padding:3px 6px;cursor:pointer" onclick="lnToggleGon('+i+')">'
       + '<span style="background:'+tx+';color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;flex-shrink:0">L'+(i+1)+'</span>'
-      + '<span style="font-size:10px;color:'+tx+';font-weight:600;flex:1">'+lbl+' · '+tipoLbl+'</span>'
+      + '<span style="font-size:10px;color:'+tx+';font-weight:600;flex:1">'+tipoLbl+'</span>'
+      + btnUp + btnDn
       + '<span style="font-size:10px;color:'+tx+'">'+(l.abierta?'▲':'▼')+'</span>'
       + btnDel
       + '</div>'
@@ -2512,6 +2515,16 @@ function lnToggleGon(i){
 }
 function lnSetGon(i, key, val){
   lineasGondola[i][key] = val;
+  renderLineasGondola();
+  if(typeof build === 'function') build();
+  if(typeof renderCotizacion === 'function') renderCotizacion();
+}
+function lnMoveGon(i, delta){
+  const j = i + delta;
+  if(j < 0 || j >= lineasGondola.length) return;
+  const tmp = lineasGondola[i];
+  lineasGondola[i] = lineasGondola[j];
+  lineasGondola[j] = tmp;
   renderLineasGondola();
   if(typeof build === 'function') build();
   if(typeof renderCotizacion === 'function') renderCotizacion();
