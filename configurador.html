@@ -2519,6 +2519,55 @@ function lnSetGon(i, key, val){
   if(typeof build === 'function') build();
   if(typeof renderCotizacion === 'function') renderCotizacion();
 }
+// Genera las líneas de cotización agrupadas para góndolas.
+// - 1 sola fila: colapsa en 1 línea "GÓNDOLA <TIPO> · <medida> · <niveles> NIVELES"
+// - N filas: 1 línea por fila, precio proporcional a los módulos de cada fila.
+function _gonLineasAgrupadas(materialUSD){
+  const filas = (typeof lineasGondola !== 'undefined' && lineasGondola.length)
+    ? lineasGondola.map(_gonNormaliza)
+    : [{
+        tipo:'sencilla',
+        tipoGon: document.getElementById('tipo').value,
+        medida:  document.getElementById('medida').value,
+        niveles: parseInt(document.getElementById('niveles').value),
+        modulos: parseInt(document.getElementById('modulos').value),
+        cabeceras: parseInt(document.getElementById('cabeceras').value)
+      }];
+  const modsDe = l => Math.max(1, (parseInt(l.modulos)||1) + (parseInt(l.cabeceras)||0)) * (l.tipo==='doble'?2:1);
+  const _tg = t => t==='central' ? 'CENTRAL' : 'PARED';
+  const _med = mk => { const m = MED[mk]; return m ? (m.alto*100).toFixed(0)+'×'+m.anchoCm+' cm' : mk; };
+
+  if(filas.length === 1){
+    const l = filas[0];
+    const cant = modsDe(l);
+    return [{
+      sku: '—',
+      producto: 'GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + l.niveles + ' NIVELES',
+      cantidad: cant,
+      precioUSD: materialUSD / cant,
+      importeUSD: materialUSD,
+      _esGondolaAgrupada: true
+    }];
+  }
+  // Multi-fila: repartir materialUSD proporcional al número de módulos de cada fila.
+  const totalMods = filas.reduce((s,l)=>s + modsDe(l), 0) || 1;
+  const precioPorMod = materialUSD / totalMods;
+  return filas.map((l, i) => {
+    const cant = modsDe(l);
+    const imp = cant * precioPorMod;
+    return {
+      sku: '—',
+      producto: 'L'+(i+1)+' · GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + l.niveles + ' NIVELES'
+              + (l.cabeceras>0 ? ' + '+l.cabeceras+' cab' : '')
+              + (l.tipo==='doble' ? ' · DOBLE' : ''),
+      cantidad: cant,
+      precioUSD: precioPorMod,
+      importeUSD: imp,
+      _esGondolaAgrupada: true
+    };
+  });
+}
+
 function lnMoveGon(i, delta){
   const j = i + delta;
   if(j < 0 || j >= lineasGondola.length) return;
@@ -4299,25 +4348,12 @@ function renderCotizacion(){
     }
   }
 
-  // GÓNDOLA: agrupar todo el material en 1 sola línea "Góndola [tipo] [medida]"
+  // GÓNDOLA: agrupar el material — 1 sola línea si hay 1 fila; una línea por fila si hay varias.
   // Guardamos el desglose para el PDF
   window._desgloseGondola = null;
   if(sistemaActual === 'gondola'){
-    const cfgRes = configResumen();
-    const cantModulos = Math.max(1, parseInt(cfgRes.modulos||1) + parseInt(cfgRes.cabeceras||0));
-    const precioUnit = materialUSD / cantModulos;
-    const nombreGondola = 'GÓNDOLA ' + (cfgRes.tipo||'').toUpperCase() + ' · ' + (cfgRes.medida||'') + ' · ' + (cfgRes.niveles||'') + ' NIVELES';
-    // Guardar desglose de piezas para el PDF (sin flete/instalación)
     window._desgloseGondola = lineas.slice();
-    // Reemplazar todas las líneas con 1 sola línea agrupada
-    lineas = [{
-      sku: '—',
-      producto: nombreGondola,
-      cantidad: cantModulos,
-      precioUSD: precioUnit,
-      importeUSD: materialUSD,
-      _esGondolaAgrupada: true
-    }];
+    lineas = _gonLineasAgrupadas(materialUSD);
   }
   // Flete como línea más del listado (no en el total)
   const fleteUSD = requiereEnvio ? calcularFlete(materialUSD).flete : 0;
@@ -5050,22 +5086,12 @@ async function generarPDF(datos){
     }
   }
 
-  // GÓNDOLA: colapsar en 1 sola línea y guardar el desglose para imprimirlo debajo
+  // GÓNDOLA: colapsar y guardar desglose. 1 fila = 1 línea; multi-fila = 1 línea por fila.
   let desgloseGondola = null;
   let lineasParaPDF = lineas;
   if(sistemaActual === 'gondola'){
-    const cfgRes = configResumen();
-    const cantModulos = Math.max(1, parseInt(cfgRes.modulos||1) + parseInt(cfgRes.cabeceras||0));
-    const precioUnit = materialUSD / cantModulos;
-    const nombreGondola = 'GÓNDOLA ' + (cfgRes.tipo||'').toUpperCase() + ' · ' + (cfgRes.medida||'') + ' · ' + (cfgRes.niveles||'') + ' NIVELES';
     desgloseGondola = lineas.slice();
-    lineasParaPDF = [{
-      sku: '—',
-      producto: nombreGondola,
-      cantidad: cantModulos,
-      precioUSD: precioUnit,
-      importeUSD: materialUSD
-    }];
+    lineasParaPDF = _gonLineasAgrupadas(materialUSD);
   }
 
   const fleteUSD = requiereEnvio ? calcularFlete(materialUSD).flete : 0;
