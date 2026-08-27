@@ -5216,46 +5216,47 @@ async function generarPDF(datos, opts){
   doc.setFontSize(20);
   doc.text('Presupuesto # ' + folio, W - M, y, {align:'right'});
 
-  // ── BLOQUE DE FECHAS ──
+  // ── BLOQUE DE FECHAS (delgado: label + valor en la misma linea) ──
   y = Math.max(148, infoY + 15);
-  const boxH = 46;
+  const boxH = 24;   // ~50% mas delgado que antes (era 46)
   doc.setDrawColor(220,222,225);
   doc.setLineWidth(0.5);
   doc.roundedRect(M, y, W - M*2, boxH, 5, 5, 'S');
   const colW = (W - M*2) / 3;
   doc.setFont('helvetica','normal');
   doc.setFontSize(9);
+  const yTxt = y + boxH/2 + 3;   // centrado vertical
   doc.setTextColor(...GREY);
-  doc.text('Fecha del presupuesto:', M + 12, y + 16);
-  doc.text('Vencimiento', M + colW + 12, y + 16);
-  doc.text('Comercial', M + colW*2 + 12, y + 16);
+  doc.text('Fecha:', M + 12, yTxt);
+  doc.text('Vence:', M + colW + 12, yTxt);
+  doc.text('Comercial:', M + colW*2 + 12, yTxt);
   doc.setTextColor(...DARK);
   doc.setFontSize(10);
-  doc.text(dFmt(fechaHoy), M + 12, y + 33);
-  doc.text(dFmt(fechaVenc), M + colW + 12, y + 33);
-  doc.text('Isaac Romero', M + colW*2 + 12, y + 33);
+  doc.text(dFmt(fechaHoy),  M + 12 + 34, yTxt);
+  doc.text(dFmt(fechaVenc), M + colW + 12 + 34, yTxt);
+  doc.text('Isaac Romero',  M + colW*2 + 12 + 48, yTxt);
 
-  // ── CONFIGURACIÓN (franja gris con la config actual) ──
+  // ── CONFIGURACIÓN (solo en PDF interno; el cliente no la ve) ──
   y = y + boxH + 10;
-  const cfg = configResumen();
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(9);
-  // Hacer wrap del texto de configuracion para que no se corte (ej. "... 50 cuerpos"
-  // que antes se salia). Si necesita mas de una linea, la franja gris se expande.
-  const cfgMaxW = W - M - 110 - 8;
-  const cfgLines = doc.splitTextToSize(cfg.txt, cfgMaxW);
-  const cfgRectH = cfgLines.length > 1 ? 8 + 12 * cfgLines.length : 22;
-  doc.setFillColor(...GREY_BG);
-  doc.rect(M, y, W - M*2, cfgRectH, 'F');
-  doc.setFont('helvetica','bold');
-  doc.setTextColor(...ORANGE);
-  doc.text('CONFIGURACIÓN', M + 8, y + 14);
-  doc.setTextColor(...DARK);
-  doc.setFont('helvetica','normal');
-  doc.text(cfgLines, M + 110, y + 14);
+  if(soloInterno){
+    const cfg = configResumen();
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(9);
+    const cfgMaxW = W - M - 110 - 8;
+    const cfgLines = doc.splitTextToSize(cfg.txt, cfgMaxW);
+    const cfgRectH = cfgLines.length > 1 ? 8 + 12 * cfgLines.length : 22;
+    doc.setFillColor(...GREY_BG);
+    doc.rect(M, y, W - M*2, cfgRectH, 'F');
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...ORANGE);
+    doc.text('CONFIGURACIÓN', M + 8, y + 14);
+    doc.setTextColor(...DARK);
+    doc.setFont('helvetica','normal');
+    doc.text(cfgLines, M + 110, y + 14);
+    y = y + cfgRectH + 10;
+  }
 
   // ── TABLA ──
-  y = y + cfgRectH + 10;
   doc.autoTable({
     startY: y,
     head: [['DESCRIPCIÓN','CANTIDAD','PRECIO UNITARIO','IMPUESTOS','IMPORTE']],
