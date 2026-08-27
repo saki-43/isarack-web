@@ -180,35 +180,33 @@ gtag('config', 'G-XXXXXXXXXX');
   <!-- Opciones GÓNDOLA -->
   <div id="opGondola">
     <div class="row">
-      <label>Tipo</label>
+      <label>Distribución del almacén</label>
+      <div id="gonLineasList" style="display:flex;flex-direction:column;gap:4px;margin:4px 0"></div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button id="btnAddGonSen" onclick="lnAddGon('sencilla')" style="flex:1;padding:6px 8px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">+ Fila sencilla</button>
+        <button id="btnAddGonDob" onclick="lnAddGon('doble')" style="flex:1;padding:6px 8px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">+ Fila doble</button>
+      </div>
+    </div>
+    <!-- Selects espejo (ocultos) — reflejan la fila 1 de lineasGondola. Las funciones
+         existentes (buildGondola, calcularBomGondola, configResumen, captura3D) siguen
+         leyendo de aqui para no romperse. Un wrapper aparte itera las filas adicionales. -->
+    <div style="display:none">
       <select id="tipo">
         <option value="pared">Pared (1 cara)</option>
-        <option value="central">Central (2 caras)</option>
+        <option value="central" selected>Central (2 caras)</option>
       </select>
-    </div>
-    <div class="row">
-      <label>Medida (alto × ancho)</label>
       <select id="medida">
         <option value="141x100">141 × 100 cm</option>
-        <option value="141x122">141 × 122 cm</option>
+        <option value="141x122" selected>141 × 122 cm</option>
         <option value="211x100">211 × 100 cm</option>
         <option value="211x122">211 × 122 cm</option>
       </select>
-    </div>
-    <div class="row">
-      <label>Niveles</label>
       <select id="niveles">
         <option>3</option><option selected>4</option><option>5</option><option>6</option>
       </select>
-    </div>
-    <div class="row">
-      <label>Módulos en fila</label>
       <select id="modulos">
         <option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
       </select>
-    </div>
-    <div class="row">
-      <label>Cabeceras (141×100, pared)</label>
       <select id="cabeceras">
         <option value="0" selected>Sin cabecera</option>
         <option value="1">1 cabecera (derecha)</option>
@@ -2408,6 +2406,117 @@ function _optsDe(idOculto, fallback, val){
   return _opts(pairs, val);
 }
 
+// ═════════════════════════════════════════════════════════════════
+// GONDOLAS — modelo multi-fila (L1, L2, L3...) — mismo patron que selectivo
+// La fila 1 se ESPEJA a los selects ocultos #tipo/#medida/#niveles/#modulos/#cabeceras
+// para que las funciones existentes (buildGondola, calcularBomGondola, configResumen,
+// captura3D) sigan funcionando sin cambios. Las filas 2+ se procesan aparte.
+// ═════════════════════════════════════════════════════════════════
+const GON_TIPOS   = [['pared','Pared (1 cara)'],['central','Central (2 caras)']];
+const GON_MEDIDAS = [['141x100','141 × 100 cm'],['141x122','141 × 122 cm'],['211x100','211 × 100 cm'],['211x122','211 × 122 cm']];
+const GON_NIVELES = [[3,'3'],[4,'4'],[5,'5'],[6,'6']];
+const GON_MODULOS = [[1,'1'],[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6']];
+const GON_CABECERAS = [[0,'Sin cabecera'],[1,'1 cabecera'],[2,'2 cabeceras']];
+
+function _gonDefaultFila(tipo){
+  return {
+    tipo: tipo || 'sencilla',                // 'sencilla' | 'doble'
+    tipoGon: 'central',                       // 'central' | 'pared'
+    medida: '141x122',
+    niveles: 4,
+    modulos: 1,
+    cabeceras: 0,
+    abierta: true
+  };
+}
+function _gonNormaliza(l){
+  if(!l.tipo) l.tipo = 'sencilla';
+  if(!l.tipoGon) l.tipoGon = 'central';
+  if(!l.medida) l.medida = '141x122';
+  if(!l.niveles) l.niveles = 4;
+  if(!l.modulos) l.modulos = 1;
+  if(l.cabeceras == null) l.cabeceras = 0;
+  return l;
+}
+
+// Al arranque: lineasGondola tiene una sola fila con los defaults de siempre.
+let lineasGondola = [ _gonDefaultFila('sencilla') ];
+
+// Refleja la fila 1 al DOM oculto para que buildGondola/calcularBomGondola/etc.
+// obtengan los mismos valores que la UI de filas muestra.
+function _gonEspejar(){
+  const l = lineasGondola[0]; if(!l) return;
+  const set = (id, val) => { const e=document.getElementById(id); if(e && e.value !== String(val)) e.value = String(val); };
+  set('tipo', l.tipoGon);
+  set('medida', l.medida);
+  set('niveles', l.niveles);
+  set('modulos', l.modulos);
+  set('cabeceras', l.cabeceras);
+}
+
+function renderLineasGondola(){
+  lineasGondola.forEach(_gonNormaliza);
+  _gonEspejar();
+  const cont = document.getElementById('gonLineasList'); if(!cont) return;
+  cont.innerHTML = lineasGondola.map((l, i) => {
+    const esD = l.tipo === 'doble';
+    const bg = esD ? '#faf0ea' : '#eef4fb';
+    const bd = esD ? '#f0c4ae' : '#b5d4f4';
+    const tx = esD ? '#993C1D' : '#185FA5';
+    const lbl = esD ? 'Doble' : 'Sencilla';
+    const tipoLbl = l.tipoGon === 'central' ? 'Central' : 'Pared';
+    const btnDel = lineasGondola.length > 1
+      ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lnDelGon('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
+      : '';
+    const chip = !l.abierta
+      ? '<div onclick="lnToggleGon('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tipoLbl+' · '+l.medida+' · '+l.niveles+' niv · '+l.modulos+' mód'+(l.cabeceras?' + '+l.cabeceras+' cab':'')+'</div>'
+      : '';
+    const detalle = l.abierta
+      ? '<div style="background:#fff;border-top:1px solid '+bd+';padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:10px">'
+        + '<div><div style="color:#666;margin-bottom:1px">Tipo</div><select onchange="lnSetGon('+i+',\'tipoGon\',this.value)" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_TIPOS, l.tipoGon)+'</select></div>'
+        + '<div><div style="color:#666;margin-bottom:1px">Medida</div><select onchange="lnSetGon('+i+',\'medida\',this.value)" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_MEDIDAS, l.medida)+'</select></div>'
+        + '<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lnSetGon('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_NIVELES, l.niveles)+'</select></div>'
+        + '<div><div style="color:#666;margin-bottom:1px">Módulos</div><select onchange="lnSetGon('+i+',\'modulos\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_MODULOS, l.modulos)+'</select></div>'
+        + '<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Cabeceras (141×100)</div><select onchange="lnSetGon('+i+',\'cabeceras\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_CABECERAS, l.cabeceras)+'</select></div>'
+        + '</div>'
+      : '';
+    return '<div style="border:1px solid '+bd+';border-radius:6px;background:'+bg+';overflow:hidden">'
+      + '<div style="display:flex;align-items:center;gap:4px;padding:3px 6px;cursor:pointer" onclick="lnToggleGon('+i+')">'
+      + '<span style="background:'+tx+';color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;flex-shrink:0">L'+(i+1)+'</span>'
+      + '<span style="font-size:10px;color:'+tx+';font-weight:600;flex:1">'+lbl+' · '+tipoLbl+'</span>'
+      + '<span style="font-size:10px;color:'+tx+'">'+(l.abierta?'▲':'▼')+'</span>'
+      + btnDel
+      + '</div>'
+      + chip
+      + detalle
+      + '</div>';
+  }).join('');
+}
+
+function lnAddGon(tipo){
+  lineasGondola.push(_gonDefaultFila(tipo));
+  renderLineasGondola();
+  if(typeof buildScene === 'function') buildScene();
+  if(typeof renderCotizacion === 'function') renderCotizacion();
+}
+function lnDelGon(i){
+  if(lineasGondola.length <= 1) return;
+  lineasGondola.splice(i, 1);
+  renderLineasGondola();
+  if(typeof buildScene === 'function') buildScene();
+  if(typeof renderCotizacion === 'function') renderCotizacion();
+}
+function lnToggleGon(i){
+  lineasGondola[i].abierta = !lineasGondola[i].abierta;
+  renderLineasGondola();
+}
+function lnSetGon(i, key, val){
+  lineasGondola[i][key] = val;
+  renderLineasGondola();
+  if(typeof buildScene === 'function') buildScene();
+  if(typeof renderCotizacion === 'function') renderCotizacion();
+}
+
 // ── Niveles por módulo (opcional): cada cuerpo de una fila puede tener niveles distintos ──
 // Arreglo por cuerpo de una fila (A o B), con el valor de la fila como default de cada módulo.
 function _nivArrRaw(l, fila, n){
@@ -3101,34 +3210,105 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
   }
 }
 
-function buildGondola(){
-  const tipo = document.getElementById('tipo').value;
-  const m = MED[document.getElementById('medida').value];
-  const niv = parseInt(document.getElementById('niveles').value);
-  const mods = parseInt(document.getElementById('modulos').value);
-  const cabs = parseInt(document.getElementById('cabeceras').value);
-  const central = tipo==='central';
-  const totalW = m.ancho*mods;
-  buildRow(grupo, central, m.alto, m.ancho, m.fondo, niv, mods);
+// Dibuja UNA góndola sencilla (con sus cabeceras) dentro de `parent`, centrada en (0,0,0).
+// El fondo de la góndola queda simétrico respecto a Z=0.
+function _gonBuildFila(parent, tipoGon, medidaKey, niv, mods, cabs){
+  const m = MED[medidaKey];
+  const central = tipoGon === 'central';
+  const totalW = m.ancho * mods;
+  buildRow(parent, central, m.alto, m.ancho, m.fondo, niv, mods);
   for(let cIdx=0; cIdx<cabs; cIdx++){
     const side = cIdx===0 ? 1 : -1;
     const cab = new THREE.Group();
     buildRow(cab, false, CAB.alto, CAB.ancho, CAB.fondo, niv, 1);
     cab.rotation.y = side * Math.PI/2;
     cab.position.set(side * totalW/2, 0, 0);
-    grupo.add(cab);
+    parent.add(cab);
   }
-  targetY = m.alto*0.46;
-  const xExt = totalW + (cabs?CAB.fondo*2:0);
-  const zExt = cabs?CAB.ancho:(central?m.fondo*2+0.1:m.fondo+0.15);
-  camDist = Math.max(m.alto*1.7 + 1.25, Math.max(xExt, zExt)*1.05 + 0.9);
-  document.getElementById('dims').innerHTML =
-    'Largo fila <b>'+totalW.toFixed(2)+' m</b> · Alto <b>'+m.alto.toFixed(2)+' m</b> · '+
-    mods+' módulo'+(mods>1?'s':'')+
-    (cabs>0 ? ' + '+cabs+' cabecera'+(cabs>1?'s':'')+' (141×100)' : '');
-  document.getElementById('medidasResumen').innerHTML =
-    'Largo fila <b>'+totalW.toFixed(2)+' m</b> · Alto <b>'+m.alto.toFixed(2)+' m</b> · Fondo <b>'+m.fondo.toFixed(2)+' m</b>'+
-    (cabs>0 ? '<br>+ '+cabs+' cabecera'+(cabs>1?'s':'')+' de 1.41 × 1.00 m' : '');
+}
+
+function buildGondola(){
+  const filas = (typeof lineasGondola !== 'undefined' && lineasGondola.length)
+    ? lineasGondola.map(_gonNormaliza)
+    : [{
+        tipo:'sencilla',
+        tipoGon: document.getElementById('tipo').value,
+        medida:  document.getElementById('medida').value,
+        niveles: parseInt(document.getElementById('niveles').value),
+        modulos: parseInt(document.getElementById('modulos').value),
+        cabeceras: parseInt(document.getElementById('cabeceras').value)
+      }];
+
+  const pasilloM = 1.6;   // pasillo peatonal entre filas de góndolas
+
+  // Info geométrica por fila
+  const filasInfo = filas.map(l => {
+    const m = MED[l.medida];
+    const central = l.tipoGon === 'central';
+    const largoTotM = m.ancho * l.modulos + (l.cabeceras ? CAB.fondo * 2 : 0);
+    // Profundidad Z ocupada por la fila (contando ambas caras si es central,
+    // y duplicando si es "doble" = dos góndolas espalda con espalda).
+    const profBase = central ? m.fondo * 2 : m.fondo;
+    const profM = l.tipo === 'doble' ? profBase * 2 : profBase;
+    return { l, m, central, largoTotM, profM };
+  });
+
+  const profTotal = filasInfo.reduce((s,f)=>s + f.profM, 0)
+                  + pasilloM * (filas.length - 1);
+  const maxLargo  = Math.max(...filasInfo.map(f=>f.largoTotM));
+  const maxAlto   = Math.max(...filasInfo.map(f=>f.m.alto));
+
+  let zFrente = profTotal / 2;
+  filasInfo.forEach(({l, m, central, profM}) => {
+    const gLin = new THREE.Group();
+    if(l.tipo === 'doble'){
+      // Dos góndolas espalda con espalda.
+      const off = central ? m.fondo : m.fondo/2;
+      const filaA = new THREE.Group();
+      _gonBuildFila(filaA, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
+      filaA.position.set(0, 0, off);
+      gLin.add(filaA);
+      const filaB = new THREE.Group();
+      _gonBuildFila(filaB, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
+      filaB.rotation.y = Math.PI;
+      filaB.position.set(0, 0, -off);
+      gLin.add(filaB);
+    } else {
+      _gonBuildFila(gLin, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
+    }
+    gLin.position.z = zFrente - profM/2;
+    grupo.add(gLin);
+    zFrente -= profM + pasilloM;
+  });
+
+  targetY = maxAlto * 0.46;
+  const xExt = maxLargo + (filasInfo.some(f=>f.l.cabeceras>0) ? 0 : 0);
+  const zExt = profTotal;
+  camDist = Math.max(maxAlto*1.7 + 1.25, Math.max(xExt, zExt)*1.05 + 0.9);
+
+  const dimsEl = document.getElementById('dims');
+  const resEl  = document.getElementById('medidasResumen');
+  if(filas.length === 1){
+    const l = filas[0], f = filasInfo[0];
+    const totalW = f.m.ancho * l.modulos;
+    if(dimsEl) dimsEl.innerHTML =
+      'Largo fila <b>'+totalW.toFixed(2)+' m</b> · Alto <b>'+f.m.alto.toFixed(2)+' m</b> · '+
+      l.modulos+' módulo'+(l.modulos>1?'s':'')+
+      (l.cabeceras>0 ? ' + '+l.cabeceras+' cabecera'+(l.cabeceras>1?'s':'')+' (141×100)' : '')+
+      (l.tipo==='doble' ? ' · <b>doble</b>' : '');
+    if(resEl) resEl.innerHTML =
+      'Largo fila <b>'+totalW.toFixed(2)+' m</b> · Alto <b>'+f.m.alto.toFixed(2)+' m</b> · Fondo <b>'+f.m.fondo.toFixed(2)+' m</b>'+
+      (l.cabeceras>0 ? '<br>+ '+l.cabeceras+' cabecera'+(l.cabeceras>1?'s':'')+' de 1.41 × 1.00 m' : '')+
+      (l.tipo==='doble' ? '<br>Configuración <b>doble</b> (2 góndolas espalda con espalda)' : '');
+  } else {
+    const desg = filas.map((l,i)=>{
+      const t = l.tipo==='doble' ? 'D' : 'S';
+      const tg = l.tipoGon==='central' ? 'C' : 'P';
+      return 'L'+(i+1)+': '+t+' '+tg+' '+l.medida+' · '+l.niveles+'n · '+l.modulos+'m'+(l.cabeceras?' + '+l.cabeceras+'c':'');
+    }).join(' | ');
+    if(dimsEl) dimsEl.innerHTML = filas.length+' filas · largo máx <b>'+maxLargo.toFixed(2)+' m</b> · '+desg;
+    if(resEl)  resEl.innerHTML  = filas.length+' filas · largo máx <b>'+maxLargo.toFixed(2)+' m</b> · alto máx <b>'+maxAlto.toFixed(2)+' m</b><br>'+desg+'<br>Pasillo entre filas: '+pasilloM.toFixed(1)+' m';
+  }
 }
 
 const FT_TO_M = 0.3048;
@@ -3871,39 +4051,65 @@ function calcularBomMecano(){
   return orden.map(sku => [sku, items[sku]]);
 }
 
-function calcularBomGondola(){
-  const tipo = document.getElementById('tipo').value;
-  const m = MED[document.getElementById('medida').value];
-  const niv = parseInt(document.getElementById('niveles').value);
-  const mods = parseInt(document.getElementById('modulos').value);
-  const cabs = parseInt(document.getElementById('cabeceras').value);
+// Core: BOM de UNA fila con parametros explicitos. Multiplicador aplica a "doble"
+// (2 gondolas espalda con espalda). Retorna [[sku, qty]...].
+function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult){
+  const m = MED[medidaKey];
   const items = {}; const orden = [];
   function add(sku, q){
+    if(!q) return;
     if(items[sku]===undefined){ items[sku]=0; orden.push(sku); }
-    items[sku] += q;
+    items[sku] += q * (mult || 1);
   }
-  const c = tipo==='central', mul = c?2:1, A = m.anchoCm, a211 = m.pilar==='211';
-  const postesC = mods+1;
+  const c = tipoGon==='central', mul = c?2:1, A = m.anchoCm, a211 = m.pilar==='211';
+  const postesC = modulos+1;
   add('PILAR '+m.pilar+'CM', postesC);
-  add('BRAZO', (niv-1)*2*mul*mods);
-  add('CHAROLA '+A+'CM X 47CM', niv*mul*mods);
-  add('PANEL TRASERO '+A+'CMX40CM', (a211?5:3)*2*mods);
-  if(!a211) add('PANEL TRASERO '+A+'CMX10CM', 2*mods);
+  add('BRAZO', (niveles-1)*2*mul*modulos);
+  add('CHAROLA '+A+'CM X 47CM', niveles*mul*modulos);
+  add('PANEL TRASERO '+A+'CMX40CM', (a211?5:3)*2*modulos);
+  if(!a211) add('PANEL TRASERO '+A+'CMX10CM', 2*modulos);
   add('BASE', (c?2:1)*postesC);
-  add('PORTA PRECIO '+A+'CM', niv*mul*mods);
-  add('CUBRE POLVO '+A+'CM', (c?2:1)*mods);
-  add('CUBIERTA SUPERIOR '+A+'CM', mods);
-  if(cabs>0){
-    add('PILAR '+CAB.pilar+'CM', 2*cabs);
-    add('BRAZO', (niv-1)*2*cabs);
-    add('CHAROLA '+CAB.anchoCm+'CM X 47CM', niv*cabs);
-    add('PANEL TRASERO '+CAB.anchoCm+'CMX40CM', 3*2*cabs);   // 2 caras
-    add('PANEL TRASERO '+CAB.anchoCm+'CMX10CM', 1*2*cabs);
-    add('BASE', 2*cabs);
-    add('PORTA PRECIO '+CAB.anchoCm+'CM', niv*cabs);
-    add('CUBRE POLVO '+CAB.anchoCm+'CM', 1*cabs);
-    add('CUBIERTA SUPERIOR '+CAB.anchoCm+'CM', cabs);
+  add('PORTA PRECIO '+A+'CM', niveles*mul*modulos);
+  add('CUBRE POLVO '+A+'CM', (c?2:1)*modulos);
+  add('CUBIERTA SUPERIOR '+A+'CM', modulos);
+  if(cabeceras>0){
+    add('PILAR '+CAB.pilar+'CM', 2*cabeceras);
+    add('BRAZO', (niveles-1)*2*cabeceras);
+    add('CHAROLA '+CAB.anchoCm+'CM X 47CM', niveles*cabeceras);
+    add('PANEL TRASERO '+CAB.anchoCm+'CMX40CM', 3*2*cabeceras);   // 2 caras
+    add('PANEL TRASERO '+CAB.anchoCm+'CMX10CM', 1*2*cabeceras);
+    add('BASE', 2*cabeceras);
+    add('PORTA PRECIO '+CAB.anchoCm+'CM', niveles*cabeceras);
+    add('CUBRE POLVO '+CAB.anchoCm+'CM', 1*cabeceras);
+    add('CUBIERTA SUPERIOR '+CAB.anchoCm+'CM', cabeceras);
   }
+  return orden.map(k=>[k, items[k]]);
+}
+
+// Wrapper: itera lineasGondola y suma el BOM de todas las filas. Si el modelo
+// no esta inicializado (fallback), cae a los selects del DOM.
+function calcularBomGondola(){
+  const items = {}; const orden = [];
+  function acumular(pairs){
+    pairs.forEach(([sku, q]) => {
+      if(items[sku]===undefined){ items[sku]=0; orden.push(sku); }
+      items[sku] += q;
+    });
+  }
+  const filas = (typeof lineasGondola !== 'undefined' && lineasGondola.length)
+    ? lineasGondola
+    : [{
+        tipo:'sencilla',
+        tipoGon: document.getElementById('tipo').value,
+        medida:  document.getElementById('medida').value,
+        niveles: parseInt(document.getElementById('niveles').value),
+        modulos: parseInt(document.getElementById('modulos').value),
+        cabeceras: parseInt(document.getElementById('cabeceras').value)
+      }];
+  filas.forEach(l => {
+    const mult = l.tipo === 'doble' ? 2 : 1;
+    acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, mult));
+  });
   return orden.map(k=>[k, items[k]]);
 }
 
@@ -4562,13 +4768,46 @@ function configResumen(){
       txt: 'Cantilever · '+cfg.lineas.length+' línea'+(cfg.lineas.length>1?'s':'')+' · '+desg+(cfg.lineas.length>1?' · pasillo '+cfg.pasilloM.toFixed(1)+'m':'')
     };
   }
-  const t = document.getElementById('tipo').selectedOptions[0].text;
-  const md = document.getElementById('medida').selectedOptions[0].text;
-  const nv = document.getElementById('niveles').value;
-  const mo = document.getElementById('modulos').value;
-  const cb = parseInt(document.getElementById('cabeceras').value);
-  return { sistema:'Góndola', tipo:t, medida:md, niveles:nv, modulos:mo, cabeceras:cb,
-    txt: 'Góndola · '+t+' · '+md+' · '+nv+' niveles · '+mo+' módulo'+(mo>1?'s':'')+(cb>0?' + '+cb+' cabecera'+(cb>1?'s':''):'') };
+  const filas = (typeof lineasGondola !== 'undefined' && lineasGondola.length)
+    ? lineasGondola.map(_gonNormaliza)
+    : [{
+        tipo:'sencilla',
+        tipoGon: document.getElementById('tipo').value,
+        medida:  document.getElementById('medida').value,
+        niveles: parseInt(document.getElementById('niveles').value),
+        modulos: parseInt(document.getElementById('modulos').value),
+        cabeceras: parseInt(document.getElementById('cabeceras').value)
+      }];
+  const _lblTipoGon = tg => tg==='central' ? 'Central' : 'Pared';
+  const _lblMedida  = mk => {
+    const m = MED[mk]; if(!m) return mk;
+    return (m.alto*100).toFixed(0)+'×'+m.anchoCm+' cm';
+  };
+  if(filas.length === 1){
+    const l = filas[0];
+    const cb = l.cabeceras;
+    return {
+      sistema:'Góndola',
+      tipo: _lblTipoGon(l.tipoGon),
+      medida: _lblMedida(l.medida),
+      niveles: l.niveles,
+      modulos: l.modulos,
+      cabeceras: cb,
+      txt: 'Góndola · '+(l.tipo==='doble'?'Doble · ':'')+_lblTipoGon(l.tipoGon)+' · '+_lblMedida(l.medida)+' · '+l.niveles+' niveles · '+l.modulos+' módulo'+(l.modulos>1?'s':'')+(cb>0?' + '+cb+' cabecera'+(cb>1?'s':''):'')
+    };
+  }
+  const nSen = filas.filter(l=>l.tipo!=='doble').length;
+  const nDob = filas.filter(l=>l.tipo==='doble').length;
+  const filaTxt = [nSen? nSen+' sencilla'+(nSen>1?'s':''):'', nDob? nDob+' doble'+(nDob>1?'s':''):''].filter(Boolean).join(' + ');
+  const desg = filas.map((l,i)=>{
+    const t = l.tipo==='doble' ? 'D' : 'S';
+    const tg = l.tipoGon==='central' ? 'C' : 'P';
+    return 'L'+(i+1)+': '+t+' '+tg+' '+_lblMedida(l.medida)+' '+l.niveles+'n '+l.modulos+'m'+(l.cabeceras?' + '+l.cabeceras+'c':'');
+  }).join(' | ');
+  return {
+    sistema:'Góndola',
+    txt: 'Góndola · '+filaTxt+' · '+desg
+  };
 }
 
 function abrirFormCliente(){
@@ -5273,6 +5512,7 @@ function addEvents(){
   });
   renderLineasAlmacen();
   renderLineasPicking();
+  if(typeof renderLineasGondola === 'function') renderLineasGondola();
   actualizarSelUnion();
 
   // Los tipos de CARGA por nivel son mutuamente exclusivos: solo se puede elegir uno
