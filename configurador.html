@@ -2496,14 +2496,14 @@ function renderLineasGondola(){
 function lnAddGon(tipo){
   lineasGondola.push(_gonDefaultFila(tipo));
   renderLineasGondola();
-  if(typeof buildScene === 'function') buildScene();
+  if(typeof build === 'function') build();
   if(typeof renderCotizacion === 'function') renderCotizacion();
 }
 function lnDelGon(i){
   if(lineasGondola.length <= 1) return;
   lineasGondola.splice(i, 1);
   renderLineasGondola();
-  if(typeof buildScene === 'function') buildScene();
+  if(typeof build === 'function') build();
   if(typeof renderCotizacion === 'function') renderCotizacion();
 }
 function lnToggleGon(i){
@@ -2513,7 +2513,7 @@ function lnToggleGon(i){
 function lnSetGon(i, key, val){
   lineasGondola[i][key] = val;
   renderLineasGondola();
-  if(typeof buildScene === 'function') buildScene();
+  if(typeof build === 'function') build();
   if(typeof renderCotizacion === 'function') renderCotizacion();
 }
 
