@@ -2183,6 +2183,15 @@ function renderLineasPicking(){
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lpNivMod('+i+',this.checked)"> Niveles por módulo</label>'
           + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB, 'lpNivSet') : '')
         + '</div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#0a6;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.escHOn?'checked':'')+' onchange="lpEscHOn('+i+',this.checked)"> 🪜 Hueco escalera</label>'
+          + (l.escHOn ? (
+              '<div style="font-size:9.5px;color:#888;margin:3px 0 2px">Cuerpo(s) donde va la escalera:</div>'
+              + '<div style="display:flex;flex-wrap:wrap;gap:4px">' + _escHChipsPic(l, i, cA) + '</div>'
+              + '<div style="font-size:9.5px;color:#888;margin:6px 0 2px">Nivel(es) a quitar:</div>'
+              + '<div style="display:flex;flex-wrap:wrap;gap:4px">' + _escHNivChipsPic(l, i) + '</div>'
+            ) : '')
+        + '</div>'
         +'</div>'
       : '';
     return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
@@ -2200,6 +2209,51 @@ function renderLineasPicking(){
       +'</div>';
   }).join('');
   lineasSyncPic();
+}
+
+// ── Hueco escalera manual: Picking ──
+function lpEscHOn(i, on){
+  const l = lineasPicking[i];
+  l.escHOn = !!on;
+  if(!on){ l.escH = []; l.escHNivs = []; }
+  else {
+    if(!Array.isArray(l.escH)) l.escH = [];
+    if(!Array.isArray(l.escHNivs)) l.escHNivs = [];
+  }
+  renderLineasPicking(); build();
+}
+function lpEscHCuerpo(i, c){
+  const l = lineasPicking[i];
+  if(!Array.isArray(l.escH)) l.escH = [];
+  const idx = l.escH.indexOf(c);
+  if(idx >= 0) l.escH.splice(idx, 1); else l.escH.push(c);
+  renderLineasPicking(); build();
+}
+function lpEscHNivel(i, n){
+  const l = lineasPicking[i];
+  if(!Array.isArray(l.escHNivs)) l.escHNivs = [];
+  const idx = l.escHNivs.indexOf(n);
+  if(idx >= 0) l.escHNivs.splice(idx, 1); else l.escHNivs.push(n);
+  renderLineasPicking(); build();
+}
+function _escHChipsPic(l, i, cuerpos){
+  const esc = l.escH || [];
+  let h = '';
+  for(let c = 0; c < cuerpos; c++){
+    const on = esc.indexOf(c) >= 0;
+    h += '<button onclick="lpEscHCuerpo('+i+','+c+')" title="Cuerpo '+(c+1)+'" style="border:1px solid '+(on?'#0a6':'#ccc')+';background:'+(on?'#0a6':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">'+(c+1)+'</button>';
+  }
+  return h;
+}
+function _escHNivChipsPic(l, i){
+  const nivs = l.escHNivs || [];
+  let h = '';
+  const n = l.niveles || 0;
+  for(let k = 0; k < n; k++){
+    const on = nivs.indexOf(k) >= 0;
+    h += '<button onclick="lpEscHNivel('+i+','+k+')" title="Nivel '+(k+1)+'" style="border:1px solid '+(on?'#0a6':'#ccc')+';background:'+(on?'#0a6':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">'+(k+1)+'</button>';
+  }
+  return h;
 }
 
 function lpAdd(tipo){
@@ -3805,6 +3859,11 @@ function buildPicking(){
         arr = arr.concat(ksEsc);
       }
     }
+    // Hueco escalera manual (vendedor eligió cuerpos + niveles)
+    _huecosManualesEsc(lineas[iLn]).forEach(it => {
+      const k = invertido ? (nCuerpos - 1 - it.k) : it.k;
+      if(k >= 0 && k < nCuerpos) arr.push({ k, niveles: it.niveles });
+    });
     // Ramal de acceso PS-1 (solo fila 0)
     if(iLn === 0){
       const idx = cuerpoRamalPasarela(cfg, xInicio, lineas[0].largoM, nCuerpos);
