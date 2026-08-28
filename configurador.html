@@ -1303,7 +1303,18 @@ function dibujarPasarelaEntrepiso(cfg, pasillosInfo, xInicio, matVigaLocal){
   const profTotal = lineas.reduce((a,l)=>a+(l.profM||0),0) + cfg.pasilloM*Math.max(0,lineas.length-1);
   const ejesFilas = [];
   { let zCur = profTotal/2;
-    lineas.forEach(l => { ejesFilas.push({z: zCur - l.profM/2, prof: l.profM}); zCur -= l.profM + cfg.pasilloM; }); }
+    lineas.forEach(l => {
+      // Fila doble = 2 marcos (uno por cada fila), como hace PS-1.
+      if(l.tipo === 'doble' && l.fondoM){
+        const union = Math.max(0, l.profM - 2*l.fondoM);
+        ejesFilas.push({ z: zCur - l.fondoM/2, prof: l.fondoM });
+        ejesFilas.push({ z: zCur - l.fondoM - union - l.fondoM/2, prof: l.fondoM });
+      } else {
+        ejesFilas.push({ z: zCur - l.profM/2, prof: l.profM });
+      }
+      zCur -= l.profM + cfg.pasilloM;
+    });
+  }
   if(!ejesFilas.length) return;
 
   // Pasillos peatonales POR FUERA del rack, en la parte de ENFRENTE y de ATRÁS.
