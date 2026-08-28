@@ -2659,11 +2659,25 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
   const ksEscA = (cfg && iLn != null) ? cuerposEscaleraPS2(cfg, iLn, -l.largoM/2, ancho, cA) : [];
   const escMapA = new Map();
   ksEscA.forEach(it => escMapA.set(it.k, it.niveles));
+  // Hueco escalera manual: se combina con lo anterior
+  _huecosManualesEsc(l).forEach(it => {
+    if(it.k < cA){
+      const cur = escMapA.get(it.k) || [];
+      escMapA.set(it.k, Array.from(new Set(cur.concat(it.niveles))));
+    }
+  });
   // Fila B (doble) va rotada 180°: reflejar el índice.
   const escMapB = new Map();
   if(esD){
     const ksEscB = (cfg && iLn != null) ? cuerposEscaleraPS2(cfg, iLn, -l.largoM/2, ancho, cB) : [];
     ksEscB.forEach(it => escMapB.set(cB - 1 - it.k, it.niveles));
+    _huecosManualesEsc(l).forEach(it => {
+      const kB = cB - 1 - it.k;
+      if(kB >= 0 && kB < cB){
+        const cur = escMapB.get(kB) || [];
+        escMapB.set(kB, Array.from(new Set(cur.concat(it.niveles))));
+      }
+    });
   }
   const cuentaFila = (fila, nCuerpos, escMap) => {
     const arr = l.nivMod ? _nivArrRaw(l, fila, nCuerpos) : null;
@@ -2747,6 +2761,56 @@ function _tunelChips(l, i, cuerpos){
   }
   return h;
 }
+// ── Hueco de escalera manual: el vendedor marca los cuerpos y los niveles a quitar ──
+function _huecosManualesEsc(l){
+  if(!l || !l.escHOn || !Array.isArray(l.escH) || !l.escH.length) return [];
+  const nivs = Array.isArray(l.escHNivs) ? l.escHNivs.slice() : [];
+  if(!nivs.length) return [];
+  return l.escH.map(k => ({ k, niveles: nivs.slice() }));
+}
+function lnEscHOn(i, on){
+  const l = lineasAlmacen[i];
+  l.escHOn = !!on;
+  if(!on){ l.escH = []; l.escHNivs = []; }
+  else {
+    if(!Array.isArray(l.escH)) l.escH = [];
+    if(!Array.isArray(l.escHNivs)) l.escHNivs = [];
+  }
+  renderLineasAlmacen(); build();
+}
+function lnEscHCuerpo(i, c){
+  const l = lineasAlmacen[i];
+  if(!Array.isArray(l.escH)) l.escH = [];
+  const idx = l.escH.indexOf(c);
+  if(idx >= 0) l.escH.splice(idx, 1); else l.escH.push(c);
+  renderLineasAlmacen(); build();
+}
+function lnEscHNivel(i, n){
+  const l = lineasAlmacen[i];
+  if(!Array.isArray(l.escHNivs)) l.escHNivs = [];
+  const idx = l.escHNivs.indexOf(n);
+  if(idx >= 0) l.escHNivs.splice(idx, 1); else l.escHNivs.push(n);
+  renderLineasAlmacen(); build();
+}
+function _escHChips(l, i, cuerpos){
+  const esc = l.escH || [];
+  let h = '';
+  for(let c = 0; c < cuerpos; c++){
+    const on = esc.indexOf(c) >= 0;
+    h += '<button onclick="lnEscHCuerpo('+i+','+c+')" title="Cuerpo '+(c+1)+'" style="border:1px solid '+(on?'#0a6':'#ccc')+';background:'+(on?'#0a6':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">'+(c+1)+'</button>';
+  }
+  return h;
+}
+function _escHNivChips(l, i){
+  const nivs = l.escHNivs || [];
+  let h = '';
+  const n = l.niveles || 0;
+  for(let k = 0; k < n; k++){
+    const on = nivs.indexOf(k) >= 0;
+    h += '<button onclick="lnEscHNivel('+i+','+k+')" title="Nivel '+(k+1)+'" style="border:1px solid '+(on?'#0a6':'#ccc')+';background:'+(on?'#0a6':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">'+(k+1)+'</button>';
+  }
+  return h;
+}
 function renderLineasAlmacen(){
   lineasAlmacen.forEach(_nivNormaliza);
   const cont = document.getElementById('selLineasList');
@@ -2799,6 +2863,15 @@ function renderLineasAlmacen(){
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#993C1D;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.tunelOn?'checked':'')+' onchange="lnTunelOn('+i+',this.checked)"> 🚇 Túnel (paso montacargas)</label>'
           + (l.tunelOn ? ('<div style="font-size:9.5px;color:#888;margin:3px 0 2px">Toca el cuerpo donde va el paso:</div><div style="display:flex;flex-wrap:wrap;gap:4px">' + _tunelChips(l, i, cA) + '</div>') : '')
+        + '</div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#0a6;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.escHOn?'checked':'')+' onchange="lnEscHOn('+i+',this.checked)"> 🪜 Hueco escalera</label>'
+          + (l.escHOn ? (
+              '<div style="font-size:9.5px;color:#888;margin:3px 0 2px">Cuerpo(s) donde va la escalera:</div>'
+              + '<div style="display:flex;flex-wrap:wrap;gap:4px">' + _escHChips(l, i, cA) + '</div>'
+              + '<div style="font-size:9.5px;color:#888;margin:6px 0 2px">Nivel(es) a quitar:</div>'
+              + '<div style="display:flex;flex-wrap:wrap;gap:4px">' + _escHNivChips(l, i) + '</div>'
+            ) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<div style="font-size:10px;color:'+tx+';font-weight:600;margin-bottom:2px">🔗 Marco existente del cliente</div>'
@@ -3907,6 +3980,10 @@ function buildSelectivo(){
       const nivT = _tunelNiveles(lineas[iLn]);
       tun.forEach(k => { if(k >= 0 && k < nCuerpos) arr.push({k: k, niveles: nivT}); });
     }
+    // HUECO ESCALERA MANUAL: cuerpos + niveles elegidos por el vendedor
+    _huecosManualesEsc(lineas[iLn]).forEach(it => {
+      if(it.k >= 0 && it.k < nCuerpos) arr.push(it);
+    });
     return arr.length ? arr : -1;
   };
   lineas.forEach((l, iLn) => {
