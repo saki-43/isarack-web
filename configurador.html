@@ -1455,6 +1455,27 @@ function dibujarTramoEscaleraPS2(g, xBase, zBase, yBase, subeH, anchoEsc, matVig
     esc.position.set(xBase + sentido*(e-0.5)*huella, yBase + e*(subeH/nEsc), zBase);
     g.add(esc);
   }
+  // ── BARANDALES / PASAMANOS (mismo estilo que la escalera exterior PS-1) ──
+  const angulo = Math.atan2(subeH, run);
+  const largoDiag = Math.sqrt(run*run + subeH*subeH);
+  const hBar = 0.90;
+  [-anchoEsc/2, anchoEsc/2].forEach(zL => {
+    // 4 postes verticales repartidos a lo largo del tramo
+    for(let kk = 0; kk <= 3; kk++){
+      const xOff = huella*0.5 + (run - huella)*(kk/3);
+      const yP = (subeH/run) * xOff;
+      const poste = box(0.035, hBar, 0.035, matRejillaBarra);
+      poste.position.set(xBase + sentido*xOff, yBase + yP + hBar/2, zBase + zL);
+      g.add(poste);
+    }
+    // 2 tubos diagonales que siguen la pendiente (pasamanos + medio)
+    [hBar, hBar*0.55].forEach(hT => {
+      const tubo = box(largoDiag, 0.032, 0.032, matRejillaBarra);
+      tubo.rotation.z = sentido >= 0 ? angulo : -angulo;
+      tubo.position.set(xBase + sentido*(run/2), yBase + subeH/2 + hT, zBase + zL);
+      g.add(tubo);
+    });
+  });
 }
 
 // Bandas de altura que la pasarela despeja en el módulo del ramal:
