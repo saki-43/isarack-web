@@ -1512,26 +1512,34 @@ function cuerposEscaleraPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   const iBaja = filaEscaleraPS2(cfg), iAlta = filaEscaleraAltaPS2(cfg);
   if(iLn !== iBaja && iLn !== iAlta) return [];
   const yN = cfg.pasarela.alturaM;
-  const nEsc = Math.max(8, Math.round(yN / 0.20));
-  const run = nEsc * 0.25;
-  const alcance = run + anchoCuerpo;          // escalera + rellano de una bahía
   const l = (cfg.lineas || [])[iLn];
   if(!l) return [];
   const sistema = (typeof sistemaActual !== 'undefined') ? sistemaActual : 'selectivo';
-  const yLo = (iLn === iBaja) ? 0 : yN;
-  const yHi = (iLn === iBaja) ? yN : 2*yN;
   const alturasMan = getAlturasManualesM(sistema);
   const alturasDef = alturasDefaultM(l.altoM, l.niveles);
-  const niveles = [];
+  const ys = [];
   for(let n = 0; n < l.niveles; n++){
-    const y = Math.min(alturasMan ? alturasMan[n] : alturasDef[n], l.altoM - 0.10);
-    if(y >= yLo && y < yHi) niveles.push(n);
+    ys.push(Math.min(alturasMan ? alturasMan[n] : alturasDef[n], l.altoM - 0.10));
   }
-  const k0 = 0;
-  // El tramo de abajo despeja escalera + rellano; el de arriba solo sus 2 primeros módulos
-  const k1 = (iLn === iBaja) ? Math.floor((alcance - 0.001) / anchoCuerpo) : 1;
+  // Niveles atravesados por la escalera (por debajo del rellano)
+  const yLo = (iLn === iBaja) ? 0 : yN;
+  const yHi = (iLn === iBaja) ? yN : 2*yN;
+  const nivelesAtrav = [];
+  for(let n = 0; n < l.niveles; n++){
+    if(ys[n] >= yLo && ys[n] < yHi) nivelesAtrav.push(n);
+  }
+  // ADEMÁS: los primeros 3 niveles por ENCIMA del rellano tambien se quitan
+  // (espacio libre para salir de la escalera hacia el primer piso o segundo).
+  const yPiso = yHi;
+  const arribaCandidatos = [];
+  for(let n = 0; n < l.niveles; n++){
+    if(ys[n] >= yPiso) arribaCandidatos.push(n);
+  }
+  const nivelesArriba = arribaCandidatos.slice(0, 3);   // los 3 más bajos por encima
+  const niveles = Array.from(new Set(nivelesAtrav.concat(nivelesArriba))).sort((a,b)=>a-b);
+  // Solo el cuerpo del rellano de la escalera pierde vigas (no el siguiente).
   const out = [];
-  for(let k = k0; k <= k1 && k < nCuerpos; k++) out.push({k, niveles});
+  if(nCuerpos > 0) out.push({k: 0, niveles});
   return out;
 }
 
