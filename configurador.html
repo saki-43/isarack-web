@@ -1521,25 +1521,29 @@ function cuerposEscaleraPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   for(let n = 0; n < l.niveles; n++){
     ys.push(Math.min(alturasMan ? alturasMan[n] : alturasDef[n], l.altoM - 0.10));
   }
-  // Niveles atravesados por la escalera (por debajo del rellano)
-  const yLo = (iLn === iBaja) ? 0 : yN;
-  const yHi = (iLn === iBaja) ? yN : 2*yN;
-  const nivelesAtrav = [];
-  for(let n = 0; n < l.niveles; n++){
-    if(ys[n] >= yLo && ys[n] < yHi) nivelesAtrav.push(n);
-  }
-  // ADEMÁS: los primeros 3 niveles por ENCIMA del rellano tambien se quitan
-  // (espacio libre para salir de la escalera hacia el primer piso o segundo).
-  const yPiso = yHi;
-  const arribaCandidatos = [];
-  for(let n = 0; n < l.niveles; n++){
-    if(ys[n] >= yPiso) arribaCandidatos.push(n);
-  }
-  const nivelesArriba = arribaCandidatos.slice(0, 3);   // los 3 más bajos por encima
-  const niveles = Array.from(new Set(nivelesAtrav.concat(nivelesArriba))).sort((a,b)=>a-b);
+  // Cada tramo de escalera corta:
+  //  - Los niveles cuyo Y esta debajo del rellano (atravesados)
+  //  - Los 3 primeros niveles por encima del rellano (desalojo)
+  // Si iBaja e iAlta caen en la misma fila (ej. rack con 2 filas o menos), se suman.
+  const cortarTramo = (yLo, yHi) => {
+    const set = new Set();
+    for(let n = 0; n < l.niveles; n++){
+      if(ys[n] >= yLo && ys[n] < yHi) set.add(n);
+    }
+    const arriba = [];
+    for(let n = 0; n < l.niveles; n++){
+      if(ys[n] >= yHi) arriba.push(n);
+    }
+    arriba.slice(0, 3).forEach(n => set.add(n));
+    return set;
+  };
+  const niveles = new Set();
+  if(iLn === iBaja) cortarTramo(0,  yN).forEach(n => niveles.add(n));
+  if(iLn === iAlta) cortarTramo(yN, 2*yN).forEach(n => niveles.add(n));
+  const nivelesArr = Array.from(niveles).sort((a,b)=>a-b);
   // Solo el cuerpo del rellano de la escalera pierde vigas (no el siguiente).
   const out = [];
-  if(nCuerpos > 0) out.push({k: 0, niveles});
+  if(nCuerpos > 0) out.push({k: 0, niveles: nivelesArr});
   return out;
 }
 
