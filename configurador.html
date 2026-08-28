@@ -1122,8 +1122,22 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
     const alturasC = alturasManPic || alturasDefaultM(altoM, nivC);
     for(let n=0; n<nivC; n++){
       const y = Math.min(alturasC[n], altoM - 0.10);
-      // Solo se despejan los niveles por donde pasa la pasarela; arriba y abajo quedan normales
-      if(c === skipCuerpo && bandasPic.some(b => y >= b[0] && y <= b[1])) continue;
+      // skipCuerpo puede ser:
+      //  - un número (cuerpo entero descartado en bandas de altura de la pasarela)
+      //  - un arreglo mixto de números y objetos {k, niveles} (escalera PS-2 / túnel)
+      let _skipN = false, _nivelesC = null, _bandasC = null;
+      if(Array.isArray(skipCuerpo)){
+        for(const it of skipCuerpo){
+          if(typeof it === 'object' && it && it.k === c){
+            _skipN = true; _nivelesC = it.niveles; _bandasC = it.bandas; break;
+          }
+          if(it === c){ _skipN = true; break; }
+        }
+      } else _skipN = (c === skipCuerpo);
+      if(_skipN){
+        if(_nivelesC){ if(_nivelesC.includes(n)) continue; }
+        else if((_bandasC || bandasPic).some(b => y >= b[0] && y <= b[1])) continue;
+      }
       const usaRej    = tieneRejilla;
       const usaPanel  = tienePanel && !tieneRejilla;
       const usaMadera = tieneMadera && !tieneRejilla && !tienePanel;
@@ -1491,6 +1505,9 @@ function filaEscaleraAltaPS2(cfg){
 }
 // Cuerpos (bahías) que atraviesa la escalera de PS-2, incluida su PUNTA:
 // por ahí sube la gente, así que esos cuerpos van sin vigas de carga.
+// Los niveles cortados se calculan segun la altura Y de cada nivel (no hardcoded):
+//  - iBaja (tramo del piso al primer piso): niveles con Y en [0, yN)
+//  - iAlta (segundo tramo): niveles con Y en [yN, 2*yN)
 function cuerposEscaleraPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   const iBaja = filaEscaleraPS2(cfg), iAlta = filaEscaleraAltaPS2(cfg);
   if(iLn !== iBaja && iLn !== iAlta) return [];
@@ -1498,10 +1515,18 @@ function cuerposEscaleraPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   const nEsc = Math.max(8, Math.round(yN / 0.20));
   const run = nEsc * 0.25;
   const alcance = run + anchoCuerpo;          // escalera + rellano de una bahía
-  // Niveles que se quitan (base 0): la de abajo el 5-8, la de arriba el 9-12
-  const NIV_BAJA = [4, 5, 6, 7];
-  const NIV_ALTA = [8, 9, 10, 11];
-  const niveles = (iLn === iBaja) ? NIV_BAJA : NIV_ALTA;
+  const l = (cfg.lineas || [])[iLn];
+  if(!l) return [];
+  const sistema = (typeof sistemaActual !== 'undefined') ? sistemaActual : 'selectivo';
+  const yLo = (iLn === iBaja) ? 0 : yN;
+  const yHi = (iLn === iBaja) ? yN : 2*yN;
+  const alturasMan = getAlturasManualesM(sistema);
+  const alturasDef = alturasDefaultM(l.altoM, l.niveles);
+  const niveles = [];
+  for(let n = 0; n < l.niveles; n++){
+    const y = Math.min(alturasMan ? alturasMan[n] : alturasDef[n], l.altoM - 0.10);
+    if(y >= yLo && y < yHi) niveles.push(n);
+  }
   const k0 = 0;
   // El tramo de abajo despeja escalera + rellano; el de arriba solo sus 2 primeros módulos
   const k1 = (iLn === iBaja) ? Math.floor((alcance - 0.001) / anchoCuerpo) : 1;
@@ -2612,22 +2637,36 @@ function _nivTotBom(l, cA, cB, esD){
   return s;
 }
 // Posiciones (cuerpo × nivel) que SÍ llevan carga (viga/rejilla/panel), descontando los
-// huecos del túnel CUERPO POR CUERPO. Respeta niveles por módulo: si un cuerpo tiene menos
-// niveles que los que abre el túnel, solo se quitan los que de verdad existen. Igual que el build.
-function _nivCargaSel(l, cA, cB, esD){
+// huecos del túnel + escalera PS-2 CUERPO POR CUERPO. Respeta niveles por módulo: si un
+// cuerpo tiene menos niveles que los que abre el hueco, solo se quitan los que existen.
+function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
   const tun  = (l.tunelOn && Array.isArray(l.tunel) && l.tunel.length) ? l.tunel : [];
   const tunN = tun.length ? _tunelNiveles(l) : [];
-  const cuentaFila = (fila, nCuerpos) => {
+  // Escalera PS-2: {k, niveles} por cuerpo (base 0). Solo aplica a la fila iBaja/iAlta.
+  const ancho = anchoCuerpo || l.vigaM || l.largoM || 1;
+  const ksEscA = (cfg && iLn != null) ? cuerposEscaleraPS2(cfg, iLn, -l.largoM/2, ancho, cA) : [];
+  const escMapA = new Map();
+  ksEscA.forEach(it => escMapA.set(it.k, it.niveles));
+  // Fila B (doble) va rotada 180°: reflejar el índice.
+  const escMapB = new Map();
+  if(esD){
+    const ksEscB = (cfg && iLn != null) ? cuerposEscaleraPS2(cfg, iLn, -l.largoM/2, ancho, cB) : [];
+    ksEscB.forEach(it => escMapB.set(cB - 1 - it.k, it.niveles));
+  }
+  const cuentaFila = (fila, nCuerpos, escMap) => {
     const arr = l.nivMod ? _nivArrRaw(l, fila, nCuerpos) : null;
     let s = 0;
     for(let c = 0; c < nCuerpos; c++){
       const nivC = arr ? arr[c] : l.niveles;
-      const quitados = (tun.indexOf(c) >= 0) ? tunN.filter(n => n < nivC).length : 0;
-      s += (nivC - quitados);
+      const nivosCortados = new Set();
+      if(tun.indexOf(c) >= 0) tunN.forEach(n => { if(n < nivC) nivosCortados.add(n); });
+      const nivEsc = escMap.get(c);
+      if(nivEsc) nivEsc.forEach(n => { if(n < nivC) nivosCortados.add(n); });
+      s += (nivC - nivosCortados.size);
     }
     return s;
   };
-  return cuentaFila('A', cA) + (esD ? cuentaFila('B', cB) : 0);
+  return cuentaFila('A', cA, escMapA) + (esD ? cuentaFila('B', cB, escMapB) : 0);
 }
 // Mantiene los arreglos del tamaño de los cuerpos actuales (tras agregar/quitar módulos o cambiar tipo).
 function _nivNormaliza(l){
@@ -3670,10 +3709,23 @@ function buildPicking(){
   // La escalera y el corredor van por FUERA del rack: ya no se sacrifica ningún cuerpo
   // Solo la línea frontal pierde las vigas del módulo que cruza el ramal de acceso
   const skipDe = (nCuerpos, invertido, iLn) => {
-    if(iLn !== 0) return -1;
-    const idx = cuerpoRamalPasarela(cfg, xInicio, lineas[0].largoM, nCuerpos);
-    if(idx < 0) return -1;
-    return invertido ? (nCuerpos - 1 - idx) : idx;   // la fila B va girada 180°
+    let arr = [];
+    // Escalera PS-2: cuerpos+niveles atravesados por la escalera
+    const ksEsc = cuerposEscaleraPS2(cfg, iLn, xInicio, lineas[iLn].largoM, nCuerpos);
+    if(ksEsc.length){
+      if(invertido){
+        // Fila B va rotada 180°: reflejar el índice del cuerpo
+        arr = arr.concat(ksEsc.map(it => ({ k: nCuerpos - 1 - it.k, niveles: it.niveles })));
+      } else {
+        arr = arr.concat(ksEsc);
+      }
+    }
+    // Ramal de acceso PS-1 (solo fila 0)
+    if(iLn === 0){
+      const idx = cuerpoRamalPasarela(cfg, xInicio, lineas[0].largoM, nCuerpos);
+      if(idx >= 0) arr.push(invertido ? (nCuerpos - 1 - idx) : idx);
+    }
+    return arr.length ? arr : -1;
   };
   lineas.forEach((l, iLn) => {
     const gLin = new THREE.Group();
@@ -4201,32 +4253,31 @@ function calcularBomPicking(){
     const esD = l.tipo === 'doble';
     const cA = l.cuerposA, cB = esD ? l.cuerposB : 0;
     const sumaCuerpos = esD ? cA + cB : cA;
-    const nivTot = _nivTotBom(l, cA, cB, esD);   // Σ niveles por módulo; = niveles*cuerpos si es parejo
+    // Posiciones cuerpo×nivel con carga: descuenta ramal PS-1, escalera PS-2 y túneles.
+    const nivCarga = _nivCargaSel(l, cA, cB, esD, cfg, iLn, l.largoM);
+    // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera (PS-1)
+    const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.largoM, cA) : -1;
+    const nivQuitadosRamal = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'picking') * (esD ? 2 : 1) : 0;
+    const nivCargaFinal = nivCarga - nivQuitadosRamal;
     const nMarcos = esD ? (cA + 1) + (cB + 1) : (cA + 1);
     // 1) Marcos picking (alto × fondo)
     const marcoSku = MARCOS_PIC[l.altoIn] && MARCOS_PIC[l.altoIn][l.fondoIn];
     if(marcoSku) add(marcoSku, nMarcos);
     // 2) Pies de poste: van INCLUIDOS en el marco picking — no se cotizan aparte
     // 3) Vigas/travesaños: 2 por nivel por cuerpo (frente + atrás)
-    // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
-    const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.largoM, cA) : -1;
-    const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'picking') * (esD ? 2 : 1) : 0;
-    add(VIGAS_PIC[l.largoCm], 2 * (nivTot - nivQuitados));
-    // 4) Carga del nivel
+    add(VIGAS_PIC[l.largoCm], 2 * nivCargaFinal);
+    // 4) Carga del nivel (rejilla/panel/madera se ponen SOLO en los cuerpos×nivel con viga)
     if(cfg.rejilla && tieneRejillaPicking(l.largoCm)){
       const combo = REJILLAS_COMBO_PIC[l.largoCm];
       const skuRej = REJILLAS_PIC[combo.tipo] && REJILLAS_PIC[combo.tipo][l.fondoIn];
-      add(skuRej, combo.cantidad * nivTot);
+      add(skuRej, combo.cantidad * nivCarga);
     } else if(cfg.panel || (cfg.rejilla && !tieneRejillaPicking(l.largoCm))){
       const skuPanel = PANELES_BEIGE_PIC[l.fondoIn];
-      // Panel picking beige: 8" (20.32 cm) de ancho util. Se colocan en fila a lo
-      // largo del cuerpo para cubrir todo el nivel; el ultimo se corta a medida.
-      // Ej: cuerpo 120 cm → ceil(120/20.32)=6 paneles por nivel; 200 cm → 10.
       const piezasPorNivel = Math.ceil(l.largoCm / (8 * 2.54));
-      add(skuPanel, piezasPorNivel * nivTot);
+      add(skuPanel, piezasPorNivel * nivCarga);
     } else if(cfg.madera){
       const skuTam = TAM_PIC[l.largoCm] && TAM_PIC[l.largoCm][l.fondoIn];
-      if(skuTam) add(skuTam, nivTot);
+      if(skuTam) add(skuTam, nivCarga);
     }
   });
   // ── Pasarela: piezas individuales (compartida) ──
@@ -4247,7 +4298,7 @@ function calcularBomSelectivo(){
     const esD = l.tipo === 'doble';
     const cA = l.cuerposA, cB = esD ? l.cuerposB : 0;
     const sumaCuerpos = esD ? cA + cB : cA;             // cuerpos de racking totales
-    const nivCarga = _nivCargaSel(l, cA, cB, esD);      // posiciones cuerpo×nivel con carga (respeta niveles por módulo y túnel, hueco por hueco)
+    const nivCarga = _nivCargaSel(l, cA, cB, esD, cfg, iLn);   // descuenta túnel + escalera PS-2 hueco por hueco
     // Marcos ya existentes del cliente: 1 por lado marcado en sencilla; en doble
     // el mismo lado descuenta 2 (uno frontal + uno trasero).
     const nMarcosExisPorLado = (l.marcoIzqExistente ? 1 : 0) + (l.marcoDerExistente ? 1 : 0);
