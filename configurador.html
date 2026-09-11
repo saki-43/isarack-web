@@ -1129,6 +1129,7 @@ function init(){
     const bq = document.getElementById('pzBuscar');   if(bq) bq.addEventListener('input', repinta);
     const bs = document.getElementById('pzSistema');  if(bs) bs.addEventListener('change', repinta);
     const be = document.getElementById('pzSoloExist');if(be) be.addEventListener('change', repinta);
+    const bc = document.getElementById('colorRack');  if(bc) bc.addEventListener('change', ()=>{ if(sistemaActual==='piezas') pzRefrescar(); });
     aplicarModoPiezas(sistemaActual === 'piezas');
   }catch(e){ console.warn('piezas/init', e); }
   Promise.all([cargarPrecios(), cargarTC()]).then(()=>{ renderCotizacion(); try{ if(sistemaActual==='piezas' || piezasCarrito.length) pzRefrescar(); }catch(e){} }).catch(e=>{
@@ -4669,6 +4670,24 @@ var piezasCarrito = [];             // [{sku, cant}] en el orden en que se agreg
 var _pzUltimoBom = null;            // BOM del rack del que se llegó, para poder re-traerlo
 var PZ_SERVICIOS = ['SEL-0305','SRV-INST','REC-AZUL'];   // no son piezas de almacén
 
+// El inventario guarda los marcos SIN color ("MARCO 192\" X 42\""), pero la descripcion
+// que ve el cliente lleva el color: MARCO 192" X 42" VERDE. No es adorno — ISA-OS lee
+// ese nombre para saber de que color descontar postes y diagonales; sin color agarra
+// los del color que se le atraviese. Es la misma descripcion que arma ISA-OS con sus
+// "marcos virtuales" y la que ya sale hoy en el PDF de un presupuesto.
+function pzColorSel(){
+  const v = ((document.getElementById('colorRack')||{}).value || 'verde').toUpperCase();
+  return v.indexOf('AZUL') >= 0 ? 'AZUL' : 'VERDE';
+}
+function pzDescripcion(prod){
+  const p = String(prod == null ? '' : prod);
+  const u = p.toUpperCase();
+  if(u.indexOf('MARCO') !== 0) return p;                    // solo los marcos lo necesitan
+  if(u.indexOf('USADO') >= 0) return p;                     // usado: se queda con el color que traiga
+  if(u.indexOf('VERDE') >= 0 || u.indexOf('AZUL') >= 0) return p;
+  return p + ' ' + pzColorSel();
+}
+
 // Convierte el BOM de un rack (parejas [producto, cant] u objetos) a carrito de piezas.
 function pzDesdeBom(bom){
   const out = [];
@@ -4769,7 +4788,7 @@ function renderCatalogoPiezas(){
     const sk = pzEsc(it.sku);
     return '<div class="pz-it">' +
       '<div><div class="pz-sku">' + sk + '</div>' +
-      '<div class="pz-nm">' + pzEsc(it.producto || it.sku) + '</div>' +
+      '<div class="pz-nm">' + pzEsc(pzDescripcion(it.producto) || it.sku) + '</div>' +
       '<div class="pz-mt">' + pzFmtUSD(it.precio) + ' / pza ' + pill + exceso + '</div></div>' +
       '<div class="pz-stp' + (n ? ' on' : '') + '">' +
         '<button type="button" onclick="pzSumar(\'' + sk + '\',-1)" aria-label="Quitar uno">−</button>' +
@@ -4816,7 +4835,7 @@ function calcularBomPiezas(){
     const it = porSku[c.sku];
     if(!it || !(c.cant > 0)) return;
     const pu = Number(it.precio) || 0;
-    out.push({ sku:it.sku, producto:it.producto || it.sku, cantidad:c.cant, precioUSD:pu, importeUSD:pu*c.cant });
+    out.push({ sku:it.sku, producto:pzDescripcion(it.producto) || it.sku, cantidad:c.cant, precioUSD:pu, importeUSD:pu*c.cant });
   });
   return out;
 }
