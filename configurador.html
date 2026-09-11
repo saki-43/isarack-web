@@ -94,6 +94,41 @@
 .tabs .tab.active{background:#fff;color:#1a1d22;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .tabico{width:12px;height:12px;vertical-align:-1.5px;margin-right:4px}
 .tabs .tab.active .tabico{color:#DA6635}
+/* ── PIEZAS SUELTAS ── */
+#pzBuscar{margin-bottom:4px}
+#pzCatalogo{margin-top:4px;border-top:1px solid #ebedef;max-height:46vh;overflow-y:auto}
+.pz-it{padding:8px 0;border-bottom:1px solid #f0f1f2;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.pz-it .pz-sku{font-size:10px;font-weight:700;color:#D85A30;letter-spacing:.5px}
+.pz-it .pz-nm{font-size:12px;line-height:1.25;margin-top:1px;color:#2a2d31}
+.pz-it .pz-mt{font-size:10.5px;color:#9aa0a6;margin-top:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pz-pill{font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:9px;letter-spacing:.2px;white-space:nowrap}
+.pz-pill.ok{background:#eaf5ee;color:#2f7d4f}
+.pz-pill.wr{background:#fdf3e3;color:#b3711a}
+.pz-stp{display:flex;align-items:center;border:1px solid #d4d8dc;border-radius:7px;overflow:hidden;background:#fff;flex-shrink:0}
+.pz-stp button{width:22px;height:24px;padding:0;background:#fff;color:#6a6f75;font-size:13px;font-weight:700;border-radius:0;line-height:1}
+.pz-stp button:hover{background:#f4f6f7;color:#D85A30}
+.pz-stp b{font-size:12.5px;min-width:28px;text-align:center;font-variant-numeric:tabular-nums;border-left:1px solid #ebedef;border-right:1px solid #ebedef;height:24px;display:grid;place-items:center}
+.pz-stp.on{border-color:#D85A30}
+.pz-stp.on b{color:#D85A30}
+#pzCarrito{top:14px;left:270px;right:354px;max-height:calc(100vh - 28px);display:none;flex-direction:column;padding:16px 18px;gap:12px}
+#pzCarrito.on{display:flex}
+#pzCarrito .pz-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+#pzCarrito h2{font-size:15px;color:#2a2d31}
+#pzCarrito .pz-n{font-size:11.5px;color:#9aa0a6}
+#pzCarrito .pz-wrap{flex:1;overflow:auto}
+#pzCarrito table{border-collapse:collapse;width:100%;min-width:420px}
+#pzCarrito th{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:#9aa0a6;text-align:left;padding:0 0 7px;border-bottom:1px solid #ebedef;font-weight:700}
+#pzCarrito th.r,#pzCarrito td.r{text-align:right}
+#pzCarrito td{padding:11px 0;border-bottom:1px solid #f0f1f2;font-size:13px;vertical-align:top}
+#pzCarrito td .s{font-size:10px;font-weight:700;color:#D85A30;letter-spacing:.5px}
+#pzCarrito td .p{font-size:12.5px;line-height:1.3;margin-top:1px}
+#pzCarrito td .u{font-size:10.5px;color:#9aa0a6;margin-top:2px}
+#pzCarrito .num{font-variant-numeric:tabular-nums}
+#pzCarrito .qy{font-size:15px;font-weight:700}
+#pzCarrito .xq{color:#9aa0a6;font-size:14px;background:none;width:auto;padding:0 0 0 12px;font-weight:400}
+#pzCarrito .xq:hover{color:#c0392b}
+#pzCarrito .pz-vacio{padding:30px 10px;text-align:center;color:#9aa0a6;font-size:12.5px;line-height:1.6}
+@media (max-width:768px){ #pzCarrito{padding:14px} #pzCarrito table{min-width:0} }
 /* Badges de existencia en la lista de materiales */
 .stk{display:inline-block;font-size:10.5px;font-weight:600;padding:1.5px 6px;border-radius:4px;margin-left:5px;vertical-align:middle}
 .stk-ok{background:#e6f4ea;color:#137333}
@@ -167,6 +202,7 @@ gtag('config', 'G-XXXXXXXXXX');
     <div class="tab" data-sys="selectivo"><svg class="tabico" viewBox="0 0 16 16"><path d="M2 1v14M14 1v14M2 8h12M2 14.5h12" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><rect x="4" y="3.6" width="3.4" height="3.4" rx=".4" fill="currentColor"/><rect x="8.8" y="10" width="3.4" height="3.4" rx=".4" fill="currentColor"/></svg>Selectivo</div>
     <div class="tab" data-sys="mecano"><svg class="tabico" viewBox="0 0 16 16"><path d="M3 1v14M13 1v14M3 4.5h10M3 8h10M3 11.5h10" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>Mecano</div>
     <div class="tab" data-sys="cantilever"><svg class="tabico" viewBox="0 0 16 16"><path d="M4 1v14M2 15h4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M4 4h9M4 8h9M4 12h9" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>Cantilever</div>
+    <div class="tab" id="tabPiezas" data-sys="piezas" style="display:none"><svg class="tabico" viewBox="0 0 16 16"><path d="M8 2.2 12.6 4.9v5.4L8 13l-4.6-2.7V4.9z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><circle cx="8" cy="7.6" r="2" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>Piezas</div>
   </div>
 
   <div class="row" id="rowColorRack">
@@ -502,6 +538,26 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
   </div>
 
+  <div id="opPiezas" style="display:none">
+    <div class="row">
+      <label>Buscar pieza o SKU</label>
+      <input type="text" id="pzBuscar" placeholder="viga 96, SEL-0362, rejilla…" autocomplete="off">
+    </div>
+    <div class="row">
+      <label>Sistema</label>
+      <select id="pzSistema">
+        <option value="">Todos los sistemas</option>
+        <option value="SELECTIVO">Selectivo</option>
+        <option value="PICKING">Picking</option>
+        <option value="GONDOLAS">Góndola</option>
+        <option value="MECANO">Mecano</option>
+        <option value="CANTILEVER">Cantilever</option>
+      </select>
+    </div>
+    <label class="chk"><input type="checkbox" id="pzSoloExist" checked> Solo con existencia</label>
+    <div id="pzCatalogo"></div>
+  </div>
+
   <label class="chk"><input type="checkbox" id="auto" checked> Girar automático</label>
   <button id="wa">📱 Solicitar cotización por WhatsApp</button>
   <button id="reset">Reiniciar vista</button>
@@ -522,6 +578,14 @@ gtag('config', 'G-XXXXXXXXXX');
   <div class="body" id="lista"><div id="ldg">Cargando precios…</div></div>
   <div class="stats" id="stats"></div>
   <div class="totales" id="totales"></div>
+</div>
+
+<div class="panel" id="pzCarrito">
+  <div class="pz-top">
+    <h2>Piezas que llevas</h2>
+    <div class="pz-n" id="pzResumen">Nada todavía</div>
+  </div>
+  <div class="pz-wrap" id="pzTabla"></div>
 </div>
 
 <div id="dims"></div>
@@ -1054,7 +1118,19 @@ function init(){
   addEvents();
   animate();
   // Cargar precios en paralelo
-  Promise.all([cargarPrecios(), cargarTC()]).then(renderCotizacion).catch(e=>{
+  // Piezas sueltas: la pestaña solo aparece donde se activó (?piezas=1) o si el
+  // link del cliente ya trae un carrito. Mientras no existan los usuarios, no es pública.
+  try{
+    if(pzVisible() || piezasCarrito.length){
+      const tp = document.getElementById('tabPiezas'); if(tp) tp.style.display = '';
+    }
+    const repinta = () => renderCatalogoPiezas();
+    const bq = document.getElementById('pzBuscar');   if(bq) bq.addEventListener('input', repinta);
+    const bs = document.getElementById('pzSistema');  if(bs) bs.addEventListener('change', repinta);
+    const be = document.getElementById('pzSoloExist');if(be) be.addEventListener('change', repinta);
+    aplicarModoPiezas(sistemaActual === 'piezas');
+  }catch(e){ console.warn('piezas/init', e); }
+  Promise.all([cargarPrecios(), cargarTC()]).then(()=>{ renderCotizacion(); try{ if(sistemaActual==='piezas' || piezasCarrito.length) pzRefrescar(); }catch(e){} }).catch(e=>{
     document.getElementById('lista').innerHTML = '<div id="ldg" style="color:#c0392b">Error cargando precios: '+e.message+'</div>';
   });
 }
@@ -4546,7 +4622,176 @@ function calcularBomSelectivo(){
   return orden.map(sku => [sku, items[sku]]);
 }
 
+// ══════════════════ PIEZAS SUELTAS ══════════════════
+// Sexta pestaña: vender piezas de inventario sin armar un rack. Reusa el mismo
+// inventario, las mismas existencias (ya descontado lo comprometido), el mismo
+// flete por monto y el mismo PDF — calcularBOM() acepta partidas como objeto,
+// así que la cotización y el PDF no necesitaron ni un cambio.
+// Isaac, 11 sep 2026:
+//   · Se PUEDE pedir más de lo que hay (solo se avisa) — como en el resto del configurador.
+//   · Sin cantidad mínima: el anclaje y demás piezas chicas se venden con servicio.
+//   · Las piezas en $0 se esconden por ahora; queda pendiente revisarlas.
+//   · La pestaña NO es pública mientras no existan los usuarios: se abre con ?piezas=1.
+// var y no let/const a proposito: con let, si algo revienta ARRIBA de esta linea el
+// carrito queda en zona muerta y estadoConfigurador() truena. Mismo bug que nos costo
+// un dia en ISA-OS con _CFG_BAJAS. Con var se iza y nunca queda a medias.
+var PZ_OCULTAR_SIN_PRECIO = true;   // ← pendiente de revisar con Isaac
+var piezasCarrito = [];             // [{sku, cant}] en el orden en que se agregaron
+
+function pzVisible(){
+  try{
+    if(new URLSearchParams(location.search).get('piezas') === '1'){
+      localStorage.setItem('isarack_piezas','1');
+      return true;
+    }
+    return localStorage.getItem('isarack_piezas') === '1';
+  }catch(e){ return false; }
+}
+function pzCantDe(sku){
+  const it = piezasCarrito.find(x => x.sku === sku);
+  return it ? it.cant : 0;
+}
+function pzFijar(sku, n){
+  n = Math.max(0, Math.min(9999, Math.round(Number(n)||0)));
+  const i = piezasCarrito.findIndex(x => x.sku === sku);
+  if(n === 0){ if(i >= 0) piezasCarrito.splice(i,1); }
+  else if(i >= 0) piezasCarrito[i].cant = n;
+  else piezasCarrito.push({sku:sku, cant:n});
+  pzRefrescar();
+}
+function pzSumar(sku, d){ pzFijar(sku, pzCantDe(sku) + d); }
+function pzQuitar(sku){ pzFijar(sku, 0); }
+
+// Items vendibles del inventario, ya filtrados por lo que escribió el usuario.
+function pzCatalogoFiltrado(){
+  if(!Array.isArray(inventarioArr)) return [];
+  const q   = ((document.getElementById('pzBuscar')||{}).value || '').trim().toLowerCase();
+  const sis = (document.getElementById('pzSistema')||{}).value || '';
+  const soloExist = !!(document.getElementById('pzSoloExist')||{}).checked;
+  const pal = q ? q.split(/\s+/) : [];
+  return inventarioArr.filter(it => {
+    if(!it || !it.sku) return false;
+    if(PZ_OCULTAR_SIN_PRECIO && !(Number(it.precio) > 0)) return false;
+    if(sis && it.sistema !== sis) return false;
+    const disp = stockDisponibleDe(it.sku);
+    if(soloExist && !(disp > 0) && pzCantDe(it.sku) === 0) return false;
+    if(pal.length){
+      const txt = (it.sku + ' ' + (it.producto||'')).toLowerCase();
+      if(!pal.every(w => txt.includes(w))) return false;
+    }
+    return true;
+  }).sort((a,b) => (b.cantidad||0) - (a.cantidad||0)).slice(0, 120);
+}
+
+function pzFmtUSD(usd){
+  const tc  = monedaSel === 'MXN' ? tcCache : 1;
+  const sym = monedaSel === 'MXN' ? '$' : 'US$';
+  return sym + (usd*tc).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function pzEsc(t){
+  return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderCatalogoPiezas(){
+  const cont = document.getElementById('pzCatalogo');
+  if(!cont) return;
+  if(!inventarioArr){ cont.innerHTML = '<div style="padding:16px;text-align:center;color:#9aa0a6;font-size:12px">Cargando piezas…</div>'; return; }
+  const items = pzCatalogoFiltrado();
+  if(!items.length){
+    cont.innerHTML = '<div style="padding:16px;text-align:center;color:#9aa0a6;font-size:12px;line-height:1.5">Ninguna pieza con eso.<br>Prueba con otra palabra o quita el filtro de existencia.</div>';
+    return;
+  }
+  cont.innerHTML = items.map(it => {
+    const disp = stockDisponibleDe(it.sku);
+    const n    = pzCantDe(it.sku);
+    const pill = (disp > 0)
+      ? '<span class="pz-pill ok">' + disp + ' disp</span>'
+      : '<span class="pz-pill wr">sobre pedido</span>';
+    const exceso = (n > 0 && disp > 0 && n > disp)
+      ? ' <span class="pz-pill wr">pides ' + (n - disp) + ' de más</span>' : '';
+    const sk = pzEsc(it.sku);
+    return '<div class="pz-it">' +
+      '<div><div class="pz-sku">' + sk + '</div>' +
+      '<div class="pz-nm">' + pzEsc(it.producto || it.sku) + '</div>' +
+      '<div class="pz-mt">' + pzFmtUSD(it.precio) + ' / pza ' + pill + exceso + '</div></div>' +
+      '<div class="pz-stp' + (n ? ' on' : '') + '">' +
+        '<button type="button" onclick="pzSumar(\'' + sk + '\',-1)" aria-label="Quitar uno">−</button>' +
+        '<b>' + n + '</b>' +
+        '<button type="button" onclick="pzSumar(\'' + sk + '\',1)" aria-label="Agregar uno">+</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+function renderCarritoPiezas(){
+  const tabla = document.getElementById('pzTabla');
+  const res   = document.getElementById('pzResumen');
+  if(!tabla) return;
+  const lineas = calcularBomPiezas();
+  if(!lineas.length){
+    tabla.innerHTML = '<div class="pz-vacio">Todavía no llevas nada.<br>Busca una pieza a la izquierda y dale al <b>+</b>.</div>';
+    if(res) res.textContent = 'Nada todavía';
+    return;
+  }
+  const totPz = lineas.reduce((a,l) => a + l.cantidad, 0);
+  if(res) res.textContent = lineas.length + ' partida' + (lineas.length!==1?'s':'') + ' · ' + totPz + ' pieza' + (totPz!==1?'s':'');
+  tabla.innerHTML =
+    '<table><thead><tr><th>Pieza</th><th class="r">Cant.</th><th class="r">Importe</th><th></th></tr></thead><tbody>' +
+    lineas.map(l => {
+      const disp = stockDisponibleDe(l.sku);
+      const aviso = (disp !== null && l.cantidad > disp)
+        ? '<span class="pz-pill wr">hay ' + Math.max(0,disp) + ', pides ' + l.cantidad + '</span>' : '';
+      return '<tr><td><div class="s">' + pzEsc(l.sku) + '</div>' +
+        '<div class="p">' + pzEsc(l.producto) + '</div>' +
+        '<div class="u">' + pzFmtUSD(l.precioUSD) + ' / pza ' + aviso + '</div></td>' +
+        '<td class="r"><span class="qy num">' + l.cantidad + '</span></td>' +
+        '<td class="r num">' + pzFmtUSD(l.importeUSD) + '</td>' +
+        '<td class="r"><button type="button" class="xq" onclick="pzQuitar(\'' + pzEsc(l.sku) + '\')" title="Quitar del pedido">✕</button></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+// BOM de piezas: partidas como objeto. calcularBOM() y el PDF ya soportan esta forma.
+function calcularBomPiezas(){
+  if(!preciosCache) return [];
+  const porSku = {};
+  Object.keys(preciosCache).forEach(k => { const it = preciosCache[k]; if(it && it.sku) porSku[it.sku] = it; });
+  const out = [];
+  piezasCarrito.forEach(c => {
+    const it = porSku[c.sku];
+    if(!it || !(c.cant > 0)) return;
+    const pu = Number(it.precio) || 0;
+    out.push({ sku:it.sku, producto:it.producto || it.sku, cantidad:c.cant, precioUSD:pu, importeUSD:pu*c.cant });
+  });
+  return out;
+}
+
+function pzRefrescar(){
+  renderCatalogoPiezas();
+  renderCarritoPiezas();
+  try{ renderCotizacion(); }catch(e){ console.warn('piezas/cotizacion', e); }
+}
+
+// Entrar/salir del modo piezas: no hay 3D que dibujar, el centro lo ocupa el pedido.
+function aplicarModoPiezas(on){
+  const set = (id, v) => { const e = document.getElementById(id); if(e) e.style.display = v; };
+  set('opPiezas', on ? '' : 'none');
+  set('cv', on ? 'none' : '');
+  set('dims', on ? 'none' : '');
+  set('hint', on ? 'none' : '');
+  set('rowColorRack', on ? 'none' : '');
+  const car = document.getElementById('pzCarrito');
+  if(car) car.classList.toggle('on', !!on);
+  ['auto','wa','reset'].forEach(id => {
+    const e = document.getElementById(id);
+    if(!e) return;
+    const cont = (id === 'auto' && e.parentElement) ? e.parentElement : e;
+    cont.style.display = (on && id !== 'wa') ? 'none' : '';
+  });
+  if(on) pzRefrescar();
+}
+// ══════════════════ /PIEZAS SUELTAS ══════════════════
+
 function calcularBOM(){
+  if(sistemaActual === 'piezas')    return calcularBomPiezas();
   if(sistemaActual === 'selectivo') return calcularBomSelectivo();
   if(sistemaActual === 'picking')   return calcularBomPicking();
   if(sistemaActual === 'mecano')    return calcularBomMecano();
@@ -4642,7 +4887,15 @@ function renderCotizacion(){
   `).join('');
 
   // Stats
-  if(sistemaActual === 'selectivo'){
+  if(sistemaActual === 'piezas'){
+    const nPart = lineas.filter(l => l.sku && l.sku.indexOf('SRV-')!==0 && l.sku!=='SEL-0305').length;
+    document.getElementById('medidasResumen').innerHTML =
+      '<b>Piezas sueltas</b> · ' + nPart + ' partida' + (nPart!==1?'s':'') + '<br>Sin rack armado · folio <b>PZ-</b>';
+    document.getElementById('stats').innerHTML =
+      '<div class="s"><div class="v">PZ</div><div class="l">Tipo</div></div>' +
+      '<div class="s"><div class="v">' + nPart + '</div><div class="l">Partidas</div></div>' +
+      '<div class="s"><div class="v">' + piezasTot + '</div><div class="l">Piezas</div></div>';
+  } else if(sistemaActual === 'selectivo'){
     const cfg = getConfigSel();
     const filaLbl = cfg.lineas.length===1
       ? (cfg.lineas[0].tipo==='doble' ? 'Doble' : 'Sencilla')
@@ -5011,6 +5264,15 @@ document.getElementById('mX').addEventListener('click', cerrarModal);
 ov.addEventListener('click', e=>{ if(e.target===ov) cerrarModal(); });
 
 function configResumen(){
+  if(sistemaActual === 'piezas'){
+    const ls = calcularBomPiezas();
+    const tot = ls.reduce((a,l)=>a+l.cantidad,0);
+    const txt = ls.length
+      ? 'Piezas sueltas (' + ls.length + ' partidas, ' + tot + ' piezas):\n' +
+        ls.map(l => '• ' + l.cantidad + ' × ' + l.sku + ' ' + l.producto).join('\n')
+      : 'Piezas sueltas (sin nada seleccionado todavía)';
+    return {txt: txt, corto: 'Piezas sueltas · ' + ls.length + ' partidas'};
+  }
   if(sistemaActual === 'selectivo'){
     const cfg = getConfigSel();
     const extras = [];
@@ -5382,7 +5644,7 @@ async function generarPDF(datos, opts){
   const subtotalUSD = materialUSD + fleteUSD + instalacionUSD;
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
-  const folioPrefix = sistemaActual==='selectivo' ? 'RW-' : (sistemaActual==='picking' ? 'PW-' : 'GW-');
+  const folioPrefix = sistemaActual==='piezas' ? 'PZ-' : (sistemaActual==='selectivo' ? 'RW-' : (sistemaActual==='picking' ? 'PW-' : 'GW-'));
   const folio = await siguienteFolio(folioPrefix);
   const fechaHoy = new Date();
   const fechaVenc = new Date(fechaHoy.getTime() + 15*24*60*60*1000);
@@ -5648,7 +5910,7 @@ async function generarPDF(datos, opts){
   if(btnSubmit){ btnSubmit.disabled = true; btnSubmit.textContent = 'Procesando…'; }
 
   // Preparar payload de venta
-  const sistemaLabel = sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking' : 'Góndola');
+  const sistemaLabel = sistemaActual==='piezas' ? 'Piezas sueltas' : (sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking' : 'Góndola'));
   const lineasVenta = lineasParaPDF.map(l => ({
     producto: l.producto,
     cantidad: l.cantidad,
@@ -5877,8 +6139,10 @@ function addEvents(){
       document.getElementById('opMecano').style.display    = sistemaActual==='mecano'    ? '' : 'none';
       document.getElementById('opCantilever').style.display = sistemaActual==='cantilever' ? '' : 'none';
       document.getElementById('bodegaShared').style.display = (sistemaActual==='picking'||sistemaActual==='selectivo') ? '' : 'none';
+      aplicarModoPiezas(sistemaActual==='piezas');
       ajustarSelectorColor();
-      build();
+      if(sistemaActual==='piezas'){ try{ renderCotizacion(); }catch(e){} }
+      else build();
     });
   });
   document.getElementById('reset').addEventListener('click', ()=>{rotY=0.7; rotX=0.32;});
@@ -5929,6 +6193,7 @@ function estadoConfigurador(){
   else if(sistemaActual === 'picking')    st.l.pic = lineasPicking;
   else if(sistemaActual === 'mecano')     st.l.mec = lineasMecano;
   else if(sistemaActual === 'cantilever') st.l.can = lineasCantilever;
+  else if(sistemaActual === 'piezas')     st.pz = piezasCarrito.map(c => [c.sku, c.cant]);
   try{ st.nb = {n: (typeof nivelesPorBahia !== 'undefined' ? nivelesPorBahia : null),
                 a: (typeof alturasPorBahia !== 'undefined' ? alturasPorBahia : null)}; }catch(e){}
   // Bodega y unidad de cota (no tienen prefijo de sistema, se guardan aparte)
@@ -5960,6 +6225,11 @@ function aplicarEstado(st){
   if(st.s){
     sistemaActual = st.s;
     document.querySelectorAll('#tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.sys === st.s));
+  }
+  if(Array.isArray(st.pz)){
+    // El link del cliente trae el carrito: se muestra la pestaña aunque no esté abierta en este equipo
+    piezasCarrito = st.pz.filter(x => Array.isArray(x) && x[0]).map(x => ({sku:String(x[0]), cant:Math.max(0, Math.round(Number(x[1])||0))})).filter(c => c.cant > 0);
+    const tp = document.getElementById('tabPiezas'); if(tp) tp.style.display = '';
   }
   if(st.u){ unidadCota = st.u; const su = document.getElementById('selUnidad'); if(su) su.value = st.u; }
   if(st.bod){
