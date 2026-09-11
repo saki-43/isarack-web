@@ -450,7 +450,7 @@ gtag('config', 'G-XXXXXXXXXX');
   <!-- Bodega (compartida: se muestra en Picking y Selectivo) -->
   <div id="bodegaShared" style="display:none">
     <div class="row">
-      <label class="chk"><input type="checkbox" id="bodChk" onchange="bodegaOn=this.checked; document.getElementById('bodBox').style.display=this.checked?'':'none'; build();"> Mostrar bodega (ver cuánto entra)</label>
+      <label class="chk"><input type="checkbox" id="bodChk" onchange="bodegaOn=this.checked; document.getElementById('bodBox').style.display=this.checked?'':'none'; build();"> Mostrar bodega</label>
       <div id="bodBox" style="display:none;background:#f7f4ef;border:1px solid #e3ddd2;border-radius:6px;padding:6px;margin-top:2px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
           <div><div style="font-size:10px;color:#666">Ancho (m)</div><input type="number" id="bodAncho" value="12" min="1" step="0.5" style="width:100%" oninput="build()"></div>
@@ -3804,8 +3804,14 @@ function crearLineaCota(start, end, color){
 }
 
 // Cota profesional estilo plano: remates perpendiculares + flechas + etiqueta centrada
+var _COTA_PEND = [];
 function cotaDim(parent, a, b, texto, opts){
   opts = opts || {};
+  // Todo lo que cuelgue de aquí queda marcado como cota: _dimsDesde3D() lo ignora,
+  // si no, las flechas y etiquetas inflarían la medida del rack.
+  const _nAntes = parent.children.length;
+  const _marcarCotas = () => { for(let i=_nAntes;i<parent.children.length;i++){ parent.children[i].userData = parent.children[i].userData || {}; parent.children[i].userData.cota = true; } };
+  _COTA_PEND.push(_marcarCotas);
   const color = opts.color || 0x1a1a1a;
   const A = new THREE.Vector3(a[0],a[1],a[2]), B = new THREE.Vector3(b[0],b[1],b[2]);
   const dir = B.clone().sub(A);
@@ -4284,6 +4290,22 @@ function buildSelectivo(){
   }
 }
 
+// Medida real del rack a partir de su geometría: sirve para cualquier sistema,
+// incluso los que no llevan un cálculo propio de dimensiones.
+function _dimsDesde3D(g){
+  if(!g || typeof THREE === 'undefined') return null;
+  const caja = new THREE.Box3();
+  let hay = false;
+  g.traverse(o => {
+    if(!o.isMesh) return;
+    for(let pa = o; pa && pa !== g; pa = pa.parent){ if(pa.userData && pa.userData.cota) return; }
+    const bb = new THREE.Box3().setFromObject(o);
+    if(bb.isEmpty() || !isFinite(bb.min.x)) return;
+    caja.union(bb); hay = true;
+  });
+  if(!hay) return null;
+  return { x: caja.max.x - caja.min.x, z: caja.max.z - caja.min.z, y: Math.max(caja.max.y, 0) };
+}
 function build(){
   if(grupo){
     // Liberar geometrías de la GPU antes de descartar el grupo (evita fugas de memoria)
@@ -4303,11 +4325,17 @@ function build(){
   }
   grupo = new THREE.Group();
   _rackDims = null;
+  _COTA_PEND = [];
   if(sistemaActual === 'selectivo') buildSelectivo();
   else if(sistemaActual === 'picking') buildPicking();
   else if(sistemaActual === 'mecano') buildMecano();
   else if(sistemaActual === 'cantilever') buildCantilever();
   else buildGondola();
+  // Góndola, Mecano y Cantilever no publican _rackDims: se saca del propio 3D,
+  // midiendo solo la geometría del rack (las cotas van marcadas y no cuentan).
+  // Así "Mostrar bodega" sirve en los cinco sistemas, y en el que venga después.
+  try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
+  if(!_rackDims){ try{ _rackDims = _dimsDesde3D(grupo); }catch(e){ console.warn('medir rack', e); } }
   try{ agregarBodega(grupo); }catch(e){}
   // Muñeco Isaac al lado izquierdo del rack (referencia de escala 1.75 m)
   // Con pasarela + escalera, se coloca junto a la base de la escalera
@@ -6138,7 +6166,7 @@ function addEvents(){
       document.getElementById('opSelectivo').style.display = sistemaActual==='selectivo' ? '' : 'none';
       document.getElementById('opMecano').style.display    = sistemaActual==='mecano'    ? '' : 'none';
       document.getElementById('opCantilever').style.display = sistemaActual==='cantilever' ? '' : 'none';
-      document.getElementById('bodegaShared').style.display = (sistemaActual==='picking'||sistemaActual==='selectivo') ? '' : 'none';
+      document.getElementById('bodegaShared').style.display = (sistemaActual==='piezas') ? 'none' : '';
       aplicarModoPiezas(sistemaActual==='piezas');
       ajustarSelectorColor();
       if(sistemaActual==='piezas'){ try{ renderCotizacion(); }catch(e){} }
@@ -6347,7 +6375,7 @@ let _visorPendiente = null;
     document.getElementById('opGondola').style.display   = sysParam==='gondola'   ? '' : 'none';
     document.getElementById('opPicking').style.display   = sysParam==='picking'   ? '' : 'none';
     document.getElementById('opSelectivo').style.display = sysParam==='selectivo' ? '' : 'none';
-    document.getElementById('bodegaShared').style.display = (sysParam==='picking'||sysParam==='selectivo') ? '' : 'none';
+    document.getElementById('bodegaShared').style.display = (sysParam==='piezas') ? 'none' : '';
   }
 })();
 init();
@@ -6355,7 +6383,7 @@ if(_visorPendiente !== null){
   document.getElementById('opGondola').style.display   = sistemaActual==='gondola'   ? '' : 'none';
   document.getElementById('opPicking').style.display   = sistemaActual==='picking'   ? '' : 'none';
   document.getElementById('opSelectivo').style.display = sistemaActual==='selectivo' ? '' : 'none';
-  document.getElementById('bodegaShared').style.display = (sistemaActual==='picking'||sistemaActual==='selectivo') ? '' : 'none';
+  document.getElementById('bodegaShared').style.display = (sistemaActual==='piezas') ? 'none' : '';
   try{ renderLineasAlmacen(); }catch(e){}
   try{ renderLineasPicking(); }catch(e){}
   build();
