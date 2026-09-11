@@ -4679,6 +4679,27 @@ function pzColorSel(){
   const v = ((document.getElementById('colorRack')||{}).value || 'verde').toUpperCase();
   return v.indexOf('AZUL') >= 0 ? 'AZUL' : 'VERDE';
 }
+// Existencias de un marco: NO son las del SKU fisico. Isaac (11 sep 2026): "no tengo
+// nada armado, todo es para armar, y no se pintan". Asi que un marco vale lo que se
+// pueda ARMAR con los postes y diagonales DE ESE COLOR — exactamente el mismo numero
+// que ISA-OS muestra en sus marcos virtuales (MARCO-192-42-VER, MARCO-192-42-AZU).
+// Los USADO si son fisicos: esos entraron armados y se quedan con su propia existencia.
+function pzEsMarcoArmable(prod){
+  const u = String(prod == null ? '' : prod).toUpperCase();
+  if(u.indexOf('MARCO') !== 0) return null;
+  if(u.indexOf('USADO') >= 0 || u.indexOf('PICKING') >= 0) return null;
+  const m = u.match(/^MARCO\s+(\d{2,3})\s*(?:"|'')?\s*X\s*(\d{2,3})/);
+  return m ? {alto:m[1], fondo:m[2]} : null;
+}
+function pzDisponibles(it){
+  if(!it || !it.sku) return null;
+  const marco = pzEsMarcoArmable(it.producto);
+  if(marco && typeof marcosFabricables === 'function'){
+    try{ return marcosFabricables(marco.alto, marco.fondo, pzColorSel()); }
+    catch(e){ console.warn('piezas/marcosFabricables', e); }
+  }
+  return stockDisponibleDe(it.sku);
+}
 function pzDescripcion(prod){
   const p = String(prod == null ? '' : prod);
   const u = p.toUpperCase();
@@ -4749,7 +4770,7 @@ function pzCatalogoFiltrado(){
     if(!it || !it.sku) return false;
     if(PZ_OCULTAR_SIN_PRECIO && !(Number(it.precio) > 0)) return false;
     if(sis && it.sistema !== sis) return false;
-    const disp = stockDisponibleDe(it.sku);
+    const disp = pzDisponibles(it);
     if(soloExist && !(disp > 0) && pzCantDe(it.sku) === 0) return false;
     if(pal.length){
       const txt = (it.sku + ' ' + (it.producto||'')).toLowerCase();
@@ -4778,7 +4799,7 @@ function renderCatalogoPiezas(){
     return;
   }
   cont.innerHTML = items.map(it => {
-    const disp = stockDisponibleDe(it.sku);
+    const disp = pzDisponibles(it);
     const n    = pzCantDe(it.sku);
     const pill = (disp > 0)
       ? '<span class="pz-pill ok">' + disp + ' disp</span>'
@@ -4813,7 +4834,7 @@ function renderCarritoPiezas(){
   tabla.innerHTML =
     '<table><thead><tr><th>Pieza</th><th class="r">Cant.</th><th class="r">Importe</th><th></th></tr></thead><tbody>' +
     lineas.map(l => {
-      const disp = stockDisponibleDe(l.sku);
+      const disp = pzDisponibles({sku:l.sku, producto:l.producto});
       const aviso = (disp !== null && l.cantidad > disp)
         ? '<span class="pz-pill wr">hay ' + Math.max(0,disp) + ', pides ' + l.cantidad + '</span>' : '';
       return '<tr><td><div class="s">' + pzEsc(l.sku) + '</div>' +
