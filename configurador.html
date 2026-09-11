@@ -4684,6 +4684,15 @@ function pzColorSel(){
 // pueda ARMAR con los postes y diagonales DE ESE COLOR — exactamente el mismo numero
 // que ISA-OS muestra en sus marcos virtuales (MARCO-192-42-VER, MARCO-192-42-AZU).
 // Los USADO si son fisicos: esos entraron armados y se quedan con su propia existencia.
+// Piezas que NO se venden sueltas. Isaac (11 sep 2026): "no vendo postes, solo se
+// venden en conjunto" — el poste va dentro del marco, y por eso 29 de los 50 postes
+// estan en $0 a proposito. Si manana hay otra pieza que solo va en conjunto, se agrega
+// su palabra aqui y desaparece del catalogo.
+var PZ_SOLO_EN_CONJUNTO = ['POSTE'];
+function pzSoloEnConjunto(prod){
+  const u = String(prod == null ? '' : prod).toUpperCase();
+  return PZ_SOLO_EN_CONJUNTO.some(w => u.indexOf(w) >= 0);
+}
 function pzEsMarcoArmable(prod){
   const u = String(prod == null ? '' : prod).toUpperCase();
   if(u.indexOf('MARCO') !== 0) return null;
@@ -4769,6 +4778,7 @@ function pzCatalogoFiltrado(){
   return inventarioArr.filter(it => {
     if(!it || !it.sku) return false;
     if(PZ_OCULTAR_SIN_PRECIO && !(Number(it.precio) > 0)) return false;
+    if(pzSoloEnConjunto(it.producto)) return false;   // el poste solo va dentro del marco
     if(sis && it.sistema !== sis) return false;
     const disp = pzDisponibles(it);
     if(soloExist && !(disp > 0) && pzCantDe(it.sku) === 0) return false;
