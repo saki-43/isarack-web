@@ -555,6 +555,7 @@ gtag('config', 'G-XXXXXXXXXX');
       </select>
     </div>
     <label class="chk"><input type="checkbox" id="pzSoloExist" checked> Solo con existencia</label>
+    <button type="button" id="pzDelRack" onclick="pzTraerDelRack()" style="display:none;margin-top:6px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;font-size:11px;padding:6px">↺ Traer otra vez las piezas del rack</button>
     <div id="pzCatalogo"></div>
   </div>
 
@@ -4665,6 +4666,34 @@ function calcularBomSelectivo(){
 // un dia en ISA-OS con _CFG_BAJAS. Con var se iza y nunca queda a medias.
 var PZ_OCULTAR_SIN_PRECIO = true;   // ← pendiente de revisar con Isaac
 var piezasCarrito = [];             // [{sku, cant}] en el orden en que se agregaron
+var _pzUltimoBom = null;            // BOM del rack del que se llegó, para poder re-traerlo
+var PZ_SERVICIOS = ['SEL-0305','SRV-INST','REC-AZUL'];   // no son piezas de almacén
+
+// Convierte el BOM de un rack (parejas [producto, cant] u objetos) a carrito de piezas.
+function pzDesdeBom(bom){
+  const out = [];
+  (bom || []).forEach(item => {
+    let sku = null, cant = 0;
+    if(Array.isArray(item)){
+      const inv = preciosCache ? preciosCache[item[0]] : null;
+      if(inv && inv.sku){ sku = inv.sku; cant = Number(item[1]) || 0; }
+    } else if(item && item.sku){
+      sku = item.sku; cant = Number(item.cantidad) || 0;
+    }
+    if(!sku || cant <= 0) return;
+    if(PZ_SERVICIOS.indexOf(sku) >= 0) return;
+    cant = Math.max(1, Math.round(cant));
+    const i = out.findIndex(x => x.sku === sku);
+    if(i >= 0) out[i].cant += cant; else out.push({sku:sku, cant:cant});
+  });
+  return out;
+}
+// Botón "traer las piezas del rack": pisa el carrito con lo que traía el diseño.
+function pzTraerDelRack(){
+  if(!_pzUltimoBom) return;
+  piezasCarrito = pzDesdeBom(_pzUltimoBom);
+  pzRefrescar();
+}
 
 function pzVisible(){
   try{
@@ -4879,7 +4908,7 @@ function renderCotizacion(){
     lineas = _gonLineasAgrupadas(materialUSD);
   }
   // Flete como línea más del listado (no en el total)
-  const fleteUSD = requiereEnvio ? calcularFlete(materialUSD).flete : 0;
+  const fleteUSD = (requiereEnvio && materialUSD > 0) ? calcularFlete(materialUSD).flete : 0;
   if(requiereEnvio){
     lineas.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
   }
@@ -4894,6 +4923,8 @@ function renderCotizacion(){
   // Existencias a la vista (decisión de Isaac: mostrar a todos).
   const badgeStock = (l) => {
     if(!preciosCache || !l || !l.sku || typeof stockDisponibleDe!=='function') return '';
+    // El flete y la instalación son servicios, no piezas de almacén: decían "0 disp".
+    if(PZ_SERVICIOS.indexOf(l.sku) >= 0) return '';
     const disp = stockDisponibleDe(l.sku);
     if(disp===null||disp===undefined) return '';
     const need = parseFloat(l.cantidad)||0;
@@ -5661,7 +5692,7 @@ async function generarPDF(datos, opts){
     lineasParaPDF = _gonLineasAgrupadas(materialUSD);
   }
 
-  const fleteUSD = requiereEnvio ? calcularFlete(materialUSD).flete : 0;
+  const fleteUSD = (requiereEnvio && materialUSD > 0) ? calcularFlete(materialUSD).flete : 0;
   if(requiereEnvio){
     lineasParaPDF.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
   }
@@ -6157,6 +6188,12 @@ function addEvents(){
   // Tabs: cambiar de sistema
   document.querySelectorAll('#tabs .tab').forEach(tab=>{
     tab.addEventListener('click', ()=>{
+      // Al entrar a Piezas desde un rack, el diseño se lleva al carrito para
+      // poder sumarle o quitarle. Hay que leer el BOM ANTES de cambiar de sistema.
+      const _sisPrevio = sistemaActual;
+      if(tab.dataset.sys === 'piezas' && _sisPrevio !== 'piezas'){
+        try{ _pzUltimoBom = calcularBOM(); }catch(e){ _pzUltimoBom = null; console.warn('piezas/bom del rack', e); }
+      }
       document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.remove('active'));
       tab.classList.add('active');
       sistemaActual = tab.dataset.sys;
@@ -6167,6 +6204,12 @@ function addEvents(){
       document.getElementById('opMecano').style.display    = sistemaActual==='mecano'    ? '' : 'none';
       document.getElementById('opCantilever').style.display = sistemaActual==='cantilever' ? '' : 'none';
       document.getElementById('bodegaShared').style.display = (sistemaActual==='piezas') ? 'none' : '';
+      if(sistemaActual === 'piezas'){
+        // Solo se precarga si el carrito está vacío: si ya estabas editando, no se pisa.
+        if(_pzUltimoBom && !piezasCarrito.length) piezasCarrito = pzDesdeBom(_pzUltimoBom);
+        const bd = document.getElementById('pzDelRack');
+        if(bd) bd.style.display = _pzUltimoBom ? '' : 'none';
+      }
       aplicarModoPiezas(sistemaActual==='piezas');
       ajustarSelectorColor();
       if(sistemaActual==='piezas'){ try{ renderCotizacion(); }catch(e){} }
