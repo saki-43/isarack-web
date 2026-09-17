@@ -3454,7 +3454,11 @@ function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
   }
 }
 
-function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost){
+// ladoBota: que poste de cada marco lleva bota protectora. En fila DOBLE va una
+// sola por marco, la del lado del pasillo — el poste interior queda entre las dos
+// filas y nadie lo golpea (Isaac, 17 sep 2026). 'front' = zFront, 'back' = zBack,
+// 'ambos' (default) = fila sencilla, que puede tener pasillo de los dos lados.
+function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota){
   const postW = 0.076, postD = 0.076, vigaH = 0.10, vigaD = 0.06;
   const nMarcos = cuerpos + 1;
   const totalLen = vigaM * cuerpos;
@@ -3486,8 +3490,31 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         const pn2 = new THREE.Mesh(pernoGeo, matPerno); pn2.position.set(x+px, pieT+0.012, zBack+pz); parent.add(pn2);
       });
       if(tieneBotas){
-        const b = box(0.10, 0.30, fondoM + 0.05, matBota);
-        b.position.set(x, 0.15, 0); parent.add(b);
+        // Bota protectora POR POSTE: van 2 por marco, no una sola pieza. Antes se
+        // dibujaba UNA barra de 0.10 x 0.30 x (fondo+0.05) cruzando todo el marco
+        // de poste a poste, cuando el BOM ya cobraba 2*nMarcos (linea ~4642): el
+        // cliente veia una pieza en el render y en la cotizacion le salian dos.
+        // Forma real (SEL-0021, BOTA PROTECTORA H12"): lamina doblada que envuelve
+        // el poste, conica — mas ancha abajo que arriba — y anclada al piso con
+        // una placa que sobresale. Se modela como piramide truncada de base
+        // cuadrada: CylinderGeometry con 4 segmentos girada 45 grados deja las
+        // caras planas hacia los ejes en vez de en diagonal.
+        // Holgura ajustada a la pieza real: abraza el poste de 7.6 cm dejando ~2 cm
+        // por lado abajo y ~0.6 arriba, de donde sale la silueta esbelta de la foto.
+        const botaH = 0.30, ladoAb = 0.125, ladoAr = 0.088, placaT = 0.010;
+        const K = Math.SQRT1_2;  // lado del cuadrado -> radio circunscrito
+        const _lados = ladoBota==='front' ? [zFront] : ladoBota==='back' ? [zBack] : [zFront, zBack];
+        _lados.forEach(zb=>{
+          const gb = new THREE.CylinderGeometry(ladoAr*K, ladoAb*K, botaH, 4);
+          const bo = new THREE.Mesh(gb, matBota);
+          bo.rotation.y = Math.PI/4;
+          bo.position.set(x, pieT + botaH/2, zb);
+          bo.add(new THREE.LineSegments(new THREE.EdgesGeometry(gb), matEdge));
+          parent.add(bo);
+          const pl = box(ladoAb + 0.022, placaT, ladoAb + 0.022, matBota);
+          pl.position.set(x, pieT + placaT/2, zb);
+          parent.add(pl);
+        });
       }
     }
     const yIni = 0.20, yFin = altoM - 0.20, seg = 0.6096;  // 2 ft entre diagonales
@@ -4183,10 +4210,10 @@ function buildSelectivo(){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
       const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA);
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front');
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB);
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back');
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = Math.min(l.cuerposA, l.cuerposB) + 1;
@@ -4201,7 +4228,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen);
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos');
     }
     // El rack se construye centrado en 0 → desplazar para que su borde izq. quede en xInicio
     gLin.position.x = xInicio + l.largoM/2;
@@ -4639,7 +4666,10 @@ function calcularBomSelectivo(){
         add(skuPanelSel, piezasPorNivel * nivCarga);
       }
     }
-    if(cfg.botas) add(BOTA_SEL, 2 * nMarcos);
+    // Fila doble: 1 bota por marco (solo el poste de pasillo). Sencilla: 2, porque
+    // puede quedar con pasillo de los dos lados. Antes cobraba 2 siempre, asi que
+    // las dobles llevaban el doble de botas de las que se instalan.
+    if(cfg.botas) add(BOTA_SEL, (esD ? 1 : 2) * nMarcos);
     if(esD){
       const skuUnion = UNIONES_SEL[cfg.unionIn];
       // La unión también se hereda si el cliente ya tiene ese marco (izq o der).
