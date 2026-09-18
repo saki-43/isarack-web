@@ -845,6 +845,20 @@ function _mallaLado(l){
 function _mallaLadosDe(l){
   return (l.tipo === 'doble') ? ['medio','adelante','atras'] : ['atras','adelante'];
 }
+// Lado que le toca por omision a la fila i. Las filas se acomodan en Z de
+// adelante (la 1) hacia atras, asi que la PRIMERA mira a +Z y la ULTIMA a -Z:
+// las dos sencillas de las orillas quedan protegiendo el pasillo de afuera,
+// que es justo donde camina la gente, y dejan libre la cara por donde carga el
+// montacargas (Isaac, 18 sep 2026). Las de en medio arrancan atras y se cambian
+// con los botones, porque de ahi depende de como quede la bodega.
+function _mallaLadoDefault(i){
+  const arr = (typeof lineasAlmacen !== 'undefined' && Array.isArray(lineasAlmacen)) ? lineasAlmacen : [];
+  const l = arr[i];
+  if(!l) return 'atras';
+  if(l.tipo === 'doble') return 'medio';
+  if(i === 0 && arr.length > 1) return 'adelante';
+  return 'atras';
+}
 const MALLA_LADO_TXT = {medio:'En medio', adelante:'Adelante', atras:'Atrás'};
 // Claros con malla. En medio de una doble solo cuentan los claros que tienen
 // fila de los dos lados; en una cara exterior manda la fila de ese lado.
@@ -3173,9 +3187,10 @@ function _mallaInfo(l, i, esD, info){
   const sku = _mallaSku(vigaIn);
   const lado = _mallaLado(l);
   const donde = (lado === 'medio') ? 'entre las dos filas'
-              : (lado === 'atras') ? 'en la cara de atrás (la de la pared)'
-              :                      'en la cara de adelante';
-  const chips = '<div style="display:flex;gap:4px;margin:4px 0 2px">'
+              : (lado === 'atras') ? 'en la cara de atrás (hacia el fondo de la bodega)'
+              :                      'en la cara de adelante (hacia el frente de la bodega)';
+  const chips = '<div style="font-size:9px;color:#888;margin-top:3px">Lado donde va la malla — la cara de carga del montacargas debe quedar libre:</div>'
+    + '<div style="display:flex;gap:4px;margin:3px 0 4px">'
     + _mallaLadosDe(l).map(function(op){
         const on = (op === lado);
         return '<button onclick="lnMallaLado('+i+',\''+op+'\')" style="border:1px solid '+(on?'#b07d00':'#ccc')+';background:'+(on?'#b07d00':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:6px;padding:3px 9px;font-size:10.5px;cursor:pointer">'+MALLA_LADO_TXT[op]+'</button>';
@@ -3202,6 +3217,7 @@ function lnMallaLado(i, lado){
 }
 function lnMalla(i, on){
   lineasAlmacen[i].mallaOn = !!on;
+  if(on && !lineasAlmacen[i].mallaLado) lineasAlmacen[i].mallaLado = _mallaLadoDefault(i);
   renderLineasAlmacen();
   try{ _syncProtecciones(); }catch(e){}
   build();
