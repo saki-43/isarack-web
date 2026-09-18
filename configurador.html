@@ -444,7 +444,10 @@ gtag('config', 'G-XXXXXXXXXX');
     <div class="alturas-nivel" id="selAlturasContainer"></div>
     <label class="chk"><input type="checkbox" id="selChkRej"> Rejilla electrosoldada</label>
     <label class="chk"><input type="checkbox" id="selChkPanel"> Panel beige (corte a medida)</label>
-    <label class="chk"><input type="checkbox" id="selChkBot"> Protector puntal</label>
+    <label class="chk"><input type="checkbox" id="selChkPunt"> Protector de puntal</label>
+    <select id="selMedPunt" style="display:none;margin:2px 0 6px 22px;max-width:230px"></select>
+    <label class="chk"><input type="checkbox" id="selChkBot"> Bota protectora</label>
+    <select id="selMedBota" style="display:none;margin:2px 0 6px 22px;max-width:230px"></select>
   </div>
 
   <!-- Bodega (compartida: se muestra en Picking y Selectivo) -->
@@ -692,7 +695,75 @@ const VIGAS_INFO = {
 };
 const ANCLA_STD_SEL = 'SEL-0001';  // Anclaje 1/2" x 4 1/4" expansible (wedge anchor)
 const ANCLA_QUI_SEL = 'SEL-0003';
-const BOTA_SEL = 'SEL-0021';
+// ── PROTECCIONES DEL PUNTAL: dos piezas DISTINTAS (Isaac, 18 sep 2026) ──
+// Antes habia una sola casilla, "Protector puntal", que cotizaba SEL-0021 (una
+// BOTA de 12", con existencia 0) mientras los 723 protectores de puntal del
+// almacen no se ofrecian nunca. Son dos familias del catalogo:
+//
+//   BOTA PROTECTORA    — canal en U, conica, CON placa de barrenos: va anclada al PISO.
+//   PROTECTOR DE PUNTAL— canal en U, recto, SIN placa: va atornillado AL PUNTAL.
+//
+// Las dos abrazan el poste por tres caras y traen las esquinas del frente
+// achaflanadas; la trasera queda abierta.
+// El default de cada una es la medida con mas existencia, para no cotizar aire.
+const BOTA_OPC = [
+  {sku:'SEL-0026', hIn:16, txt:'Reforzada 16"'},
+  {sku:'SEL-0023', hIn:18, txt:'H18"'},
+  {sku:'SEL-0021', hIn:12, txt:'H12"'},
+  {sku:'SEL-0022', hIn:16, txt:'H16"'},
+  {sku:'SEL-0024', hIn:12, txt:'Reforzada 12"'},
+  {sku:'SEL-0025', hIn:12, txt:'Reforzada 12" x 8"'},
+  {sku:'SEL-0027', hIn:18, txt:'Reforzada 18"'},
+  {sku:'SEL-0028', hIn:24, txt:'Reforzada 24"'},
+  {sku:'SEL-0029', hIn:36, txt:'Reforzada 36"'},
+  {sku:'SEL-0019', hIn:18, txt:'Estructural 18"x8"'},
+  {sku:'SEL-0020', hIn:36, txt:'Estructural 36"x8"'},
+  {sku:'SEL-0018', hIn:24, txt:'Estructural c/placa 24"'}
+];
+const PUNTAL_OPC = [
+  {sku:'SEL-0267', hIn:24, txt:'H24"'},
+  {sku:'SEL-0266', hIn:16, txt:'H16"'},
+  {sku:'SEL-0265', hIn:12, txt:'H12"'},
+  {sku:'SEL-0244', hIn:36, txt:'Atornillada 36"'},
+  {sku:'SEL-0268', hIn:36, txt:'H36"x4" double deep'},
+  {sku:'SEL-0269', hIn:51, txt:'H51"'}
+];
+const BOTA_SEL = BOTA_OPC[0].sku;      // respaldo si el select no existe
+const PUNTAL_SEL = PUNTAL_OPC[0].sku;
+// Altura real de la pieza elegida, en metros — el 3D la dibuja a escala:
+// un protector H51" se ve cuatro veces mas alto que uno H12".
+// Llena los dos selectores con su medida, existencia real y precio. El
+// inventario ya viene descargado en inventarioArr, asi que no hace falta
+// ninguna consulta nueva. Las que estan en cero se marcan pero se pueden
+// elegir igual: se piden a fabrica.
+function _llenarSelectProteccion(idSel, opciones){
+  var sel = document.getElementById(idSel);
+  if(!sel) return;
+  var previo = sel.value;
+  sel.innerHTML = opciones.map(function(o){
+    var it = Array.isArray(inventarioArr) ? inventarioArr.find(function(x){return x.sku===o.sku;}) : null;
+    var disp = it ? Math.max(0, (Number(it.cantidad)||0) - comprometidoDe(it)) : 0;
+    var pre  = it ? (Number(it.precio)||0) : 0;
+    var txt  = o.txt + '  ·  ' + (disp>0 ? disp.toLocaleString('es-MX')+' disp' : 'sin existencia')
+             + (pre>0 ? '  ·  $'+pre.toFixed(2) : '');
+    return '<option value="'+o.sku+'">'+txt+'</option>';
+  }).join('');
+  if(previo) sel.value = previo;
+  if(!sel.value) sel.selectedIndex = 0;
+}
+// Enciende o apaga el selector junto con su casilla.
+function _syncProtecciones(){
+  var pares = [['selChkPunt','selMedPunt',PUNTAL_OPC], ['selChkBot','selMedBota',BOTA_OPC]];
+  pares.forEach(function(pr){
+    var chk = document.getElementById(pr[0]), sel = document.getElementById(pr[1]);
+    if(!chk || !sel) return;
+    _llenarSelectProteccion(pr[1], pr[2]);
+    sel.style.display = chk.checked ? '' : 'none';
+  });
+}
+function _altoBotaM(cfg){ return _opcDe(BOTA_OPC, (cfg&&cfg.botaSku)||BOTA_SEL).hIn * 0.0254; }
+function _altoPuntM(cfg){ return _opcDe(PUNTAL_OPC, (cfg&&cfg.puntSku)||PUNTAL_SEL).hIn * 0.0254; }
+function _opcDe(arr, sku){ for(var i=0;i<arr.length;i++) if(arr[i].sku===sku) return arr[i]; return arr[0]; }
 // REGLA DE OBRA (ISARACK): la rejilla electrosoldada viene en 2 anchos, uno
 // por cada largo de viga. NO se puede poner rejilla 46" en viga 108" — quedan
 // huecos y no cargan bien. La combinacion correcta es:
@@ -920,6 +991,7 @@ const matVigaSel  = new THREE.MeshStandardMaterial({color:0xda6635,metalness:0.3
 const matPieSel   = new THREE.MeshStandardMaterial({color:0x1f3a26,metalness:0.4,roughness:0.6});
 const matPerno    = new THREE.MeshStandardMaterial({color:0x18181a,metalness:0.5,roughness:0.4});
 const matBota     = new THREE.MeshStandardMaterial({color:0xf2b71d,metalness:0.2,roughness:0.7});
+const matPunt     = new THREE.MeshStandardMaterial({color:0xe1651c,metalness:0.2,roughness:0.7});  // protector de puntal: naranja
 const matTriplay  = new THREE.MeshStandardMaterial({color:0xa8856b,metalness:0.05,roughness:0.85});
 // Muñeco Isaac (imagen real con fondo transparente)
 const IMG_ISAAC_B64 = 'data:image/png;base64,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';
@@ -991,6 +1063,53 @@ function getMatPanel(panW, panH){
   return m;
 }
 
+// ── PERFIL DE LAS PROTECCIONES DE PUNTAL ──
+// Las dos piezas son LAMINA DOBLADA, no un bloque: el frente lleva un doblez en
+// V (la arista vertical que se ve al centro), las alas van hacia atras y terminan
+// en un doblez hacia adentro — el poste entra hasta ahi y ese doblez le hace tope.
+// La cara trasera queda ABIERTA. Visto desde arriba, con el pasillo hacia +Z:
+//
+//            /\          <- vertice en V, apunta al pasillo
+//           /  \
+//          |    |        <- alas
+//          ]    [        <- dobleces: el poste entra hasta aqui
+//
+function _shapeProteccion(vert, ala, doblez, esp){
+  var sh = new THREE.Shape();
+  // contorno exterior, de un doblez al otro pasando por el vertice
+  sh.moveTo(-ala, -doblez);
+  sh.lineTo(-ala,  0);
+  sh.lineTo(   0,  vert);
+  sh.lineTo( ala,  0);
+  sh.lineTo( ala, -doblez);
+  // regreso por dentro, desplazado el espesor de la lamina
+  sh.lineTo( ala-esp, -doblez);
+  sh.lineTo( ala-esp, -esp*0.5);
+  sh.lineTo(       0,  vert-esp*1.6);
+  sh.lineTo(-ala+esp, -esp*0.5);
+  sh.lineTo(-ala+esp, -doblez);
+  sh.closePath();
+  return sh;
+}
+// Malla vertical del perfil. conico=true encoge el tope (la bota va mas ancha
+// abajo); el protector de puntal es recto de arriba a abajo.
+function _mallaProteccion(hM, mat, conico, vert, ala){
+  var esp = 0.005, doblez = 0.022;
+  var g = new THREE.ExtrudeGeometry(_shapeProteccion(vert, ala, doblez, esp), {depth:hM, bevelEnabled:false});
+  g.rotateX(-Math.PI/2);            // extruido en +Z -> lo paramos en +Y
+  if(conico){
+    // encoge en X/Z los vertices de arriba: 0 abajo, 30% arriba
+    var po = g.attributes.position;
+    for(var i=0;i<po.count;i++){
+      var t = po.getY(i)/hM, k = 1 - 0.30*Math.max(0,Math.min(1,t));
+      po.setX(i, po.getX(i)*k); po.setZ(i, po.getZ(i)*k);
+    }
+    po.needsUpdate = true; g.computeVertexNormals();
+  }
+  var m = new THREE.Mesh(g, mat);
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), matEdge));
+  return m;
+}
 function box(w,h,d,mat){
   const g = new THREE.BoxGeometry(w,h,d);
   const m = new THREE.Mesh(g,mat);
@@ -3181,6 +3300,9 @@ function getConfigSel(){
     rejilla: document.getElementById('selChkRej').checked,
     panel:   document.getElementById('selChkPanel').checked,
     botas:   document.getElementById('selChkBot').checked,
+    botaSku: (document.getElementById('selMedBota')||{}).value || BOTA_SEL,
+    punt:    document.getElementById('selChkPunt').checked,
+    puntSku: (document.getElementById('selMedPunt')||{}).value || PUNTAL_SEL,
     altoM: altoIn*IN_TO_M, fondoM: fondoIn*IN_TO_M, vigaM: vigaIn*IN_TO_M};
 }
 
@@ -3458,7 +3580,9 @@ function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
 // sola por marco, la del lado del pasillo — el poste interior queda entre las dos
 // filas y nadie lo golpea (Isaac, 17 sep 2026). 'front' = zFront, 'back' = zBack,
 // 'ambos' (default) = fila sencilla, que puede tener pasillo de los dos lados.
-function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota){
+function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota, tienePunt, altoBotaM, altoPuntM){
+  altoBotaM = altoBotaM || 0.41;   // 16" por omision
+  altoPuntM = altoPuntM || 0.61;   // 24" por omision
   const postW = 0.076, postD = 0.076, vigaH = 0.10, vigaD = 0.06;
   const nMarcos = cuerpos + 1;
   const totalLen = vigaM * cuerpos;
@@ -3489,31 +3613,40 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         const pn1 = new THREE.Mesh(pernoGeo, matPerno); pn1.position.set(x+px, pieT+0.012, zFront+pz); parent.add(pn1);
         const pn2 = new THREE.Mesh(pernoGeo, matPerno); pn2.position.set(x+px, pieT+0.012, zBack+pz); parent.add(pn2);
       });
-      if(tieneBotas){
-        // Bota protectora POR POSTE: van 2 por marco, no una sola pieza. Antes se
-        // dibujaba UNA barra de 0.10 x 0.30 x (fondo+0.05) cruzando todo el marco
-        // de poste a poste, cuando el BOM ya cobraba 2*nMarcos (linea ~4642): el
-        // cliente veia una pieza en el render y en la cotizacion le salian dos.
-        // Forma real (SEL-0021, BOTA PROTECTORA H12"): lamina doblada que envuelve
-        // el poste, conica — mas ancha abajo que arriba — y anclada al piso con
-        // una placa que sobresale. Se modela como piramide truncada de base
-        // cuadrada: CylinderGeometry con 4 segmentos girada 45 grados deja las
-        // caras planas hacia los ejes en vez de en diagonal.
-        // Holgura ajustada a la pieza real: abraza el poste de 7.6 cm dejando ~2 cm
-        // por lado abajo y ~0.6 arriba, de donde sale la silueta esbelta de la foto.
-        const botaH = 0.30, ladoAb = 0.125, ladoAr = 0.088, placaT = 0.010;
-        const K = Math.SQRT1_2;  // lado del cuadrado -> radio circunscrito
-        const _lados = ladoBota==='front' ? [zFront] : ladoBota==='back' ? [zBack] : [zFront, zBack];
-        _lados.forEach(zb=>{
-          const gb = new THREE.CylinderGeometry(ladoAr*K, ladoAb*K, botaH, 4);
-          const bo = new THREE.Mesh(gb, matBota);
-          bo.rotation.y = Math.PI/4;
-          bo.position.set(x, pieT + botaH/2, zb);
-          bo.add(new THREE.LineSegments(new THREE.EdgesGeometry(gb), matEdge));
-          parent.add(bo);
-          const pl = box(ladoAb + 0.022, placaT, ladoAb + 0.022, matBota);
-          pl.position.set(x, pieT + placaT/2, zb);
-          parent.add(pl);
+      if(tieneBotas || tienePunt){
+        // Las dos piezas van en el poste de PASILLO. Una bota no estorba a un
+        // protector: la bota se ancla al piso y el protector se atornilla mas
+        // arriba del puntal, asi que pueden ir juntos.
+        var _lados = ladoBota==='front' ? [zFront] : ladoBota==='back' ? [zBack] : [zFront, zBack];
+        _lados.forEach(function(zb){
+          var haciaPasillo = (zb > 0) ? 1 : -1;   // el vertice en V mira al pasillo
+          if(tieneBotas){
+            // BOTA: conica, con placa de barrenos al piso. Arranca en el pie.
+            var bo = _mallaProteccion(altoBotaM, matBota, true, 0.082, 0.072);
+            bo.position.set(x, pieT, zb);
+            bo.rotation.y = haciaPasillo>0 ? 0 : Math.PI;
+            parent.add(bo);
+            var pl = box(0.165, 0.010, 0.135, matBota);
+            pl.position.set(x, pieT+0.005, zb + haciaPasillo*0.012);
+            parent.add(pl);
+          }
+          if(tienePunt){
+            // PROTECTOR DE PUNTAL: recto y SIN placa — va atornillado al puntal,
+            // por eso arranca un poco arriba del piso y no toca el pie.
+            var yIniP = pieT + (tieneBotas ? altoBotaM + 0.03 : 0.02);
+            var pu = _mallaProteccion(altoPuntM, matPunt, false, 0.086, 0.076);
+            pu.position.set(x, yIniP, zb);
+            pu.rotation.y = haciaPasillo>0 ? 0 : Math.PI;
+            parent.add(pu);
+            // los dos tornillos que la sujetan al poste
+            var tg = new THREE.CylinderGeometry(0.006,0.006,0.02,8);
+            [0.25,0.75].forEach(function(f){
+              var tor = new THREE.Mesh(tg, matPerno);
+              tor.rotation.x = Math.PI/2;
+              tor.position.set(x, yIniP + altoPuntM*f, zb + haciaPasillo*0.055);
+              parent.add(tor);
+            });
+          }
         });
       }
     }
@@ -4210,10 +4343,10 @@ function buildSelectivo(){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
       const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front');
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back');
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = Math.min(l.cuerposA, l.cuerposB) + 1;
@@ -4228,7 +4361,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos');
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg));
     }
     // El rack se construye centrado en 0 → desplazar para que su borde izq. quede en xInicio
     gLin.position.x = xInicio + l.largoM/2;
@@ -4669,7 +4802,11 @@ function calcularBomSelectivo(){
     // Fila doble: 1 bota por marco (solo el poste de pasillo). Sencilla: 2, porque
     // puede quedar con pasillo de los dos lados. Antes cobraba 2 siempre, asi que
     // las dobles llevaban el doble de botas de las que se instalan.
-    if(cfg.botas) add(BOTA_SEL, (esD ? 1 : 2) * nMarcos);
+    // Cada pieza con su propio SKU y su propia casilla. Misma regla de cantidad:
+    // en fila doble solo el poste de pasillo lleva proteccion.
+    var _porMarco = (esD ? 1 : 2);
+    if(cfg.botas) add(cfg.botaSku || BOTA_SEL, _porMarco * nMarcos);
+    if(cfg.punt)  add(cfg.puntSku || PUNTAL_SEL, _porMarco * nMarcos);
     if(esD){
       const skuUnion = UNIONES_SEL[cfg.unionIn];
       // La unión también se hereda si el cliente ya tiene ese marco (izq o der).
@@ -5177,6 +5314,8 @@ async function cargarPrecios(){
     inventarioArr.push(item);
   }
   preciosCache = map;
+  // ya hay existencias reales: repoblar los selectores de proteccion
+  try{ if(typeof _syncProtecciones==='function') _syncProtecciones(); }catch(_e){}
   // Reglas BOM (corte de diagonales): la existencia de la hija (36"/24"/18") suma lo
   // fabricable de su madre (42"). Mismo criterio que ISA-OS.
   try{
@@ -5417,7 +5556,8 @@ function configResumen(){
     const extras = [];
     if(cfg.rejilla) extras.push('rejilla');
     if(cfg.panel) extras.push('panel beige');
-    if(cfg.botas)   extras.push('protector puntal');
+    if(cfg.punt)    extras.push('protector de puntal ' + _opcDe(PUNTAL_OPC, cfg.puntSku||PUNTAL_SEL).txt);
+    if(cfg.botas)   extras.push('bota protectora ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt);
     const ex = extras.length ? ' + '+extras.join(', ') : '';
     const nSenR = cfg.lineas.filter(l=>l.tipo==='sencilla').length;
     const nDobR = cfg.lineas.filter(l=>l.tipo==='doble').length;
@@ -6184,12 +6324,18 @@ function addEvents(){
 
   ['tipo','medida','niveles','modulos','cabeceras',
    'picAlto','picFondo','picLargo','picNiveles','picCuerpos','picChkRej','picChkPanel','picChkMadera',
-   'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkPanel','selChkBot',
+   'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkPanel','selChkBot','selChkPunt','selMedBota','selMedPunt',
    'mecAlto','mecNiveles','mecCuerpos',
    'canTipo','canAlto','canBrazo','canNiveles','canColumnas'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.addEventListener('change', build);
   });
+  // Las casillas de proteccion muestran u ocultan su selector de medida
+  ['selChkPunt','selChkBot'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener('change', _syncProtecciones);
+  });
+  _syncProtecciones();
   // Mantener el texto de capacidad del selectivo siempre sincronizado
   document.getElementById('selViga').addEventListener('change', actualizarSelVigaCap);
   actualizarSelVigaCap();
