@@ -764,29 +764,30 @@ function _syncProtecciones(){
 function _altoBotaM(cfg){ return _opcDe(BOTA_OPC, (cfg&&cfg.botaSku)||BOTA_SEL).hIn * 0.0254; }
 function _altoPuntM(cfg){ return _opcDe(PUNTAL_OPC, (cfg&&cfg.puntSku)||PUNTAL_SEL).hIn * 0.0254; }
 function _opcDe(arr, sku){ for(var i=0;i<arr.length;i++) if(arr[i].sku===sku) return arr[i]; return arr[0]; }
-// PROTECTOR LATERAL DE DOBLE BOTA: en los marcos de la ORILLA de la fila las dos
-// botas no van sueltas — van amarradas por una BARRA que cruza el fondo y se
-// atornilla a la cara exterior de las dos (Isaac, 18 sep 2026). El almacen lo
-// maneja como UN solo SKU de kit (2 botas + barra), no como piezas sueltas, asi
-// que cotizarlo por separado dejaba la barra regalada.
-// La barra se pide del largo del FONDO del marco: solo hay de 42" y 48".
-// Con fondo 24" o 36", o con una altura de bota fuera de 12/16/24, no existe kit
-// —> se regresa a botas sueltas y el 3D tampoco dibuja barra, para que lo que se
-// ve sea exactamente lo que se cobra.
-const KIT_DOBLE_BOTA = {
-  12: {42:'SEL-0245', 48:'SEL-0246'},
-  16: {42:'SEL-0248', 48:'SEL-0249'},
-  24: {42:'SEL-0251', 48:'SEL-0252'}
-};
-function _altoBotaIn(cfg){ return _opcDe(BOTA_OPC, (cfg&&cfg.botaSku)||BOTA_SEL).hIn; }
-function _kitDobleBota(hIn, fondoIn){
-  var f = KIT_DOBLE_BOTA[hIn];
-  return (f && f[fondoIn]) || null;
+// BARRA DE PROTECCION DE ORILLA: en la orilla de cada fila las dos botas van
+// amarradas por una barra estructural atornillada a su cara exterior. El largo
+// depende del tipo de fila (Isaac, 18 sep 2026):
+//   SENCILLA -> la barra cruza el fondo del marco:        fondo
+//   DOBLE    -> la barra cruza LAS DOS FILAS y la union:  fondo + union + fondo
+// Por eso el almacen maneja las dos medidas: 42" para la sencilla de fondo 42",
+// y 96" para la doble de 42"+12"+42". La barra es un SKU aparte de la bota.
+const BARRA_PROT_OPC = [
+  {sku:'SEL-0431', lIn:42},   // BARRA ESTRUCTURAL DE 3" X 42"
+  {sku:'SEL-0009', lIn:96}    // BARRA ESTRUCTURAL DE 3" X 96"
+];
+// Largo que pide la orilla, en pulgadas.
+function _largoBarraIn(cfg, l){
+  if(!l) return 0;
+  return (l.tipo === 'doble') ? (l.fondoIn*2 + (Number(cfg && cfg.unionIn) || 0)) : l.fondoIn;
 }
-// true si esta linea lleva barra en las orillas (hay kit para su combinacion).
-function _hayBarraExt(cfg, l){
-  return !!(cfg && cfg.botas && l && _kitDobleBota(_altoBotaIn(cfg), l.fondoIn));
+// De las medidas que hay en almacen, la mas cercana a lo que pide la orilla.
+function _barraProtSku(lIn){
+  var mej = BARRA_PROT_OPC[0];
+  for(var i=1;i<BARRA_PROT_OPC.length;i++)
+    if(Math.abs(BARRA_PROT_OPC[i].lIn - lIn) < Math.abs(mej.lIn - lIn)) mej = BARRA_PROT_OPC[i];
+  return mej.sku;
 }
+
 // REGLA DE OBRA (ISARACK): la rejilla electrosoldada viene en 2 anchos, uno
 // por cada largo de viga. NO se puede poner rejilla 46" en viga 108" — quedan
 // huecos y no cargan bien. La combinacion correcta es:
@@ -1163,13 +1164,14 @@ function _mallaProteccion(hM, mat, conico, vert, ala, cara){
   m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), matEdge));
   return m;
 }
-// BARRA del protector lateral de doble bota: canal en C acostado que amarra las
-// dos botas del marco de la orilla (la del poste de enfrente con la de atras).
+// BARRA de proteccion de orilla: canal en C acostado que amarra las dos botas
+// de la orilla de la fila (en sencilla, los dos postes del marco; en doble, el
+// poste de afuera de cada una de las dos filas).
 // El perfil se dibuja en XY y se extruye en +Z, que es justo el sentido del
 // fondo del rack, asi que la barra ya sale acostada sin rotarla.
 // La C abre hacia el rack (hacia -X del perfil): el alma queda del lado del golpe.
 function _mallaBarraProt(largoM, mat){
-  var alto = 0.10, prof = 0.045, esp = 0.006;
+  var alto = 0.076, prof = 0.045, esp = 0.006;   // 3" de peralte, como la barra real
   var sh = new THREE.Shape();
   sh.moveTo(0,       -alto/2);
   sh.lineTo(prof,    -alto/2);
@@ -3652,11 +3654,75 @@ function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
   }
 }
 
+// Orillas de una linea que llevan barra: 'izq' y/o 'der', saltando las que el
+// cliente ya tiene con marco puesto (esas no se cotizan ni se dibujan).
+function _orillasDe(l){
+  var o = [];
+  if(!l.marcoIzqExistente) o.push('izq');
+  if(!l.marcoDerExistente) o.push('der');
+  return o;
+}
+// true si la fila doble tiene las dos filas del mismo largo: solo asi las orillas
+// de la derecha quedan enfrentadas y cabe una barra larga que cruce las dos.
+function _doblePareja(l){
+  return l.tipo === 'doble' && l.cuerposA === l.cuerposB;
+}
+// Marcos que necesitan las DOS botas en una fila doble: solo la orilla derecha de
+// una doble despareja, que lleva su propia barra corta sobre su propio fondo.
+function _bota2De(l, cual){
+  if(_doblePareja(l) || l.marcoDerExistente) return null;
+  return [cual === 'A' ? l.cuerposA : l.cuerposB];
+}
+// Dibuja una barra de orilla entre los postes z1 y z2, por fuera del marco.
+// hacia = -1 orilla izquierda, +1 orilla derecha.
+function _barraOrilla(grupo, xM, z1, z2, hacia, yBar){
+  var zc = (z1 + z2) / 2, largoB = Math.abs(z2 - z1) + 0.08;
+  var ba = _mallaBarraProt(largoB, matBota);
+  ba.position.set(xM + hacia*0.075, yBar, zc);
+  if(hacia < 0) ba.rotation.y = Math.PI;   // la C siempre abre hacia el rack
+  grupo.add(ba);
+  var tg = new THREE.CylinderGeometry(0.007, 0.007, 0.03, 8);
+  [z1, z2].forEach(function(zb){
+    [-0.025, 0.025].forEach(function(dy){
+      var tb = new THREE.Mesh(tg, matPerno);
+      tb.rotation.z = Math.PI/2;
+      tb.position.set(xM + hacia*0.082, yBar + dy, zb);
+      grupo.add(tb);
+    });
+  });
+}
+// Todas las barras de una linea, en coordenadas del grupo de la linea.
+function _barrasDeLinea(gLin, cfg, l){
+  if(!cfg.botas) return;
+  var postD = 0.076;
+  var yBar  = 0.014 + _altoBotaM(cfg)*0.55;    // 0.014 = espesor del pie
+  var semi  = l.fondoM/2 - postD/2;            // del centro del fondo al poste
+  var xIzq  = -l.largoM/2;
+  if(l.tipo !== 'doble'){
+    _orillasDe(l).forEach(function(o){
+      var hacia = (o === 'izq') ? -1 : 1;
+      _barraOrilla(gLin, hacia < 0 ? xIzq : xIzq + l.vigaM*l.cuerpos, -semi, semi, hacia, yBar);
+    });
+    return;
+  }
+  var cf   = l.fondoM/2 + cfg.unionM/2;        // centro de cada fila
+  var zOut = cf + semi;                        // poste de afuera de cada fila
+  _orillasDe(l).forEach(function(o){
+    if(o === 'izq'){                           // las dos filas arrancan parejas
+      _barraOrilla(gLin, xIzq, -zOut, zOut, -1, yBar);
+    } else if(_doblePareja(l)){
+      _barraOrilla(gLin, xIzq + l.vigaM*l.cuerposA, -zOut, zOut, 1, yBar);
+    } else {                                   // filas desparejas: una barra corta por fila
+      _barraOrilla(gLin, xIzq + l.vigaM*l.cuerposA,  cf - semi,  cf + semi, 1, yBar);
+      _barraOrilla(gLin, xIzq + l.vigaM*l.cuerposB, -cf - semi, -cf + semi, 1, yBar);
+    }
+  });
+}
 // ladoBota: que poste de cada marco lleva bota protectora. En fila DOBLE va una
 // sola por marco, la del lado del pasillo — el poste interior queda entre las dos
 // filas y nadie lo golpea (Isaac, 17 sep 2026). 'front' = zFront, 'back' = zBack,
 // 'ambos' (default) = fila sencilla, que puede tener pasillo de los dos lados.
-function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota, tienePunt, altoBotaM, altoPuntM, conBarra){
+function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota, tienePunt, altoBotaM, altoPuntM, marcosBota2){
   altoBotaM = altoBotaM || 0.41;   // 16" por omision
   altoPuntM = altoPuntM || 0.61;   // 24" por omision
   const postW = 0.076, postD = 0.076, vigaH = 0.10, vigaD = 0.06;
@@ -3668,6 +3734,8 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
   // Marcos "ghost" (índices) que ya tiene el cliente. Se dibujan translúcidos
   // en gris y sin bota ni pernos (esos también son del cliente).
   const _ghosts = new Set(marcosGhost || []);
+  // Marcos de orilla que llevan las DOS botas (ver la barra en buildLayoutSel).
+  const _bota2  = new Set(marcosBota2 || []);
   function marco(x, kMarco){
     const hueco = _huecos.find(hh => hh.k === kMarco);
     const esGhost = _ghosts.has(kMarco);
@@ -3706,10 +3774,12 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         parent.add(pl);
       }
       var esExtremo = (kMarco === 0 || kMarco === cuerpos);
-      // En la ORILLA con barra el protector es de DOBLE bota: agarra los dos
-      // postes del marco aunque sea fila doble, porque la barra necesita las dos
-      // para amarrarse. Sin barra se respeta la regla vieja (solo el de pasillo).
-      var _botaDoble = tieneBotas && esExtremo && conBarra;
+      // En una fila DOBLE la orilla lleva UNA bota por marco, la del poste de
+      // AFUERA: la barra larga cruza las dos filas y se amarra a esas dos, sin
+      // tocar los postes de adentro. La excepcion son las dobles con filas de
+      // distinto largo: la orilla que no empareja lleva su propia barra corta y
+      // ese marco si necesita las dos botas. Esos marcos llegan en marcosBota2.
+      var _botaDoble = tieneBotas && esExtremo && _bota2.has(kMarco);
       if((tieneBotas && esExtremo) || (tienePunt && !esExtremo)){
         // Las dos piezas van en el poste de PASILLO. Una bota no estorba a un
         // protector: la bota se ancla al piso y el protector se atornilla mas
@@ -3746,31 +3816,10 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
             });
           }
         });
-        // PROTECTOR LATERAL DE DOBLE BOTA: las dos botas del marco de la orilla
-        // mas la barra que las amarra cruzando el fondo.
         if(_botaDoble){
           _ladosBota.forEach(function(zb){
             var hp = (zb > 0) ? 1 : -1;
             _ponerBota(zb, hp, (hp > 0) ? Math.PI : 0);
-          });
-          // La barra va por FUERA del marco de la orilla: a la izquierda en el
-          // marco k=0 y a la derecha en el ultimo. 0.075 es el ala de la bota,
-          // asi que la barra queda pegada a su cara exterior, no encimada.
-          var afuera = (kMarco === 0) ? -1 : 1;
-          var largoB = (fondoM - postD) + 0.08;      // sobresale un poco, como en obra
-          var ba = _mallaBarraProt(largoB, matBota);
-          ba.position.set(x + afuera*0.075, pieT + altoBotaM*0.55, 0);
-          if(afuera < 0) ba.rotation.y = Math.PI;    // la C siempre abre hacia el rack
-          parent.add(ba);
-          // los tornillos que la sujetan a cada bota
-          var tgB = new THREE.CylinderGeometry(0.007,0.007,0.03,8);
-          [zFront, zBack].forEach(function(zb){
-            [-0.025, 0.025].forEach(function(dy){
-              var tb = new THREE.Mesh(tgB, matPerno);
-              tb.rotation.z = Math.PI/2;
-              tb.position.set(x + afuera*0.082, pieT + altoBotaM*0.55 + dy, zb);
-              parent.add(tb);
-            });
           });
         }
       }
@@ -4468,10 +4517,10 @@ function buildSelectivo(){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
       const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _hayBarraExt(cfg, l));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(l, 'A'));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _hayBarraExt(cfg, l));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(l, 'B'));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = Math.min(l.cuerposA, l.cuerposB) + 1;
@@ -4486,8 +4535,9 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _hayBarraExt(cfg, l));
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null);
     }
+    _barrasDeLinea(gLin, cfg, l);
     // El rack se construye centrado en 0 → desplazar para que su borde izq. quede en xInicio
     gLin.position.x = xInicio + l.largoM/2;
     gLin.position.z = zFrente - l.profM/2;
@@ -4937,13 +4987,24 @@ function calcularBomSelectivo(){
     var _porMarco   = (esD ? 1 : 2);
     var _extremos   = Math.max(0, (esD ? 4 : 2) - nMarcosExis);
     var _intermedios= Math.max(0, nMarcos - _extremos);
-    // En la orilla, cuando hay kit para la combinacion alto de bota x fondo, se
-    // cotiza UN protector lateral de doble bota por marco: el SKU ya trae las dos
-    // botas y la barra. Sin kit se regresa a botas sueltas (y el 3D no pone barra).
-    var _kitSku = cfg.botas ? _kitDobleBota(_altoBotaIn(cfg), l.fondoIn) : null;
-    if(cfg.botas && _extremos > 0){
-      if(_kitSku) add(_kitSku, _extremos);
-      else        add(cfg.botaSku || BOTA_SEL, _porMarco * _extremos);
+    // Botas: cada orilla lleva 2 (sencilla: los dos postes del marco; doble: el
+    // poste de afuera de cada una de las dos filas). La barra que las amarra es
+    // un SKU aparte — su largo depende del tipo de fila, ver BARRA_PROT_OPC.
+    if(cfg.botas && _extremos > 0) add(cfg.botaSku || BOTA_SEL, _porMarco * _extremos);
+    if(cfg.botas){
+      var _orillas = 2 - nMarcosExisPorLado;
+      if(_orillas > 0){
+        if(esD && cA !== cB && !l.marcoDerExistente){
+          // Filas desparejas: la orilla izquierda lleva una barra larga que cruza
+          // las dos filas, y la derecha una barra corta por fila (sobre su fondo).
+          if(!l.marcoIzqExistente) add(_barraProtSku(_largoBarraIn(cfg, l)), 1);
+          add(_barraProtSku(l.fondoIn), 2);
+          // y esos dos marcos si necesitan las dos botas, no una
+          add(cfg.botaSku || BOTA_SEL, 2);
+        } else {
+          add(_barraProtSku(_largoBarraIn(cfg, l)), _orillas);
+        }
+      }
     }
     if(cfg.punt  && _intermedios > 0) add(cfg.puntSku || PUNTAL_SEL, _porMarco * _intermedios);
     if(esD){
@@ -5695,9 +5756,8 @@ function configResumen(){
     const extras = [];
     if(cfg.rejilla) extras.push('rejilla');
     if(cfg.panel) extras.push('panel beige');
-    if(cfg.botas)   extras.push(_hayBarraExt(cfg, (cfg.lineas||[])[0])
-                      ? 'protector lateral de doble bota ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt + ' con barra (orillas)'
-                      : 'bota protectora ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt + ' (orillas)');
+    if(cfg.botas)   extras.push('bota protectora ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt
+                      + ' con barra de orilla ' + _largoBarraIn(cfg, (cfg.lineas||[])[0]) + '"');
     if(cfg.punt)    extras.push('protector de puntal ' + _opcDe(PUNTAL_OPC, cfg.puntSku||PUNTAL_SEL).txt + ' (marcos de en medio)');
     const ex = extras.length ? ' + '+extras.join(', ') : '';
     const nSenR = cfg.lineas.filter(l=>l.tipo==='sencilla').length;
