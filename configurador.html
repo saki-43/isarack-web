@@ -3619,12 +3619,19 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         // arriba del puntal, asi que pueden ir juntos.
         var _lados = ladoBota==='front' ? [zFront] : ladoBota==='back' ? [zBack] : [zFront, zBack];
         _lados.forEach(function(zb){
-          var haciaPasillo = (zb > 0) ? 1 : -1;   // el vertice en V mira al pasillo
+          // El vertice de la V debe mirar al PASILLO, que es hacia afuera del rack.
+          // OJO con el signo: el shape trae el vertice en +Y, y despues de
+          // g.rotateX(-PI/2) ese vertice queda apuntando a -Z, no a +Z. Asi que
+          // el poste de +Z necesita girar PI y el de -Z se queda en 0 — al reves
+          // de lo que parece. Con el signo cambiado las botas miran hacia adentro
+          // del rack y dejan el poste descubierto por el lado del golpe.
+          var haciaPasillo = (zb > 0) ? 1 : -1;
+          var giro = (haciaPasillo > 0) ? Math.PI : 0;
           if(tieneBotas){
             // BOTA: conica, con placa de barrenos al piso. Arranca en el pie.
             var bo = _mallaProteccion(altoBotaM, matBota, true, 0.082, 0.072);
             bo.position.set(x, pieT, zb);
-            bo.rotation.y = haciaPasillo>0 ? 0 : Math.PI;
+            bo.rotation.y = giro;
             parent.add(bo);
             var pl = box(0.165, 0.010, 0.135, matBota);
             pl.position.set(x, pieT+0.005, zb + haciaPasillo*0.012);
@@ -3636,7 +3643,7 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
             var yIniP = pieT + (tieneBotas ? altoBotaM + 0.03 : 0.02);
             var pu = _mallaProteccion(altoPuntM, matPunt, false, 0.086, 0.076);
             pu.position.set(x, yIniP, zb);
-            pu.rotation.y = haciaPasillo>0 ? 0 : Math.PI;
+            pu.rotation.y = giro;
             parent.add(pu);
             // los dos tornillos que la sujetan al poste
             var tg = new THREE.CylinderGeometry(0.006,0.006,0.02,8);
