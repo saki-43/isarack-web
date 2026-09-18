@@ -106,6 +106,8 @@
 .pz-pill.wr{background:#fdf3e3;color:#b3711a}
 .pz-stp{display:flex;align-items:center;border:1px solid #d4d8dc;border-radius:7px;overflow:hidden;background:#fff;flex-shrink:0}
 .pz-stp button{width:22px;height:24px;padding:0;background:#fff;color:#6a6f75;font-size:13px;font-weight:700;border-radius:0;line-height:1}
+/* Botones chicos en linea: el button{width:100%} de arriba los apilaba a lo ancho */
+.btn-chip{width:auto!important;padding:2px 9px!important;font-size:10px!important;border-radius:5px!important;line-height:1.5}
 .pz-stp button:hover{background:#f4f6f7;color:#D85A30}
 .pz-stp b{font-size:12.5px;min-width:28px;text-align:center;font-variant-numeric:tabular-nums;border-left:1px solid #ebedef;border-right:1px solid #ebedef;height:24px;display:grid;place-items:center}
 .pz-stp.on{border-color:#D85A30}
@@ -425,8 +427,8 @@ gtag('config', 'G-XXXXXXXXXX');
         <option value="48">48" (1.22 m)</option>
       </select>
       <select id="selViga">
-        <option value="SEL-0362" selected>96" × 3"</option>
-        <option value="SEL-0364">96" × 4"</option>
+        <option value="SEL-0362">96" × 3"</option>
+        <option value="SEL-0364" selected>96" × 4"</option>
         <option value="SEL-0352">108" × 5.5"</option>
         <option value="SEL-0355">144" × 3.5"</option>
         <option value="SEL-0451">144" × 4"</option>
@@ -631,7 +633,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.18.05';
+const CFG_VERSION = '2026.09.18.06';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2889,7 +2891,8 @@ function lcSet(i,c,v){ lineasCantilever[i][c]=v; renderLineasCantilever(); build
 const SEL_ALTOS  = [[96,'96" (2.44 m)'],[144,'144" (3.66 m)'],[192,'192" (4.88 m)'],[240,'240" (6.10 m)'],[288,'288" (7.32 m)'],[312,'312" (7.92 m) · 26\''],[336,'336" (8.54 m)'],[360,'360" (9.14 m) · 30\'']];
 const SEL_FONDOS = [[24,'24" (0.61 m)'],[36,'36" (0.91 m)'],[42,'42" (1.07 m)'],[48,'48" (1.22 m)']];
 const SEL_VIGAS  = [['SEL-0362','96" × 3"'],['SEL-0364','96" × 4"'],['SEL-0352','108" × 5.5"'],['SEL-0355','144" × 3.5"'],['SEL-0451','144" × 4"'],['SEL-0358','144" × 6.25"']];
-let lineasAlmacen = [{tipo:'sencilla', cuerpos:1, altoIn:192, fondoIn:42, vigaSku:'SEL-0362', niveles:3, abierta:true}];
+// La viga que mas se vende: 96" x 4". Arranca seleccionada (Isaac, 18 sep 2026).
+let lineasAlmacen = [{tipo:'sencilla', cuerpos:1, altoIn:192, fondoIn:42, vigaSku:'SEL-0364', niveles:3, abierta:true}];
 
 function lineasSync(){
   // Espejo de la línea 1 en los selects ocultos (compatibilidad con código legado)
@@ -3215,7 +3218,7 @@ function _mallaInfo(l, i, esD, info){
     + '<div style="display:flex;gap:4px;margin:3px 0 4px">'
     + _mallaLadosDe(l).map(function(op){
         const on = (op === lado);
-        return '<button onclick="lnMallaLado('+i+',\''+op+'\')" style="border:1px solid '+(on?'#b07d00':'#ccc')+';background:'+(on?'#b07d00':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:6px;padding:3px 9px;font-size:10.5px;cursor:pointer">'+MALLA_LADO_TXT[op]+'</button>';
+        return '<button class="btn-chip" onclick="lnMallaLado('+i+',\''+op+'\')" style="border:1px solid '+(on?'#b07d00':'#ccc')+';background:'+(on?'#b07d00':'#fff')+';color:'+(on?'#fff':'#333')+';cursor:pointer;font-weight:600">'+MALLA_LADO_TXT[op]+'</button>';
       }).join('')
     + '</div>';
   if(!sku){
@@ -3269,7 +3272,7 @@ function _clarosEditorMod(l, i){
         + _clarosTabs(l, i, 'A', cA, esD ? 'Fila A' : '');
   if(esD) h += _clarosTabs(l, i, 'B', cB, 'Fila B');
   h += _clarosInputs(cl, nv, l.altoIn, function(n){ return 'lnClaroMod('+i+',\''+t.f+'\','+t.m+','+n+',this.value)'; });
-  h += '<button onclick="lnClarosCopiar('+i+')" style="margin-top:4px;border:1px solid #d9d4c5;background:#fff;border-radius:5px;padding:3px 8px;font-size:9.5px;cursor:pointer;color:#666">Copiar estos claros a todos los módulos</button>';
+  h += '<button class="btn-chip" onclick="lnClarosCopiar('+i+')" style="margin-top:5px;border:1px solid #d9d4c5;background:#fff;cursor:pointer;color:#666;font-weight:500">Copiar a todos los módulos</button>';
   return h;
 }
 // Botones de módulo de una fila.
@@ -3279,7 +3282,7 @@ function _clarosTabs(l, i, fila, cuerpos, etiqueta){
   h += '<div style="display:flex;gap:3px;flex-wrap:wrap;margin:2px 0">';
   for(let c=0; c<cuerpos; c++){
     const on = (t.f === fila && t.m === c);
-    h += '<button onclick="lnClarosTab('+i+',\''+fila+'\','+c+')" style="border:1px solid '+(on?'#da6635':'#ccc')+';background:'+(on?'#da6635':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer">M'+(c+1)+'</button>';
+    h += '<button class="btn-chip" onclick="lnClarosTab('+i+',\''+fila+'\','+c+')" style="border:1px solid '+(on?'#da6635':'#ccc')+';background:'+(on?'#da6635':'#fff')+';color:'+(on?'#fff':'#333')+';cursor:pointer;font-weight:600">M'+(c+1)+'</button>';
   }
   return h + '</div>';
 }
@@ -3309,6 +3312,28 @@ function _clarosTabSel(l){
   let m = parseInt(t.m);
   if(!(m >= 0 && m < max)) m = 0;
   return {f: f, m: m};
+}
+// ── SECCIONES PLEGABLES ──
+// Cada bloque de la tarjeta (niveles por modulo, claros, malla) se puede doblar
+// para que el panel no quede kilometrico (Isaac, 18 sep 2026). Plegar NO apaga
+// la opcion: la casilla sigue marcada y lo cotizado no cambia.
+function _plegado(l, k){ return !!(l.fold && l.fold[k]); }
+function lnFold(i, k){
+  const l = lineasAlmacen[i];
+  if(!l.fold) l.fold = {};
+  l.fold[k] = !l.fold[k];
+  renderLineasAlmacen();
+}
+// Renglon de encabezado: la casilla a la izquierda y la flecha de plegar a la
+// derecha. La flecha solo sale si hay algo que mostrar.
+function _secHead(l, i, k, labelHtml, hayDetalle){
+  const fl = _plegado(l, k);
+  return '<div style="display:flex;align-items:center;gap:4px">'
+    + '<div style="flex:1;min-width:0">' + labelHtml + '</div>'
+    + (hayDetalle
+        ? '<button class="btn-chip" onclick="lnFold('+i+',\''+k+'\')" title="'+(fl?'Mostrar':'Ocultar')+'" style="border:1px solid #ddd;background:#fff;color:#999;cursor:pointer;padding:1px 6px!important">'+(fl?'▸':'▾')+'</button>'
+        : '')
+    + '</div>';
 }
 function lnClarosTab(i, fila, m){
   lineasAlmacen[i].clarosTab = {f: fila, m: m};
@@ -3529,16 +3554,16 @@ function renderLineasAlmacen(){
         +(info.capKg ? '<div style="grid-column:1/3;color:#da6635;font-weight:600;font-size:9.5px">Capacidad: '+info.capKg.toLocaleString()+' kg / '+info.capLb.toLocaleString()+' lb por nivel</div>' : '')
         + filasAB
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
-          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lnNivMod('+i+',this.checked)"> Niveles por módulo</label>'
-          + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB) : '')
+          + _secHead(l, i, 'niv', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lnNivMod('+i+',this.checked)"> Niveles por módulo</label>', !!l.nivMod)
+          + ((l.nivMod && !_plegado(l,'niv')) ? _nivModEditor(l, i, esD, cA, cB) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
-          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.clarosOn?'checked':'')+' onchange="lnClarosOn('+i+',this.checked)"> 📏 Claros de viga a la medida</label>'
-          + (l.clarosOn ? _clarosEditor(l, i) : '')
+          + _secHead(l, i, 'claros', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.clarosOn?'checked':'')+' onchange="lnClarosOn('+i+',this.checked)"> 📏 Claros de viga a la medida</label>', !!l.clarosOn)
+          + ((l.clarosOn && !_plegado(l,'claros')) ? _clarosEditor(l, i) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
-          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#b07d00;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.mallaOn?'checked':'')+' onchange="lnMalla('+i+',this.checked)"> 🕸 Malla anticaída</label>'
-          + (l.mallaOn ? _mallaInfo(l, i, esD, info) : '')
+          + _secHead(l, i, 'malla', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#b07d00;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.mallaOn?'checked':'')+' onchange="lnMalla('+i+',this.checked)"> 🕸 Malla anticaída</label>', !!l.mallaOn)
+          + ((l.mallaOn && !_plegado(l,'malla')) ? _mallaInfo(l, i, esD, info) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#993C1D;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.tunelOn?'checked':'')+' onchange="lnTunelOn('+i+',this.checked)"> 🚇 Túnel (paso montacargas)</label>'
