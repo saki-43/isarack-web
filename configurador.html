@@ -446,6 +446,7 @@ gtag('config', 'G-XXXXXXXXXX');
     <select id="selMedPunt" style="display:none;margin:2px 0 6px 22px;max-width:230px"></select>
     <label class="chk"><input type="checkbox" id="selChkBot"> Bota protectora <span style="color:#9aa0a6;font-size:11px">(extremos de fila)</span></label>
     <select id="selMedBota" style="display:none;margin:2px 0 6px 22px;max-width:230px"></select>
+    <label class="chk" id="selLblBotBarra" style="display:none;margin-left:22px"><input type="checkbox" id="selChkBotBarra" checked> Con barra de amarre <span style="color:#9aa0a6;font-size:11px">(une las dos botas de la orilla)</span></label>
   </div>
 
   <!-- Bodega (compartida: se muestra en Picking y Selectivo) -->
@@ -758,6 +759,9 @@ function _syncProtecciones(){
     _llenarSelectProteccion(pr[1], pr[2]);
     sel.style.display = chk.checked ? '' : 'none';
   });
+  // La barra de amarre solo tiene sentido si hay botas
+  var chkB = document.getElementById('selChkBot'), lblBa = document.getElementById('selLblBotBarra');
+  if(chkB && lblBa) lblBa.style.display = chkB.checked ? '' : 'none';
 }
 function _altoBotaM(cfg){ return _opcDe(BOTA_OPC, (cfg&&cfg.botaSku)||BOTA_SEL).hIn * 0.0254; }
 function _altoPuntM(cfg){ return _opcDe(PUNTAL_OPC, (cfg&&cfg.puntSku)||PUNTAL_SEL).hIn * 0.0254; }
@@ -3415,6 +3419,7 @@ function getConfigSel(){
     panel:   document.getElementById('selChkPanel').checked,
     botas:   document.getElementById('selChkBot').checked,
     botaSku: (document.getElementById('selMedBota')||{}).value || BOTA_SEL,
+    botaBarra: !!(document.getElementById('selChkBotBarra')||{}).checked,
     punt:    document.getElementById('selChkPunt').checked,
     puntSku: (document.getElementById('selMedPunt')||{}).value || PUNTAL_SEL,
     altoM: altoIn*IN_TO_M, fondoM: fondoIn*IN_TO_M, vigaM: vigaIn*IN_TO_M};
@@ -3705,8 +3710,8 @@ function _doblePareja(l){
 }
 // Marcos que necesitan las DOS botas en una fila doble: solo la orilla derecha de
 // una doble despareja, que lleva su propia barra corta sobre su propio fondo.
-function _bota2De(l, cual){
-  if(_doblePareja(l) || l.marcoDerExistente) return null;
+function _bota2De(cfg, l, cual){
+  if(!cfg.botaBarra || _doblePareja(l) || l.marcoDerExistente) return null;
   return [cual === 'A' ? l.cuerposA : l.cuerposB];
 }
 // Dibuja una barra de orilla entre los postes z1 y z2, por fuera del marco.
@@ -3729,7 +3734,7 @@ function _barraOrilla(grupo, xM, z1, z2, hacia, yBar){
 }
 // Todas las barras de una linea, en coordenadas del grupo de la linea.
 function _barrasDeLinea(gLin, cfg, l){
-  if(!cfg.botas) return;
+  if(!cfg.botas || !cfg.botaBarra) return;   // botas sueltas, sin amarre
   var postD = 0.076;
   var yBar  = 0.014 + _altoBotaM(cfg)*0.55;    // 0.014 = espesor del pie
   var semi  = l.fondoM/2 - postD/2;            // del centro del fondo al poste
@@ -4595,10 +4600,10 @@ function buildSelectivo(){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
       const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(l, 'A'), alturasDeLineaM(l));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasDeLineaM(l));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(l, 'B'), alturasDeLineaM(l));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasDeLineaM(l));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = Math.min(l.cuerposA, l.cuerposB) + 1;
@@ -5069,7 +5074,7 @@ function calcularBomSelectivo(){
     // poste de afuera de cada una de las dos filas). La barra que las amarra es
     // un SKU aparte — su largo depende del tipo de fila, ver BARRA_PROT_OPC.
     if(cfg.botas && _extremos > 0) add(cfg.botaSku || BOTA_SEL, _porMarco * _extremos);
-    if(cfg.botas){
+    if(cfg.botas && cfg.botaBarra){
       var _orillas = 2 - nMarcosExisPorLado;
       if(_orillas > 0){
         if(esD && cA !== cB && !l.marcoDerExistente){
@@ -5835,7 +5840,7 @@ function configResumen(){
     if(cfg.rejilla) extras.push('rejilla');
     if(cfg.panel) extras.push('panel beige');
     if(cfg.botas)   extras.push('bota protectora ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt
-                      + ' con barra de orilla ' + _largoBarraIn(cfg, (cfg.lineas||[])[0]) + '"');
+                      + (cfg.botaBarra ? ' con barra de orilla ' + _largoBarraIn(cfg, (cfg.lineas||[])[0]) + '"' : ' sin barra'));
     if(cfg.punt)    extras.push('protector de puntal ' + _opcDe(PUNTAL_OPC, cfg.puntSku||PUNTAL_SEL).txt + ' (marcos de en medio)');
     const ex = extras.length ? ' + '+extras.join(', ') : '';
     const nSenR = cfg.lineas.filter(l=>l.tipo==='sencilla').length;
@@ -6601,7 +6606,7 @@ function addEvents(){
 
   ['tipo','medida','niveles','modulos','cabeceras',
    'picAlto','picFondo','picLargo','picNiveles','picCuerpos','picChkRej','picChkPanel','picChkMadera',
-   'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkPanel','selChkBot','selChkPunt','selMedBota','selMedPunt',
+   'selTipoFila','selAlto','selFondo','selViga','selNiveles','selCuerpos','selChkRej','selChkPanel','selChkBot','selChkBotBarra','selChkPunt','selMedBota','selMedPunt',
    'mecAlto','mecNiveles','mecCuerpos',
    'canTipo','canAlto','canBrazo','canNiveles','canColumnas'].forEach(id=>{
     const el = document.getElementById(id);
