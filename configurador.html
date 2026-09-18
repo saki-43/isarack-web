@@ -1074,6 +1074,33 @@ function getMatPanel(panW, panH){
 //          |    |        <- alas
 //          ]    [        <- dobleces: el poste entra hasta aqui
 //
+// La BOTA no lleva vertice en V como el protector: su frente es una CARA PLANA
+// ancha con dos dobleces en las esquinas. Con el perfil del protector se veia
+// puntiaguda, "como si fuera un triangulo" (Isaac, 18 sep 2026). Vista desde
+// arriba, con el pasillo hacia +Z:
+//
+//          _______        <- cara frontal plana
+//         /       \
+//        |         |      <- alas
+//        ]         [      <- dobleces
+//
+function _shapeBota(vert, ala, cara, doblez, esp){
+  var sh = new THREE.Shape();
+  sh.moveTo(-ala, -doblez);
+  sh.lineTo(-ala,  0);
+  sh.lineTo(-cara, vert);
+  sh.lineTo( cara, vert);
+  sh.lineTo( ala,  0);
+  sh.lineTo( ala, -doblez);
+  sh.lineTo( ala-esp, -doblez);
+  sh.lineTo( ala-esp, -esp*0.4);
+  sh.lineTo( cara-esp*0.5, vert-esp);
+  sh.lineTo(-cara+esp*0.5, vert-esp);
+  sh.lineTo(-ala+esp, -esp*0.4);
+  sh.lineTo(-ala+esp, -doblez);
+  sh.closePath();
+  return sh;
+}
 function _shapeProteccion(vert, ala, doblez, esp){
   var sh = new THREE.Shape();
   // contorno exterior, de un doblez al otro pasando por el vertice
@@ -1093,15 +1120,18 @@ function _shapeProteccion(vert, ala, doblez, esp){
 }
 // Malla vertical del perfil. conico=true encoge el tope (la bota va mas ancha
 // abajo); el protector de puntal es recto de arriba a abajo.
-function _mallaProteccion(hM, mat, conico, vert, ala){
+function _mallaProteccion(hM, mat, conico, vert, ala, cara){
   var esp = 0.005, doblez = 0.022;
-  var g = new THREE.ExtrudeGeometry(_shapeProteccion(vert, ala, doblez, esp), {depth:hM, bevelEnabled:false});
+  // cara > 0 -> perfil de BOTA (frente plano). Sin cara -> perfil de PROTECTOR (V).
+  var sh = cara ? _shapeBota(vert, ala, cara, doblez, esp)
+                : _shapeProteccion(vert, ala, doblez, esp);
+  var g = new THREE.ExtrudeGeometry(sh, {depth:hM, bevelEnabled:false});
   g.rotateX(-Math.PI/2);            // extruido en +Z -> lo paramos en +Y
   if(conico){
     // encoge en X/Z los vertices de arriba: 0 abajo, 30% arriba
     var po = g.attributes.position;
     for(var i=0;i<po.count;i++){
-      var t = po.getY(i)/hM, k = 1 - 0.30*Math.max(0,Math.min(1,t));
+      var t = po.getY(i)/hM, k = 1 - 0.12*Math.max(0,Math.min(1,t));
       po.setX(i, po.getX(i)*k); po.setZ(i, po.getZ(i)*k);
     }
     po.needsUpdate = true; g.computeVertexNormals();
@@ -3629,7 +3659,7 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
           var giro = (haciaPasillo > 0) ? Math.PI : 0;
           if(tieneBotas){
             // BOTA: conica, con placa de barrenos al piso. Arranca en el pie.
-            var bo = _mallaProteccion(altoBotaM, matBota, true, 0.082, 0.072);
+            var bo = _mallaProteccion(altoBotaM, matBota, true, 0.078, 0.075, 0.046);
             bo.position.set(x, pieT, zb);
             bo.rotation.y = giro;
             parent.add(bo);
