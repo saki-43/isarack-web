@@ -631,7 +631,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.18.02';
+const CFG_VERSION = '2026.09.18.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3250,11 +3250,14 @@ function lnMalla(i, on){
 // desde el piso en cm — que es el numero que el instalador busca en la obra.
 function _clarosEditor(l, i){
   const cl = _clarosNormaliza(l);
+  const nMax = _nivMaxLinea(l);
   const topeIn = l.altoIn;
   let acum = 0;
-  let h = '<div style="font-size:9px;color:#888;margin:3px 0 2px">Separación desde la viga de abajo (el nivel 1, desde el piso). Va de 2 en 2 pulgadas, como los barrenos del marco.</div>'
+  let h = '<div style="font-size:9px;color:#888;margin:3px 0 2px">Separación desde la viga de abajo (el nivel 1, desde el piso). Va de 2 en 2 pulgadas, como los barrenos del marco.'
+        + (l.nivMod ? '<br>Es una sola escalera de alturas: cada módulo toma los primeros escalones según sus niveles.' : '')
+        + '</div>'
         + '<div style="display:flex;gap:4px;flex-wrap:wrap">';
-  for(let n=0; n<l.niveles; n++){
+  for(let n=0; n<nMax; n++){
     acum += cl[n];
     const sobra = acum > topeIn;
     h += '<div style="text-align:center">'
@@ -3308,6 +3311,8 @@ function lnNivSet(i, fila, c, val){
   const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
   if(!Array.isArray(l[key])) l[key] = [];
   l[key][c] = v;
+  // Si subio el modulo mas alto, la escalera de claros necesita mas escalones.
+  if(l.clarosOn){ _clarosNormaliza(l); renderLineasAlmacen(); }
   build();
   if(typeof lineasSync === 'function') lineasSync();
 }
@@ -3442,10 +3447,8 @@ function renderLineasAlmacen(){
           + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
-          + (l.nivMod
-              ? '<div style="font-size:9.5px;color:#888">📏 Claros de viga a la medida: no aplican con niveles por módulo.</div>'
-              : '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.clarosOn?'checked':'')+' onchange="lnClarosOn('+i+',this.checked)"> 📏 Claros de viga a la medida</label>'
-                + (l.clarosOn ? _clarosEditor(l, i) : ''))
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.clarosOn?'checked':'')+' onchange="lnClarosOn('+i+',this.checked)"> 📏 Claros de viga a la medida</label>'
+          + (l.clarosOn ? _clarosEditor(l, i) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#b07d00;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.mallaOn?'checked':'')+' onchange="lnMalla('+i+',this.checked)"> 🕸 Malla anticaída</label>'
@@ -4150,13 +4153,15 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
   const _nivArr = Array.isArray(niveles);
   // Claros a la medida: llegan ya resueltos desde la fila. No aplican en modo
   // "niveles por modulo", porque ahi cada modulo tiene su propio numero de niveles.
-  const alturasManSel = _nivArr ? null : (alturasNivelM || null);
+  // Los claros a la medida son una sola escalera de alturas y valen tambien con
+  // "niveles por modulo": cada cuerpo toma los primeros nivC escalones.
+  const alturasManSel = alturasNivelM || null;
   const bandas = bandasLibres || [];
   for(let c=0; c<cuerpos; c++){
     const xL = x0 + c * vigaM, xR = xL + vigaM;
     const cxV = (xL + xR) / 2;
     const nivC = _nivArr ? (parseInt(niveles[c])||parseInt(niveles[0])||1) : niveles;
-    const alturasC = alturasManSel || alturasDefaultM(altoM, nivC);
+    const alturasC = (alturasManSel && alturasManSel.length >= nivC) ? alturasManSel : alturasDefaultM(altoM, nivC);
     for(let n=0; n<nivC; n++){
       const y = Math.min(alturasC[n], altoM - 0.10);
       // Solo se despejan los niveles por donde pasa la pasarela; arriba y abajo quedan normales
@@ -4334,14 +4339,30 @@ function clarosDefaultIn(altoM, niveles){
 }
 // Deja l.claros con exactamente l.niveles valores buenos. Idempotente: respeta
 // los que el usuario ya capturo y solo rellena los que faltan o vienen en cero.
+// Niveles que hay que cubrir con claros. Con "niveles por modulo" prendido es
+// el modulo MAS ALTO: los claros son una sola escalera de alturas y cada modulo
+// usa los primeros que le tocan, igual que en obra, donde los barrenos del marco
+// estan a la misma altura y al modulo con menos niveles nada mas le faltan vigas.
+function _nivMaxLinea(l){
+  let mx = parseInt(l.niveles) || 1;
+  if(l.nivMod){
+    const cA = l.cuerpos, cB = (l.cuerposB == null ? l.cuerpos : l.cuerposB);
+    _nivArrRaw(l, 'A', cA).forEach(function(v){ if(v > mx) mx = v; });
+    if(l.tipo === 'doble') _nivArrRaw(l, 'B', cB).forEach(function(v){ if(v > mx) mx = v; });
+  }
+  return Math.max(1, mx);
+}
 function _clarosNormaliza(l){
-  const def = clarosDefaultIn(l.altoIn * IN_TO_M, l.niveles);
+  const nMax = _nivMaxLinea(l);
+  const def = clarosDefaultIn(l.altoIn * IN_TO_M, nMax);
   if(!Array.isArray(l.claros)) l.claros = [];
-  for(let n=0; n<l.niveles; n++){
+  for(let n=0; n<nMax; n++){
     const v = parseFloat(l.claros[n]);
     l.claros[n] = (v > 0) ? v : def[n];
   }
-  l.claros.length = l.niveles;
+  // NO se recorta el arreglo: si se bajan los niveles y luego se vuelven a
+  // subir, los claros que ya se habian capturado siguen ahi. Recortarlos era la
+  // razon de que se perdiera el trabajo al prender y apagar niveles por modulo.
   return l.claros;
 }
 // Posiciones Y (en metros) de las vigas de ESTA fila, o null si no tiene claros
@@ -4350,7 +4371,8 @@ function alturasDeLineaM(l){
   if(!l || !l.clarosOn || !Array.isArray(l.claros) || !l.claros.length) return null;
   const ys = [];
   let acum = 0;
-  for(let n=0; n<l.niveles; n++){
+  const nMax = _nivMaxLinea(l);
+  for(let n=0; n<nMax; n++){
     const inch = parseFloat(l.claros[n]);
     if(!(inch > 0)) return null;
     acum += inch * IN_TO_M;
