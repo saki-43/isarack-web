@@ -440,8 +440,6 @@ gtag('config', 'G-XXXXXXXXXX');
     <select id="selCuerpos" style="display:none">
         <option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
     </select>
-    <label class="chk"><input type="checkbox" id="selAlturaManual"> Personalizar claros de viga</label>
-    <div class="alturas-nivel" id="selAlturasContainer"></div>
     <label class="chk"><input type="checkbox" id="selChkRej"> Rejilla electrosoldada</label>
     <label class="chk"><input type="checkbox" id="selChkPanel"> Panel beige (corte a medida)</label>
     <label class="chk"><input type="checkbox" id="selChkPunt"> Protector de puntal <span style="color:#9aa0a6;font-size:11px">(marcos de en medio)</span></label>
@@ -2787,11 +2785,6 @@ function lineasSync(){
       }
     }
   }
-  // Personalizar claros solo aplica con 1 línea
-  const chkClaros = document.getElementById('selAlturaManual');
-  const lblClaros = chkClaros ? chkClaros.closest('label') : null;
-  if(lblClaros) lblClaros.style.display = lineasAlmacen.length > 1 ? 'none' : '';
-  if(lineasAlmacen.length > 1 && chkClaros) chkClaros.checked = false;
 }
 
 function _opts(pairs, val){
@@ -3065,6 +3058,42 @@ function _nivNormaliza(l){
   l.nivelesA = _nivArrRaw(l, 'A', cA);
   if(l.tipo === 'doble') l.nivelesB = _nivArrRaw(l, 'B', cB); else l.nivelesB = null;
 }
+// Un input por nivel con el claro en pulgadas, y debajo la altura acumulada
+// desde el piso en cm — que es el numero que el instalador busca en la obra.
+function _clarosEditor(l, i){
+  const cl = _clarosNormaliza(l);
+  const topeIn = l.altoIn;
+  let acum = 0;
+  let h = '<div style="font-size:9px;color:#888;margin:3px 0 2px">Separación desde la viga de abajo (el nivel 1, desde el piso). Va de 2 en 2 pulgadas, como los barrenos del marco.</div>'
+        + '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+  for(let n=0; n<l.niveles; n++){
+    acum += cl[n];
+    const sobra = acum > topeIn;
+    h += '<div style="text-align:center">'
+       + '<div style="font-size:8.5px;color:#999;margin-bottom:1px">N'+(n+1)+'</div>'
+       + '<input type="number" step="2" min="2" value="'+cl[n]+'" onchange="lnClaro('+i+','+n+',this.value)" style="width:46px;padding:3px 2px;font-size:11px;border:1px solid '+(sobra?'#c62828':'#d9d4c5')+';border-radius:5px;text-align:center;background:#fff">'
+       + '<div style="font-size:8px;color:'+(sobra?'#c62828':'#999')+';margin-top:1px">'+Math.round(acum*2.54)+' cm</div>'
+       + '</div>';
+  }
+  h += '</div>';
+  if(acum > topeIn) h += '<div style="font-size:9px;color:#c62828;margin-top:3px">⚠ El último nivel queda arriba del marco de '+topeIn+'". El 3D lo recorta al tope.</div>';
+  return h;
+}
+// Al prender la casilla se copian los claros que la fila YA tenia, para que no
+// brinque ninguna viga: _clarosNormaliza rellena con el reparto uniforme.
+function lnClarosOn(i, on){
+  const l = lineasAlmacen[i];
+  l.clarosOn = !!on;
+  if(on) _clarosNormaliza(l);
+  renderLineasAlmacen(); build();
+}
+function lnClaro(i, n, val){
+  const l = lineasAlmacen[i];
+  _clarosNormaliza(l);
+  // Las vigas entran en barrenos cada 2\" — se redondea al par mas cercano.
+  l.claros[n] = Math.max(2, Math.round((parseFloat(val) || 0) / 2) * 2);
+  renderLineasAlmacen(); build();
+}
 function _nivModEditor(l, i, esD, cA, cB, setFn){
   setFn = setFn || 'lnNivSet';
   const fila = (f, arr, n) => {
@@ -3225,6 +3254,12 @@ function renderLineasAlmacen(){
           + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + (l.nivMod
+              ? '<div style="font-size:9.5px;color:#888">📏 Claros de viga a la medida: no aplican con niveles por módulo.</div>'
+              : '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.clarosOn?'checked':'')+' onchange="lnClarosOn('+i+',this.checked)"> 📏 Claros de viga a la medida</label>'
+                + (l.clarosOn ? _clarosEditor(l, i) : ''))
+        + '</div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#993C1D;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.tunelOn?'checked':'')+' onchange="lnTunelOn('+i+',this.checked)"> 🚇 Túnel (paso montacargas)</label>'
           + (l.tunelOn ? ('<div style="font-size:9.5px;color:#888;margin:3px 0 2px">Toca el cuerpo donde va el paso:</div><div style="display:flex;flex-wrap:wrap;gap:4px">' + _tunelChips(l, i, cA) + '</div>') : '')
         + '</div>'
@@ -3318,7 +3353,6 @@ function lnSet(i, campo, valor){
   // Combinación 336×36 no existe en catálogo → forzar fondo 42
   if(lineasAlmacen[i].altoIn === 336 && lineasAlmacen[i].fondoIn === 36) lineasAlmacen[i].fondoIn = 42;
   renderLineasAlmacen();
-  try{ if(lineasAlmacen.length === 1) actualizarInputsAlturasNivel('selectivo'); }catch(e){}
   try{ actualizarStockEnDropdowns(); }catch(e){}
   build();
 }
@@ -3355,6 +3389,8 @@ function getConfigSel(){
       escHNivs: (l.escHOn ? (l.escHNivs || []) : []),
       marcoIzqExistente: !!l.marcoIzqExistente,
       marcoDerExistente: !!l.marcoDerExistente,
+      clarosOn: !!l.clarosOn,
+      claros: (l.clarosOn ? _clarosNormaliza(l).slice() : []),
       altoM, fondoM, vigaM,
       largoM: vigaM * cuerposMaxLn,
       profM: l.tipo==='doble' ? fondoM*2 + unionM : fondoM};
@@ -3722,7 +3758,7 @@ function _barrasDeLinea(gLin, cfg, l){
 // sola por marco, la del lado del pasillo — el poste interior queda entre las dos
 // filas y nadie lo golpea (Isaac, 17 sep 2026). 'front' = zFront, 'back' = zBack,
 // 'ambos' (default) = fila sencilla, que puede tener pasillo de los dos lados.
-function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota, tienePunt, altoBotaM, altoPuntM, marcosBota2){
+function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota, tienePunt, altoBotaM, altoPuntM, marcosBota2, alturasNivelM){
   altoBotaM = altoBotaM || 0.41;   // 16" por omision
   altoPuntM = altoPuntM || 0.61;   // 24" por omision
   const postW = 0.076, postD = 0.076, vigaH = 0.10, vigaD = 0.06;
@@ -3859,7 +3895,9 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
   // Posición Y de cada nivel: manual (si está activo) o uniforme.
   // `niveles` puede ser un número (parejo) o un arreglo por cuerpo (niveles por módulo).
   const _nivArr = Array.isArray(niveles);
-  const alturasManSel = _nivArr ? null : getAlturasManualesM('selectivo'); // alturas manuales solo en modo parejo
+  // Claros a la medida: llegan ya resueltos desde la fila. No aplican en modo
+  // "niveles por modulo", porque ahi cada modulo tiene su propio numero de niveles.
+  const alturasManSel = _nivArr ? null : (alturasNivelM || null);
   const bandas = bandasLibres || [];
   for(let c=0; c<cuerpos; c++){
     const xL = x0 + c * vigaM, xR = xL + vigaM;
@@ -4029,11 +4067,51 @@ function alturasDefaultM(altoM, niveles){
   return ys;
 }
 
+// ── CLAROS DE VIGA POR FILA (Selectivo) ──
+// El "claro" es la separacion desde la viga de abajo (en el nivel 1, desde el
+// piso). La viga N queda a claro1+claro2+...+claroN del suelo.
+// El default es el MISMO reparto uniforme de alturasDefaultM, para que marcar la
+// casilla no mueva ninguna viga: antes arrancaba con (alto*0.85)/niveles y el
+// rack brincaba de 48/96/144" a 54/108/162" sin que nadie tocara nada.
+function clarosDefaultIn(altoM, niveles){
+  const espacioIn = Math.round((altoM / (niveles + 1)) * M_TO_IN / 2) * 2;
+  const arr = [];
+  for(let i=0; i<niveles; i++) arr.push(espacioIn);
+  return arr;
+}
+// Deja l.claros con exactamente l.niveles valores buenos. Idempotente: respeta
+// los que el usuario ya capturo y solo rellena los que faltan o vienen en cero.
+function _clarosNormaliza(l){
+  const def = clarosDefaultIn(l.altoIn * IN_TO_M, l.niveles);
+  if(!Array.isArray(l.claros)) l.claros = [];
+  for(let n=0; n<l.niveles; n++){
+    const v = parseFloat(l.claros[n]);
+    l.claros[n] = (v > 0) ? v : def[n];
+  }
+  l.claros.length = l.niveles;
+  return l.claros;
+}
+// Posiciones Y (en metros) de las vigas de ESTA fila, o null si no tiene claros
+// a la medida. Los claros son por fila: cada linea manda sobre las suyas.
+function alturasDeLineaM(l){
+  if(!l || !l.clarosOn || !Array.isArray(l.claros) || !l.claros.length) return null;
+  const ys = [];
+  let acum = 0;
+  for(let n=0; n<l.niveles; n++){
+    const inch = parseFloat(l.claros[n]);
+    if(!(inch > 0)) return null;
+    acum += inch * IN_TO_M;
+    ys.push(acum);
+  }
+  return ys.length ? ys : null;
+}
 // Genera (o re-genera) los inputs de altura por nivel para un sistema dado
+// (solo Picking: el Selectivo lleva los claros por fila, ver alturasDeLineaM)
 function actualizarInputsAlturasNivel(sistema){
   const cfg = sistema === 'selectivo' ? getConfigSel() : getConfigPic();
   const container = document.getElementById(sistema === 'selectivo' ? 'selAlturasContainer' : 'picAlturasContainer');
   const chk = document.getElementById(sistema === 'selectivo' ? 'selAlturaManual' : 'picAlturaManual');
+  if(!container || !chk) return;          // el Selectivo ya no usa esta ruta
   if(!chk.checked){
     container.classList.remove('activo');
     container.innerHTML = '';
@@ -4088,7 +4166,7 @@ function actualizarInputsAlturasNivel(sistema){
 // Devuelve array de posiciones Y (en metros) de cada viga si los claros personalizados están activos, o null
 function getAlturasManualesM(sistema){
   const chk = document.getElementById(sistema === 'selectivo' ? 'selAlturaManual' : 'picAlturaManual');
-  if(!chk.checked) return null;
+  if(!chk || !chk.checked) return null;   // el Selectivo ya no usa esta ruta
   const container = document.getElementById(sistema === 'selectivo' ? 'selAlturasContainer' : 'picAlturasContainer');
   const inputs = container.querySelectorAll('input[type=number]');
   // Posiciones acumulativas: viga N está a (claro1 + claro2 + ... + claroN) desde el piso
@@ -4517,10 +4595,10 @@ function buildSelectivo(){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
       const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(l, 'A'));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(l, 'A'), alturasDeLineaM(l));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(l, 'B'));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(l, 'B'), alturasDeLineaM(l));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = Math.min(l.cuerposA, l.cuerposB) + 1;
@@ -4535,7 +4613,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null);
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasDeLineaM(l));
     }
     _barrasDeLinea(gLin, cfg, l);
     // El rack se construye centrado en 0 → desplazar para que su borde izq. quede en xInicio
@@ -4615,7 +4693,7 @@ function buildSelectivo(){
   // Cotas de niveles (claros) SIEMPRE visibles en la esquina frontal del primer marco
   if(lineas[0]){
     const l0 = lineas[0];
-    const alturasManSelC = getAlturasManualesM('selectivo');
+    const alturasManSelC = alturasDeLineaM(l0);
     const alturasYSel = [];
     if(alturasManSelC){
       for(const y of alturasManSelC) alturasYSel.push(Math.min(y, l0.altoM - 0.10));
@@ -6509,7 +6587,7 @@ function addEvents(){
     lpX=e.touches[0].clientX; lpY=e.touches[0].clientY;
   }, {passive:false});
   // Checkbox altura manual + cambios de niveles regeneran los inputs
-  ['picAlturaManual','selAlturaManual'].forEach(id=>{
+  ['picAlturaManual'].forEach(id=>{
     document.getElementById(id).addEventListener('change', ()=>{
       const sistema = id.startsWith('pic') ? 'picking' : 'selectivo';
       actualizarInputsAlturasNivel(sistema);
@@ -6518,10 +6596,8 @@ function addEvents(){
   });
   // Cuando cambia el número de niveles, regenerar los inputs (si activos)
   document.getElementById('picNiveles').addEventListener('change', ()=>actualizarInputsAlturasNivel('picking'));
-  document.getElementById('selNiveles').addEventListener('change', ()=>actualizarInputsAlturasNivel('selectivo'));
   // Cuando cambia el alto del marco, también regenerar (porque el default depende del alto)
   document.getElementById('picAlto').addEventListener('change', ()=>actualizarInputsAlturasNivel('picking'));
-  document.getElementById('selAlto').addEventListener('change', ()=>actualizarInputsAlturasNivel('selectivo'));
 
   ['tipo','medida','niveles','modulos','cabeceras',
    'picAlto','picFondo','picLargo','picNiveles','picCuerpos','picChkRej','picChkPanel','picChkMadera',
