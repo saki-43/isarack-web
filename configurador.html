@@ -825,16 +825,14 @@ function _mallaSku(vigaIn){ return MALLA_PANEL[vigaIn] || null; }
 // La medida cuadra sola en el marco mas comun: 24" + 4 paneles de 42" = 192".
 const MALLA_INICIO_IN = 24;
 function _mallaInicioM(){ return MALLA_INICIO_IN * IN_TO_M; }
-// Paneles apilados que pide UN claro. Como todos son de 42" enteros, el numero
-// se redondea al MAS CERCANO, no hacia arriba: si al tope le falta menos de
-// medio panel se deja asi (el hueco queda muy por encima de la ultima carga), y
-// si le falta mas de medio se pone otro y sobresale tantito.
-// Redondear siempre hacia arriba dejaba 3 pies de malla volando sobre un marco
-// de 240"; hacia abajo dejaba 3 pies destapados en uno de 144".
+// Paneles apilados que pide UN claro. Se cubre TODO el marco: si para llegar al
+// tope hace falta otro panel, se pide (Isaac, 18 sep 2026) — por eso va hacia
+// arriba y no al mas cercano. Los paneles son de 42" enteros, asi que en los
+// marcos que no son 24" + n x 42" el ultimo sobresale y en obra se corta.
 function _mallaPaneles(l){
   const altoM = l.altoM || (l.altoIn * IN_TO_M);
   const cubrirIn = (altoM / IN_TO_M) - MALLA_INICIO_IN;
-  return Math.max(1, Math.round(cubrirIn / MALLA_ALTO_IN));
+  return Math.max(1, Math.ceil(cubrirIn / MALLA_ALTO_IN));
 }
 // Claros con malla. En doble solo los que tienen fila de los dos lados.
 function _mallaClaros(l){
@@ -3166,10 +3164,9 @@ function _mallaInfo(l, esD, info){
     + '<b>'+_mallaSujeciones(l)+'</b> sujeciones ('+(nCl+1)+' × '+(nPan+1)+'): cada una agarra las 4 esquinas que se juntan, por eso se comparten.'
     + (function(){
         const dif = MALLA_INICIO_IN + nPan*MALLA_ALTO_IN - l.altoIn;
-        if(dif === 0) return '<br><span style="color:#0a6">Cierra al ras del marco.</span>';
-        return dif > 0
-          ? '<br><span style="color:#b07d00">El último panel sobresale '+dif+'" del marco.</span>'
-          : '<br><span style="color:#b07d00">Quedan '+(-dif)+'" sin malla hasta el tope del marco.</span>';
+        return dif === 0
+          ? '<br><span style="color:#0a6">Cierra al ras del marco.</span>'
+          : '<br><span style="color:#b07d00">Cubre todo el marco; el último panel sobresale '+dif+'" y se corta en obra.</span>';
       })()
     + '</div>';
 }
