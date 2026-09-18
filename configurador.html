@@ -444,9 +444,9 @@ gtag('config', 'G-XXXXXXXXXX');
     <div class="alturas-nivel" id="selAlturasContainer"></div>
     <label class="chk"><input type="checkbox" id="selChkRej"> Rejilla electrosoldada</label>
     <label class="chk"><input type="checkbox" id="selChkPanel"> Panel beige (corte a medida)</label>
-    <label class="chk"><input type="checkbox" id="selChkPunt"> Protector de puntal</label>
+    <label class="chk"><input type="checkbox" id="selChkPunt"> Protector de puntal <span style="color:#9aa0a6;font-size:11px">(marcos de en medio)</span></label>
     <select id="selMedPunt" style="display:none;margin:2px 0 6px 22px;max-width:230px"></select>
-    <label class="chk"><input type="checkbox" id="selChkBot"> Bota protectora</label>
+    <label class="chk"><input type="checkbox" id="selChkBot"> Bota protectora <span style="color:#9aa0a6;font-size:11px">(extremos de fila)</span></label>
     <select id="selMedBota" style="display:none;margin:2px 0 6px 22px;max-width:230px"></select>
   </div>
 
@@ -3643,7 +3643,12 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         const pn1 = new THREE.Mesh(pernoGeo, matPerno); pn1.position.set(x+px, pieT+0.012, zFront+pz); parent.add(pn1);
         const pn2 = new THREE.Mesh(pernoGeo, matPerno); pn2.position.set(x+px, pieT+0.012, zBack+pz); parent.add(pn2);
       });
-      if(tieneBotas || tienePunt){
+      // REGLA DE OBRA (Isaac, 18 sep 2026): la BOTA va solo en los marcos de los
+      // EXTREMOS de la fila — son las esquinas del pasillo, las que mas golpean, y
+      // por eso llevan la pieza robusta anclada al piso. Los marcos de EN MEDIO
+      // llevan PROTECTOR DE PUNTAL, que va atornillado al puntal.
+      var esExtremo = (kMarco === 0 || kMarco === cuerpos);
+      if((tieneBotas && esExtremo) || (tienePunt && !esExtremo)){
         // Las dos piezas van en el poste de PASILLO. Una bota no estorba a un
         // protector: la bota se ancla al piso y el protector se atornilla mas
         // arriba del puntal, asi que pueden ir juntos.
@@ -3657,7 +3662,7 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
           // del rack y dejan el poste descubierto por el lado del golpe.
           var haciaPasillo = (zb > 0) ? 1 : -1;
           var giro = (haciaPasillo > 0) ? Math.PI : 0;
-          if(tieneBotas){
+          if(tieneBotas && esExtremo){
             // BOTA: conica, con placa de barrenos al piso. Arranca en el pie.
             var bo = _mallaProteccion(altoBotaM, matBota, true, 0.078, 0.075, 0.046);
             bo.position.set(x, pieT, zb);
@@ -3667,10 +3672,10 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
             pl.position.set(x, pieT+0.005, zb + haciaPasillo*0.012);
             parent.add(pl);
           }
-          if(tienePunt){
+          if(tienePunt && !esExtremo){
             // PROTECTOR DE PUNTAL: recto y SIN placa — va atornillado al puntal,
             // por eso arranca un poco arriba del piso y no toca el pie.
-            var yIniP = pieT + (tieneBotas ? altoBotaM + 0.03 : 0.02);
+            var yIniP = pieT + 0.02;   // nunca coincide con una bota: van en marcos distintos
             var pu = _mallaProteccion(altoPuntM, matPunt, false, 0.086, 0.076);
             pu.position.set(x, yIniP, zb);
             pu.rotation.y = giro;
@@ -4839,11 +4844,18 @@ function calcularBomSelectivo(){
     // Fila doble: 1 bota por marco (solo el poste de pasillo). Sencilla: 2, porque
     // puede quedar con pasillo de los dos lados. Antes cobraba 2 siempre, asi que
     // las dobles llevaban el doble de botas de las que se instalan.
-    // Cada pieza con su propio SKU y su propia casilla. Misma regla de cantidad:
-    // en fila doble solo el poste de pasillo lleva proteccion.
-    var _porMarco = (esD ? 1 : 2);
-    if(cfg.botas) add(cfg.botaSku || BOTA_SEL, _porMarco * nMarcos);
-    if(cfg.punt)  add(cfg.puntSku || PUNTAL_SEL, _porMarco * nMarcos);
+    // Cada pieza con su SKU, y cada una donde le toca (misma regla que el 3D):
+    //   BOTA      -> solo los marcos de los EXTREMOS de la fila
+    //   PROTECTOR -> los marcos de EN MEDIO
+    // Cuantos postes protegidos por marco: en fila doble solo el de pasillo (1);
+    // en sencilla los dos (2).
+    // Los marcos que el cliente ya tiene (ghost) son siempre de los extremos y no
+    // llevan proteccion, por eso se descuentan de los extremos, no de los de en medio.
+    var _porMarco   = (esD ? 1 : 2);
+    var _extremos   = Math.max(0, (esD ? 4 : 2) - nMarcosExis);
+    var _intermedios= Math.max(0, nMarcos - _extremos);
+    if(cfg.botas && _extremos > 0)    add(cfg.botaSku || BOTA_SEL,   _porMarco * _extremos);
+    if(cfg.punt  && _intermedios > 0) add(cfg.puntSku || PUNTAL_SEL, _porMarco * _intermedios);
     if(esD){
       const skuUnion = UNIONES_SEL[cfg.unionIn];
       // La unión también se hereda si el cliente ya tiene ese marco (izq o der).
@@ -5593,8 +5605,8 @@ function configResumen(){
     const extras = [];
     if(cfg.rejilla) extras.push('rejilla');
     if(cfg.panel) extras.push('panel beige');
-    if(cfg.punt)    extras.push('protector de puntal ' + _opcDe(PUNTAL_OPC, cfg.puntSku||PUNTAL_SEL).txt);
-    if(cfg.botas)   extras.push('bota protectora ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt);
+    if(cfg.botas)   extras.push('bota protectora ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt + ' (extremos)');
+    if(cfg.punt)    extras.push('protector de puntal ' + _opcDe(PUNTAL_OPC, cfg.puntSku||PUNTAL_SEL).txt + ' (marcos de en medio)');
     const ex = extras.length ? ' + '+extras.join(', ') : '';
     const nSenR = cfg.lineas.filter(l=>l.tipo==='sencilla').length;
     const nDobR = cfg.lineas.filter(l=>l.tipo==='doble').length;
