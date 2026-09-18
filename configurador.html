@@ -834,11 +834,28 @@ function _mallaPaneles(l){
   const cubrirIn = (altoM / IN_TO_M) - MALLA_INICIO_IN;
   return Math.max(1, Math.ceil(cubrirIn / MALLA_ALTO_IN));
 }
-// Claros con malla. En doble solo los que tienen fila de los dos lados.
+// Lado donde va la malla: 'atras' / 'adelante' / 'medio' (solo en fila doble).
+// Por omision, la sencilla la lleva atras (la cara que se pega a la pared) y la
+// doble en medio de las dos filas.
+function _mallaLado(l){
+  const lados = _mallaLadosDe(l);
+  const v = l.mallaLado;
+  return (lados.indexOf(v) >= 0) ? v : lados[0];
+}
+function _mallaLadosDe(l){
+  return (l.tipo === 'doble') ? ['medio','adelante','atras'] : ['atras','adelante'];
+}
+const MALLA_LADO_TXT = {medio:'En medio', adelante:'Adelante', atras:'Atrás'};
+// Claros con malla. En medio de una doble solo cuentan los claros que tienen
+// fila de los dos lados; en una cara exterior manda la fila de ese lado.
 function _mallaClaros(l){
   const cA = (l.cuerposA != null) ? l.cuerposA : l.cuerpos;
   const cB = (l.cuerposB == null) ? cA : l.cuerposB;
-  return l.tipo === 'doble' ? Math.min(cA, cB) : cA;
+  if(l.tipo !== 'doble') return cA;
+  const lado = _mallaLado(l);
+  if(lado === 'adelante') return cA;   // fila A va al frente (+Z)
+  if(lado === 'atras')    return cB;   // fila B va atras   (-Z)
+  return Math.min(cA, cB);
 }
 // De las medidas que hay en almacen, la mas cercana a lo que pide la orilla.
 function _barraProtSku(lIn){
@@ -3151,15 +3168,24 @@ function _nivNormaliza(l){
 }
 // Resumen de lo que va a cotizar la malla de esta fila, para que se vea antes
 // de mandar la cotizacion.
-function _mallaInfo(l, esD, info){
+function _mallaInfo(l, i, esD, info){
   const vigaIn = info && info.largoIn;
   const sku = _mallaSku(vigaIn);
-  const donde = esD ? 'entre las dos filas' : 'en la cara de atrás (la de la pared)';
+  const lado = _mallaLado(l);
+  const donde = (lado === 'medio') ? 'entre las dos filas'
+              : (lado === 'atras') ? 'en la cara de atrás (la de la pared)'
+              :                      'en la cara de adelante';
+  const chips = '<div style="display:flex;gap:4px;margin:4px 0 2px">'
+    + _mallaLadosDe(l).map(function(op){
+        const on = (op === lado);
+        return '<button onclick="lnMallaLado('+i+',\''+op+'\')" style="border:1px solid '+(on?'#b07d00':'#ccc')+';background:'+(on?'#b07d00':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:6px;padding:3px 9px;font-size:10.5px;cursor:pointer">'+MALLA_LADO_TXT[op]+'</button>';
+      }).join('')
+    + '</div>';
   if(!sku){
-    return '<div style="font-size:9px;color:#c62828;margin-top:3px">⚠ No hay panel de malla para viga de '+(vigaIn||'?')+'". Hay de 96", 108", 120" y 144".</div>';
+    return chips + '<div style="font-size:9px;color:#c62828">⚠ No hay panel de malla para viga de '+(vigaIn||'?')+'". Hay de 96", 108", 120" y 144".</div>';
   }
   const nPan = _mallaPaneles(l), nCl = _mallaClaros(l);
-  return '<div style="font-size:9px;color:#888;margin-top:3px">Va '+donde+', de 2 pies del piso al tope.<br>'
+  return chips + '<div style="font-size:9px;color:#888">Va '+donde+', de 2 pies del piso al tope.<br>'
     + '<b>'+(nPan*nCl)+'</b> paneles de '+vigaIn+'"×'+MALLA_ALTO_IN+'" ('+nPan+' apilados × '+nCl+' claro'+(nCl===1?'':'s')+')<br>'
     + '<b>'+_mallaSujeciones(l)+'</b> sujeciones ('+(nCl+1)+' × '+(nPan+1)+'): cada una agarra las 4 esquinas que se juntan, por eso se comparten.'
     + (function(){
@@ -3169,6 +3195,10 @@ function _mallaInfo(l, esD, info){
           : '<br><span style="color:#b07d00">Cubre todo el marco; el último panel sobresale '+dif+'" y se corta en obra.</span>';
       })()
     + '</div>';
+}
+function lnMallaLado(i, lado){
+  lineasAlmacen[i].mallaLado = lado;
+  renderLineasAlmacen(); build();
 }
 function lnMalla(i, on){
   lineasAlmacen[i].mallaOn = !!on;
@@ -3379,7 +3409,7 @@ function renderLineasAlmacen(){
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#b07d00;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.mallaOn?'checked':'')+' onchange="lnMalla('+i+',this.checked)"> 🕸 Malla anticaída</label>'
-          + (l.mallaOn ? _mallaInfo(l, esD, info) : '')
+          + (l.mallaOn ? _mallaInfo(l, i, esD, info) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#993C1D;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.tunelOn?'checked':'')+' onchange="lnTunelOn('+i+',this.checked)"> 🚇 Túnel (paso montacargas)</label>'
@@ -3512,6 +3542,7 @@ function getConfigSel(){
       marcoIzqExistente: !!l.marcoIzqExistente,
       marcoDerExistente: !!l.marcoDerExistente,
       mallaOn: !!l.mallaOn,
+      mallaLado: _mallaLado(l),
       clarosOn: !!l.clarosOn,
       claros: (l.clarosOn ? _clarosNormaliza(l).slice() : []),
       altoM, fondoM, vigaM,
@@ -3896,7 +3927,16 @@ function _mallaDeLinea(gLin, cfg, l){
   const semi = l.fondoM/2 - postD/2;
   // La medida de la sujecion ES lo que la malla se despega del poste.
   const sujM = _opcDe(SUJECION_OPC, cfg.sujSku || SUJECION_SEL).hIn * IN_TO_M;
-  const zM = (l.tipo === 'doble') ? 0 : -(semi + sujM);
+  const lado = _mallaLado(l);
+  const esD  = l.tipo === 'doble';
+  const cf   = esD ? (l.fondoM/2 + cfg.unionM/2) : 0;   // centro de cada fila
+  // Poste del que se cuelga y a que distancia queda la malla.
+  const zPoste = (lado === 'medio') ? 0
+               : (lado === 'adelante') ?  (cf + semi)
+               :                         -(cf + semi);
+  const zM = (lado === 'medio') ? 0
+           : (lado === 'adelante') ? (zPoste + sujM)
+           :                         (zPoste - sujM);
   const xIzq = -l.largoM/2;
   const nClaros = _mallaClaros(l);
   for(let c=0; c<nClaros; c++){
@@ -3908,9 +3948,9 @@ function _mallaDeLinea(gLin, cfg, l){
   // que cuenta _mallaSujeciones. En doble agarra de los postes de las dos filas.
   const ysJ = [];
   for(let i=0; i<=nApil; i++) ysJ.push(yIni + i * (altoStack / nApil));
-  const zPostes = (l.tipo === 'doble')
+  const zPostes = (lado === 'medio')
     ? [ (cfg.unionM/2 + postD/2), -(cfg.unionM/2 + postD/2) ]
-    : [ -semi ];
+    : [ zPoste ];
   for(let c=0; c<=nClaros; c++){
     const xN = xIzq + c * l.vigaM;
     ysJ.forEach(function(y){
