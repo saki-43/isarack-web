@@ -825,11 +825,16 @@ function _mallaSku(vigaIn){ return MALLA_PANEL[vigaIn] || null; }
 // La medida cuadra sola en el marco mas comun: 24" + 4 paneles de 42" = 192".
 const MALLA_INICIO_IN = 24;
 function _mallaInicioM(){ return MALLA_INICIO_IN * IN_TO_M; }
-// Paneles apilados que pide UN claro para llegar de los 2 pies al tope.
+// Paneles apilados que pide UN claro. Como todos son de 42" enteros, el numero
+// se redondea al MAS CERCANO, no hacia arriba: si al tope le falta menos de
+// medio panel se deja asi (el hueco queda muy por encima de la ultima carga), y
+// si le falta mas de medio se pone otro y sobresale tantito.
+// Redondear siempre hacia arriba dejaba 3 pies de malla volando sobre un marco
+// de 240"; hacia abajo dejaba 3 pies destapados en uno de 144".
 function _mallaPaneles(l){
   const altoM = l.altoM || (l.altoIn * IN_TO_M);
   const cubrirIn = (altoM / IN_TO_M) - MALLA_INICIO_IN;
-  return Math.max(1, Math.ceil(cubrirIn / MALLA_ALTO_IN));
+  return Math.max(1, Math.round(cubrirIn / MALLA_ALTO_IN));
 }
 // Claros con malla. En doble solo los que tienen fila de los dos lados.
 function _mallaClaros(l){
@@ -1246,8 +1251,11 @@ function crearMallaAnticaida(anchoM, altoM, pasoPanelM){
   [-anchoM/2, anchoM/2].forEach(function(x){
     const b = box(tubo, altoM, tubo, matBota); b.position.set(x, 0, 0); g.add(b);
   });
-  const ys = [-altoM/2, altoM/2];
-  for(let y = -altoM/2 + pasoPanelM; y < altoM/2 - 0.02; y += pasoPanelM) ys.push(y);
+  // Una barra por junta, repartidas por indice: asi TODAS las bandas salen del
+  // mismo alto y nunca queda una corta por acumulacion de decimales.
+  const nBandas = Math.max(1, Math.round(altoM / pasoPanelM));
+  const ys = [];
+  for(let i=0; i<=nBandas; i++) ys.push(-altoM/2 + i * (altoM / nBandas));
   ys.forEach(function(y){
     const b = box(anchoM + tubo, tubo, tubo, matBota); b.position.set(0, y, 0); g.add(b);
   });
@@ -3157,9 +3165,11 @@ function _mallaInfo(l, esD, info){
     + '<b>'+(nPan*nCl)+'</b> paneles de '+vigaIn+'"×'+MALLA_ALTO_IN+'" ('+nPan+' apilados × '+nCl+' claro'+(nCl===1?'':'s')+')<br>'
     + '<b>'+_mallaSujeciones(l)+'</b> sujeciones ('+(nCl+1)+' × '+(nPan+1)+'): cada una agarra las 4 esquinas que se juntan, por eso se comparten.'
     + (function(){
-        // Cuanto sobresale el ultimo panel arriba del marco: hay que cortarlo.
-        const sobra = MALLA_INICIO_IN + nPan*MALLA_ALTO_IN - l.altoIn;
-        return sobra > 0 ? '<br><span style="color:#b07d00">El último panel sobresale '+sobra+'" del marco.</span>' : '';
+        const dif = MALLA_INICIO_IN + nPan*MALLA_ALTO_IN - l.altoIn;
+        if(dif === 0) return '<br><span style="color:#0a6">Cierra al ras del marco.</span>';
+        return dif > 0
+          ? '<br><span style="color:#b07d00">El último panel sobresale '+dif+'" del marco.</span>'
+          : '<br><span style="color:#b07d00">Quedan '+(-dif)+'" sin malla hasta el tope del marco.</span>';
       })()
     + '</div>';
 }
@@ -3878,8 +3888,14 @@ function _barrasDeLinea(gLin, cfg, l){
 function _mallaDeLinea(gLin, cfg, l){
   if(!l.mallaOn) return;
   const postD = 0.076;
-  const yIni = _mallaInicioM(), yFin = l.altoM;
-  if(yFin - yIni < 0.20) return;
+  // Los paneles son de 42" SIEMPRE: se apilan enteros desde los 2 pies. Si el
+  // marco no es 24" + n x 42", el ultimo sobresale — en obra se corta, pero el
+  // dibujo tiene que mostrar el panel completo, no una banda corta (Isaac, 18 sep).
+  const yIni = _mallaInicioM();
+  const nApil = _mallaPaneles(l);
+  const altoStack = nApil * MALLA_ALTO_IN * IN_TO_M;
+  const yFin = yIni + altoStack;
+  if(l.altoM - yIni < 0.20) return;
   const semi = l.fondoM/2 - postD/2;
   // La medida de la sujecion ES lo que la malla se despega del poste.
   const sujM = _opcDe(SUJECION_OPC, cfg.sujSku || SUJECION_SEL).hIn * IN_TO_M;
@@ -3887,15 +3903,14 @@ function _mallaDeLinea(gLin, cfg, l){
   const xIzq = -l.largoM/2;
   const nClaros = _mallaClaros(l);
   for(let c=0; c<nClaros; c++){
-    const m = crearMallaAnticaida(l.vigaM - postD, yFin - yIni, MALLA_ALTO_IN * IN_TO_M);
-    m.position.set(xIzq + (c + 0.5) * l.vigaM, (yIni + yFin) / 2, zM);
+    const m = crearMallaAnticaida(l.vigaM - postD, altoStack, MALLA_ALTO_IN * IN_TO_M);
+    m.position.set(xIzq + (c + 0.5) * l.vigaM, yIni + altoStack / 2, zM);
     gLin.add(m);
   }
   // Sujeciones: una en cada cruce de poste con junta de panel — los mismos nodos
   // que cuenta _mallaSujeciones. En doble agarra de los postes de las dos filas.
   const ysJ = [];
-  for(let y = yIni; y < yFin - 0.02; y += MALLA_ALTO_IN * IN_TO_M) ysJ.push(y);
-  ysJ.push(yFin);
+  for(let i=0; i<=nApil; i++) ysJ.push(yIni + i * (altoStack / nApil));
   const zPostes = (l.tipo === 'doble')
     ? [ (cfg.unionM/2 + postD/2), -(cfg.unionM/2 + postD/2) ]
     : [ -semi ];
