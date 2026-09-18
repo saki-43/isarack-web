@@ -820,16 +820,15 @@ function _mallaSujeciones(l){
   return (_mallaClaros(l) + 1) * (_mallaPaneles(l) + 1);
 }
 function _mallaSku(vigaIn){ return MALLA_PANEL[vigaIn] || null; }
-// Y de la primera viga de carga: de ahi para arriba se cubre con malla.
-function _primerVigaM(l){
-  const altoM = l.altoM || (l.altoIn * IN_TO_M);
-  const ys = alturasDeLineaM(l) || alturasDefaultM(altoM, l.niveles);
-  return (ys && ys.length) ? ys[0] : 0;
-}
-// Paneles apilados que pide UN claro para llegar de la primera viga al tope.
+// La malla arranca a 2 PIES del piso y de ahi se apila hacia arriba (Isaac,
+// 18 sep 2026). No depende de donde quede la primera viga de carga.
+// La medida cuadra sola en el marco mas comun: 24" + 4 paneles de 42" = 192".
+const MALLA_INICIO_IN = 24;
+function _mallaInicioM(){ return MALLA_INICIO_IN * IN_TO_M; }
+// Paneles apilados que pide UN claro para llegar de los 2 pies al tope.
 function _mallaPaneles(l){
   const altoM = l.altoM || (l.altoIn * IN_TO_M);
-  const cubrirIn = (altoM - _primerVigaM(l)) / IN_TO_M;
+  const cubrirIn = (altoM / IN_TO_M) - MALLA_INICIO_IN;
   return Math.max(1, Math.ceil(cubrirIn / MALLA_ALTO_IN));
 }
 // Claros con malla. En doble solo los que tienen fila de los dos lados.
@@ -3154,9 +3153,15 @@ function _mallaInfo(l, esD, info){
     return '<div style="font-size:9px;color:#c62828;margin-top:3px">⚠ No hay panel de malla para viga de '+(vigaIn||'?')+'". Hay de 96", 108", 120" y 144".</div>';
   }
   const nPan = _mallaPaneles(l), nCl = _mallaClaros(l);
-  return '<div style="font-size:9px;color:#888;margin-top:3px">Va '+donde+', de la primera viga de carga al tope.<br>'
+  return '<div style="font-size:9px;color:#888;margin-top:3px">Va '+donde+', de 2 pies del piso al tope.<br>'
     + '<b>'+(nPan*nCl)+'</b> paneles de '+vigaIn+'"×'+MALLA_ALTO_IN+'" ('+nPan+' apilados × '+nCl+' claro'+(nCl===1?'':'s')+')<br>'
-    + '<b>'+_mallaSujeciones(l)+'</b> sujeciones ('+(nCl+1)+' × '+(nPan+1)+'): cada una agarra las 4 esquinas que se juntan, por eso se comparten.</div>';
+    + '<b>'+_mallaSujeciones(l)+'</b> sujeciones ('+(nCl+1)+' × '+(nPan+1)+'): cada una agarra las 4 esquinas que se juntan, por eso se comparten.'
+    + (function(){
+        // Cuanto sobresale el ultimo panel arriba del marco: hay que cortarlo.
+        const sobra = MALLA_INICIO_IN + nPan*MALLA_ALTO_IN - l.altoIn;
+        return sobra > 0 ? '<br><span style="color:#b07d00">El último panel sobresale '+sobra+'" del marco.</span>' : '';
+      })()
+    + '</div>';
 }
 function lnMalla(i, on){
   lineasAlmacen[i].mallaOn = !!on;
@@ -3873,7 +3878,7 @@ function _barrasDeLinea(gLin, cfg, l){
 function _mallaDeLinea(gLin, cfg, l){
   if(!l.mallaOn) return;
   const postD = 0.076;
-  const yIni = _primerVigaM(l), yFin = l.altoM;
+  const yIni = _mallaInicioM(), yFin = l.altoM;
   if(yFin - yIni < 0.20) return;
   const semi = l.fondoM/2 - postD/2;
   // La medida de la sujecion ES lo que la malla se despega del poste.
