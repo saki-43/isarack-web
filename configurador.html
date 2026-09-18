@@ -631,7 +631,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.18.04';
+const CFG_VERSION = '2026.09.18.05';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3249,20 +3249,50 @@ function lnMalla(i, on){
 // Un input por nivel con el claro en pulgadas, y debajo la altura acumulada
 // desde el piso en cm — que es el numero que el instalador busca en la obra.
 function _clarosEditor(l, i){
+  return l.nivMod ? _clarosEditorMod(l, i) : _clarosEditorSimple(l, i);
+}
+// Una sola escalera para toda la fila.
+function _clarosEditorSimple(l, i){
   const cl = _clarosNormaliza(l);
   const nMax = _nivMaxLinea(l);
-  const topeIn = l.altoIn;
+  return '<div style="font-size:9px;color:#888;margin:3px 0 2px">Separación desde la viga de abajo (el nivel 1, desde el piso). Va de 2 en 2 pulgadas, como los barrenos del marco.</div>'
+    + _clarosInputs(cl, nMax, l.altoIn, function(n){ return 'lnClaro('+i+','+n+',this.value)'; });
+}
+// Pestaña por módulo: cada uno con sus propias alturas.
+function _clarosEditorMod(l, i){
+  const esD = l.tipo === 'doble';
+  const cA = l.cuerpos, cB = (l.cuerposB == null ? l.cuerpos : l.cuerposB);
+  const t = _clarosTabSel(l);
+  const cl = _clarosModNormaliza(l, t.f, t.m);
+  const nv = _nivDeModulo(l, t.f, t.m);
+  let h = '<div style="font-size:9px;color:#888;margin:3px 0 2px">Cada módulo lleva sus propias alturas. Escoge el módulo y captura sus claros.</div>'
+        + _clarosTabs(l, i, 'A', cA, esD ? 'Fila A' : '');
+  if(esD) h += _clarosTabs(l, i, 'B', cB, 'Fila B');
+  h += _clarosInputs(cl, nv, l.altoIn, function(n){ return 'lnClaroMod('+i+',\''+t.f+'\','+t.m+','+n+',this.value)'; });
+  h += '<button onclick="lnClarosCopiar('+i+')" style="margin-top:4px;border:1px solid #d9d4c5;background:#fff;border-radius:5px;padding:3px 8px;font-size:9.5px;cursor:pointer;color:#666">Copiar estos claros a todos los módulos</button>';
+  return h;
+}
+// Botones de módulo de una fila.
+function _clarosTabs(l, i, fila, cuerpos, etiqueta){
+  const t = _clarosTabSel(l);
+  let h = etiqueta ? '<div style="font-size:8.5px;color:#999;margin:3px 0 1px">'+etiqueta+'</div>' : '';
+  h += '<div style="display:flex;gap:3px;flex-wrap:wrap;margin:2px 0">';
+  for(let c=0; c<cuerpos; c++){
+    const on = (t.f === fila && t.m === c);
+    h += '<button onclick="lnClarosTab('+i+',\''+fila+'\','+c+')" style="border:1px solid '+(on?'#da6635':'#ccc')+';background:'+(on?'#da6635':'#fff')+';color:'+(on?'#fff':'#333')+';border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer">M'+(c+1)+'</button>';
+  }
+  return h + '</div>';
+}
+// Los inputs en si, con la altura acumulada desde el piso en cm.
+function _clarosInputs(cl, n, topeIn, onchangeFn){
   let acum = 0;
-  let h = '<div style="font-size:9px;color:#888;margin:3px 0 2px">Separación desde la viga de abajo (el nivel 1, desde el piso). Va de 2 en 2 pulgadas, como los barrenos del marco.'
-        + (l.nivMod ? '<br>Es una sola escalera de alturas: cada módulo toma los primeros escalones según sus niveles.' : '')
-        + '</div>'
-        + '<div style="display:flex;gap:4px;flex-wrap:wrap">';
-  for(let n=0; n<nMax; n++){
-    acum += cl[n];
+  let h = '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+  for(let k=0; k<n; k++){
+    acum += parseFloat(cl[k]) || 0;
     const sobra = acum > topeIn;
     h += '<div style="text-align:center">'
-       + '<div style="font-size:8.5px;color:#999;margin-bottom:1px">N'+(n+1)+'</div>'
-       + '<input type="number" step="2" min="2" value="'+cl[n]+'" onchange="lnClaro('+i+','+n+',this.value)" style="width:46px;padding:3px 2px;font-size:11px;border:1px solid '+(sobra?'#c62828':'#d9d4c5')+';border-radius:5px;text-align:center;background:#fff">'
+       + '<div style="font-size:8.5px;color:#999;margin-bottom:1px">N'+(k+1)+'</div>'
+       + '<input type="number" step="2" min="2" value="'+cl[k]+'" onchange="'+onchangeFn(k)+'" style="width:46px;padding:3px 2px;font-size:11px;border:1px solid '+(sobra?'#c62828':'#d9d4c5')+';border-radius:5px;text-align:center;background:#fff">'
        + '<div style="font-size:8px;color:'+(sobra?'#c62828':'#999')+';margin-top:1px">'+Math.round(acum*2.54)+' cm</div>'
        + '</div>';
   }
@@ -3270,12 +3300,57 @@ function _clarosEditor(l, i){
   if(acum > topeIn) h += '<div style="font-size:9px;color:#c62828;margin-top:3px">⚠ El último nivel queda arriba del marco de '+topeIn+'". El 3D lo recorta al tope.</div>';
   return h;
 }
+// Pestaña abierta, validada contra los módulos que existen hoy.
+function _clarosTabSel(l){
+  const cA = l.cuerpos, cB = (l.cuerposB == null ? l.cuerpos : l.cuerposB);
+  const t = l.clarosTab || {};
+  const f = (t.f === 'B' && l.tipo === 'doble') ? 'B' : 'A';
+  const max = (f === 'B') ? cB : cA;
+  let m = parseInt(t.m);
+  if(!(m >= 0 && m < max)) m = 0;
+  return {f: f, m: m};
+}
+function lnClarosTab(i, fila, m){
+  lineasAlmacen[i].clarosTab = {f: fila, m: m};
+  renderLineasAlmacen();
+}
+function lnClaroMod(i, fila, c, n, val){
+  const l = lineasAlmacen[i];
+  _clarosModNormaliza(l, fila, c);
+  l[_clarosModKey(fila)][c][n] = Math.max(2, Math.round((parseFloat(val) || 0) / 2) * 2);
+  renderLineasAlmacen(); build();
+}
+// Copia la escalera del módulo abierto a todos los demás. Si alguno tiene más
+// niveles, los de más se rellenan repitiendo el último claro.
+function lnClarosCopiar(i){
+  const l = lineasAlmacen[i];
+  const t = _clarosTabSel(l);
+  const src = _clarosModNormaliza(l, t.f, t.m).slice();
+  const cA = l.cuerpos, cB = (l.cuerposB == null ? l.cuerpos : l.cuerposB);
+  function aplica(fila, cuerpos){
+    const key = _clarosModKey(fila);
+    if(!Array.isArray(l[key])) l[key] = [];
+    for(let c=0; c<cuerpos; c++){
+      const nv = _nivDeModulo(l, fila, c);
+      const arr = [];
+      for(let k=0; k<nv; k++) arr[k] = (parseFloat(src[k]) > 0) ? src[k] : src[src.length - 1];
+      l[key][c] = arr;
+    }
+  }
+  aplica('A', cA);
+  if(l.tipo === 'doble') aplica('B', cB);
+  renderLineasAlmacen(); build();
+}
+
 // Al prender la casilla se copian los claros que la fila YA tenia, para que no
 // brinque ninguna viga: _clarosNormaliza rellena con el reparto uniforme.
 function lnClarosOn(i, on){
   const l = lineasAlmacen[i];
   l.clarosOn = !!on;
-  if(on) _clarosNormaliza(l);
+  if(on){
+    _clarosNormaliza(l);
+    if(l.nivMod) _clarosSiembraModulos(l);
+  }
   renderLineasAlmacen(); build();
 }
 function lnClaro(i, n, val){
@@ -3299,10 +3374,17 @@ function _nivModEditor(l, i, esD, cA, cB, setFn){
   };
   return '<div style="margin-top:4px">' + fila('A', _nivArrRaw(l,'A',cA), cA) + (esD ? fila('B', _nivArrRaw(l,'B',cB), cB) : '') + '</div>';
 }
+// Siembra los claros de cada modulo con la escalera de la fila: al prender
+// "niveles por modulo" no se mueve ninguna viga hasta que se toque un numero.
+function _clarosSiembraModulos(l){
+  const cA = l.cuerpos, cB = (l.cuerposB == null ? l.cuerpos : l.cuerposB);
+  for(let c=0; c<cA; c++) _clarosModNormaliza(l, 'A', c);
+  if(l.tipo === 'doble') for(let c=0; c<cB; c++) _clarosModNormaliza(l, 'B', c);
+}
 function lnNivMod(i, on){
   const l = lineasAlmacen[i];
   l.nivMod = !!on;
-  if(on) _nivNormaliza(l);
+  if(on){ _nivNormaliza(l); if(l.clarosOn) _clarosSiembraModulos(l); }
   renderLineasAlmacen(); build();
 }
 function lnNivSet(i, fila, c, val){
@@ -3312,7 +3394,11 @@ function lnNivSet(i, fila, c, val){
   if(!Array.isArray(l[key])) l[key] = [];
   l[key][c] = v;
   // Si subio el modulo mas alto, la escalera de claros necesita mas escalones.
-  if(l.clarosOn){ _clarosNormaliza(l); renderLineasAlmacen(); }
+  if(l.clarosOn){
+    _clarosNormaliza(l);
+    if(l.nivMod) _clarosModNormaliza(l, fila, c);   // ese modulo puede pedir mas escalones
+    renderLineasAlmacen();
+  }
   build();
   if(typeof lineasSync === 'function') lineasSync();
 }
@@ -3588,6 +3674,9 @@ function getConfigSel(){
       mallaLado: _mallaLado(l),
       clarosOn: !!l.clarosOn,
       claros: (l.clarosOn ? _clarosNormaliza(l).slice() : []),
+      clarosModA: (l.clarosOn && l.nivMod ? (l.clarosModA || []).map(function(a){return (a||[]).slice();}) : []),
+      clarosModB: (l.clarosOn && l.nivMod ? (l.clarosModB || []).map(function(a){return (a||[]).slice();}) : []),
+      clarosTab: l.clarosTab || null,
       altoM, fondoM, vigaM,
       largoM: vigaM * cuerposMaxLn,
       profM: l.tipo==='doble' ? fondoM*2 + unionM : fondoM};
@@ -4153,15 +4242,15 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
   const _nivArr = Array.isArray(niveles);
   // Claros a la medida: llegan ya resueltos desde la fila. No aplican en modo
   // "niveles por modulo", porque ahi cada modulo tiene su propio numero de niveles.
-  // Los claros a la medida son una sola escalera de alturas y valen tambien con
-  // "niveles por modulo": cada cuerpo toma los primeros nivC escalones.
-  const alturasManSel = alturasNivelM || null;
+  // alturasNivelM llega como UNA ESCALERA POR CUERPO (alturasPorCuerpoM).
+  const alturasManSel = Array.isArray(alturasNivelM) ? alturasNivelM : null;
   const bandas = bandasLibres || [];
   for(let c=0; c<cuerpos; c++){
     const xL = x0 + c * vigaM, xR = xL + vigaM;
     const cxV = (xL + xR) / 2;
     const nivC = _nivArr ? (parseInt(niveles[c])||parseInt(niveles[0])||1) : niveles;
-    const alturasC = (alturasManSel && alturasManSel.length >= nivC) ? alturasManSel : alturasDefaultM(altoM, nivC);
+    const _escC = alturasManSel && alturasManSel[c];
+    const alturasC = (_escC && _escC.length >= nivC) ? _escC : alturasDefaultM(altoM, nivC);
     for(let n=0; n<nivC; n++){
       const y = Math.min(alturasC[n], altoM - 0.10);
       // Solo se despejan los niveles por donde pasa la pasarela; arriba y abajo quedan normales
@@ -4367,6 +4456,63 @@ function _clarosNormaliza(l){
 }
 // Posiciones Y (en metros) de las vigas de ESTA fila, o null si no tiene claros
 // a la medida. Los claros son por fila: cada linea manda sobre las suyas.
+// ── CLAROS POR MODULO ──
+// Con "niveles por modulo" prendido, cada modulo lleva SUS PROPIAS alturas: un
+// modulo de 5 niveles no reparte igual que uno de 3 (Isaac, 18 sep 2026).
+// Apagado, toda la fila comparte una sola escalera (l.claros), como antes.
+function _clarosModKey(fila){ return fila === 'B' ? 'clarosModB' : 'clarosModA'; }
+// Niveles del modulo c de esa fila.
+function _nivDeModulo(l, fila, c){
+  if(!l.nivMod) return parseInt(l.niveles) || 1;
+  const src = (fila === 'B') ? (l.nivelesB || []) : (l.nivelesA || []);
+  return Math.max(1, parseInt(src[c]) || parseInt(l.niveles) || 3);
+}
+// Deja buenos los claros de UN modulo. Lo que falte se toma de la escalera de la
+// fila —asi al prender "niveles por modulo" no brinca ninguna viga— y si esa
+// tampoco alcanza, del reparto parejo. Nunca recorta.
+function _clarosModNormaliza(l, fila, c){
+  const key = _clarosModKey(fila);
+  if(!Array.isArray(l[key])) l[key] = [];
+  const nv = _nivDeModulo(l, fila, c);
+  const base = _clarosNormaliza(l);
+  const def = clarosDefaultIn(l.altoIn * IN_TO_M, nv);
+  // Un modulo que tiene los MISMOS niveles que la fila hereda su escalera, para
+  // que no brinque ninguna viga. Uno con distintos niveles arranca con su propio
+  // reparto parejo: heredar una escalera de 3 en un modulo de 5 daba una mezcla
+  // que se pasaba del alto del marco.
+  const mismoNiv = (nv === (parseInt(l.niveles) || nv));
+  const arr = Array.isArray(l[key][c]) ? l[key][c] : [];
+  for(let n=0; n<nv; n++){
+    const v = parseFloat(arr[n]);
+    if(v > 0) continue;
+    const b = mismoNiv ? parseFloat(base[n]) : 0;
+    arr[n] = (b > 0) ? b : def[n];
+  }
+  l[key][c] = arr;
+  return arr;
+}
+// Alturas (m) de las vigas de UN cuerpo.
+function alturasDeCuerpoM(l, fila, c){
+  if(!l || !l.clarosOn) return null;
+  const cl = l.nivMod ? _clarosModNormaliza(l, fila, c) : _clarosNormaliza(l);
+  const nv = _nivDeModulo(l, fila, c);
+  const ys = [];
+  let acum = 0;
+  for(let n=0; n<nv; n++){
+    const inch = parseFloat(cl[n]);
+    if(!(inch > 0)) return null;
+    acum += inch * IN_TO_M;
+    ys.push(acum);
+  }
+  return ys.length ? ys : null;
+}
+// Una escalera por cuerpo, que es lo que espera el 3D.
+function alturasPorCuerpoM(l, fila, cuerpos){
+  if(!l || !l.clarosOn) return null;
+  const out = [];
+  for(let c=0; c<cuerpos; c++) out.push(alturasDeCuerpoM(l, fila, c));
+  return out;
+}
 function alturasDeLineaM(l){
   if(!l || !l.clarosOn || !Array.isArray(l.claros) || !l.claros.length) return null;
   const ys = [];
@@ -4870,10 +5016,10 @@ function buildSelectivo(){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
       const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasDeLineaM(l), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasPorCuerpoM(l, 'A', l.cuerposA), _ladoSinPunt(l, 'A'));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasDeLineaM(l), _ladoSinPunt(l, 'B'));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = Math.min(l.cuerposA, l.cuerposB) + 1;
@@ -4888,7 +5034,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasDeLineaM(l), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasPorCuerpoM(l, 'A', l.cuerpos), _ladoSinPunt(l, 'A'));
     }
     _barrasDeLinea(gLin, cfg, l);
     _mallaDeLinea(gLin, cfg, l);
@@ -4969,7 +5115,7 @@ function buildSelectivo(){
   // Cotas de niveles (claros) SIEMPRE visibles en la esquina frontal del primer marco
   if(lineas[0]){
     const l0 = lineas[0];
-    const alturasManSelC = alturasDeLineaM(l0);
+    const alturasManSelC = alturasDeCuerpoM(l0, 'A', 0);
     const alturasYSel = [];
     if(alturasManSelC){
       for(const y of alturasManSelC) alturasYSel.push(Math.min(y, l0.altoM - 0.10));
