@@ -811,7 +811,14 @@ const SUJECION_OPC = [
   {sku:'SEL-0324', hIn:10, txt:'10"'}
 ];
 const SUJECION_SEL = SUJECION_OPC[0].sku;
-const MALLA_SUJ_POR_PANEL = 4;      // 2 por poste
+// Sujeciones: cada una agarra hasta LAS 4 ESQUINAS de los paneles que se juntan
+// en ese punto (Isaac, 18 sep 2026), asi que se comparten entre claros vecinos y
+// entre paneles apilados. No son 4 por panel: son los NODOS de la reticula.
+// Un panel solo -> (1+1)x(1+1) = 4, que es lo que dice la regla. Una pared de
+// 4 claros x 4 paneles de alto -> 5x5 = 25, no 64.
+function _mallaSujeciones(l){
+  return (_mallaClaros(l) + 1) * (_mallaPaneles(l) + 1);
+}
 function _mallaSku(vigaIn){ return MALLA_PANEL[vigaIn] || null; }
 // Y de la primera viga de carga: de ahi para arriba se cubre con malla.
 function _primerVigaM(l){
@@ -3148,8 +3155,8 @@ function _mallaInfo(l, esD, info){
   }
   const nPan = _mallaPaneles(l), nCl = _mallaClaros(l);
   return '<div style="font-size:9px;color:#888;margin-top:3px">Va '+donde+', de la primera viga de carga al tope.<br>'
-    + '<b>'+(nPan*nCl)+'</b> paneles de '+vigaIn+'"×'+MALLA_ALTO_IN+'" ('+nPan+' apilados × '+nCl+' claro'+(nCl===1?'':'s')+') + '
-    + (nPan*nCl*MALLA_SUJ_POR_PANEL)+' sujeciones.</div>';
+    + '<b>'+(nPan*nCl)+'</b> paneles de '+vigaIn+'"×'+MALLA_ALTO_IN+'" ('+nPan+' apilados × '+nCl+' claro'+(nCl===1?'':'s')+')<br>'
+    + '<b>'+_mallaSujeciones(l)+'</b> sujeciones ('+(nCl+1)+' × '+(nPan+1)+'): cada una agarra las 4 esquinas que se juntan, por eso se comparten.</div>';
 }
 function lnMalla(i, on){
   lineasAlmacen[i].mallaOn = !!on;
@@ -3869,13 +3876,35 @@ function _mallaDeLinea(gLin, cfg, l){
   const yIni = _primerVigaM(l), yFin = l.altoM;
   if(yFin - yIni < 0.20) return;
   const semi = l.fondoM/2 - postD/2;
-  const zM = (l.tipo === 'doble') ? 0 : -(semi + 0.05);
+  // La medida de la sujecion ES lo que la malla se despega del poste.
+  const sujM = _opcDe(SUJECION_OPC, cfg.sujSku || SUJECION_SEL).hIn * IN_TO_M;
+  const zM = (l.tipo === 'doble') ? 0 : -(semi + sujM);
   const xIzq = -l.largoM/2;
   const nClaros = _mallaClaros(l);
   for(let c=0; c<nClaros; c++){
     const m = crearMallaAnticaida(l.vigaM - postD, yFin - yIni, MALLA_ALTO_IN * IN_TO_M);
     m.position.set(xIzq + (c + 0.5) * l.vigaM, (yIni + yFin) / 2, zM);
     gLin.add(m);
+  }
+  // Sujeciones: una en cada cruce de poste con junta de panel — los mismos nodos
+  // que cuenta _mallaSujeciones. En doble agarra de los postes de las dos filas.
+  const ysJ = [];
+  for(let y = yIni; y < yFin - 0.02; y += MALLA_ALTO_IN * IN_TO_M) ysJ.push(y);
+  ysJ.push(yFin);
+  const zPostes = (l.tipo === 'doble')
+    ? [ (cfg.unionM/2 + postD/2), -(cfg.unionM/2 + postD/2) ]
+    : [ -semi ];
+  for(let c=0; c<=nClaros; c++){
+    const xN = xIzq + c * l.vigaM;
+    ysJ.forEach(function(y){
+      zPostes.forEach(function(zP){
+        const prof = Math.abs(zP - zM);
+        if(prof < 0.01) return;
+        const sj = box(0.05, 0.05, prof, matBota);
+        sj.position.set(xN, y, (zP + zM) / 2);
+        gLin.add(sj);
+      });
+    });
   }
 }
 // ladoBota: que poste de cada marco lleva bota protectora. En fila DOBLE va una
@@ -5217,7 +5246,7 @@ function calcularBomSelectivo(){
       const nPanTot = _mallaPaneles(l) * _mallaClaros(l);
       if(skuMalla && nPanTot > 0){
         add(skuMalla, nPanTot);
-        add(cfg.sujSku || SUJECION_SEL, nPanTot * MALLA_SUJ_POR_PANEL);
+        add(cfg.sujSku || SUJECION_SEL, _mallaSujeciones(l));
       }
     }
     if(esD){
