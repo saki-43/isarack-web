@@ -447,6 +447,10 @@ gtag('config', 'G-XXXXXXXXXX');
     <label class="chk"><input type="checkbox" id="selChkBot"> Bota protectora <span style="color:#9aa0a6;font-size:11px">(extremos de fila)</span></label>
     <select id="selMedBota" style="display:none;margin:2px 0 6px 22px;max-width:230px"></select>
     <label class="chk" id="selLblBotBarra" style="display:none;margin-left:22px"><input type="checkbox" id="selChkBotBarra" checked> Con barra de amarre <span style="color:#9aa0a6;font-size:11px">(une las dos botas de la orilla)</span></label>
+    <div id="selMallaSujWrap" style="display:none;margin:2px 0 6px 0">
+      <div style="font-size:10px;color:#666;margin-bottom:1px">Sujeción de malla anticaída</div>
+      <select id="selMedSuj" style="max-width:230px"></select>
+    </div>
   </div>
 
   <!-- Bodega (compartida: se muestra en Picking y Selectivo) -->
@@ -762,6 +766,13 @@ function _syncProtecciones(){
   // La barra de amarre solo tiene sentido si hay botas
   var chkB = document.getElementById('selChkBot'), lblBa = document.getElementById('selLblBotBarra');
   if(chkB && lblBa) lblBa.style.display = chkB.checked ? '' : 'none';
+  // La sujecion solo aparece si alguna fila lleva malla anticaida
+  var wrap = document.getElementById('selMallaSujWrap');
+  if(wrap){
+    var hayMalla = Array.isArray(lineasAlmacen) && lineasAlmacen.some(function(l){ return l.mallaOn; });
+    wrap.style.display = hayMalla ? '' : 'none';
+    if(hayMalla) _llenarSelectProteccion('selMedSuj', SUJECION_OPC);
+  }
 }
 function _altoBotaM(cfg){ return _opcDe(BOTA_OPC, (cfg&&cfg.botaSku)||BOTA_SEL).hIn * 0.0254; }
 function _altoPuntM(cfg){ return _opcDe(PUNTAL_OPC, (cfg&&cfg.puntSku)||PUNTAL_SEL).hIn * 0.0254; }
@@ -781,6 +792,44 @@ const BARRA_PROT_OPC = [
 function _largoBarraIn(cfg, l){
   if(!l) return 0;
   return (l.tipo === 'doble') ? (l.fondoIn*2 + (Number(cfg && cfg.unionIn) || 0)) : l.fondoIn;
+}
+// MALLA ANTICAIDA: panel de alambre soldado con marco, atornillado a los postes
+// por medio de sujeciones que lo despegan del rack. Va en las filas SENCILLAS,
+// que son las que se pegan a las paredes, y de vez en cuando entre las dos filas
+// de una doble (Isaac, 18 sep 2026) — por eso la casilla es por fila.
+// Cada panel mide 42" de alto y el ANCHO DE UN CLARO, por eso el SKU sale del
+// largo de la viga. Para cubrir de la primera viga de carga hasta arriba se
+// apilan los paneles que hagan falta.
+const MALLA_ALTO_IN = 42;
+const MALLA_PANEL = {96:'SEL-0085', 108:'SEL-0081', 120:'SEL-0082', 144:'SEL-0083'};
+// Sujeciones: la medida es cuanto despega la malla del poste. Default 6", la
+// unica con existencia.
+const SUJECION_OPC = [
+  {sku:'SEL-0326', hIn:6,  txt:'6"'},
+  {sku:'SEL-0325', hIn:4,  txt:'4"'},
+  {sku:'SEL-0327', hIn:8,  txt:'8"'},
+  {sku:'SEL-0324', hIn:10, txt:'10"'}
+];
+const SUJECION_SEL = SUJECION_OPC[0].sku;
+const MALLA_SUJ_POR_PANEL = 4;      // 2 por poste
+function _mallaSku(vigaIn){ return MALLA_PANEL[vigaIn] || null; }
+// Y de la primera viga de carga: de ahi para arriba se cubre con malla.
+function _primerVigaM(l){
+  const altoM = l.altoM || (l.altoIn * IN_TO_M);
+  const ys = alturasDeLineaM(l) || alturasDefaultM(altoM, l.niveles);
+  return (ys && ys.length) ? ys[0] : 0;
+}
+// Paneles apilados que pide UN claro para llegar de la primera viga al tope.
+function _mallaPaneles(l){
+  const altoM = l.altoM || (l.altoIn * IN_TO_M);
+  const cubrirIn = (altoM - _primerVigaM(l)) / IN_TO_M;
+  return Math.max(1, Math.ceil(cubrirIn / MALLA_ALTO_IN));
+}
+// Claros con malla. En doble solo los que tienen fila de los dos lados.
+function _mallaClaros(l){
+  const cA = (l.cuerposA != null) ? l.cuerposA : l.cuerpos;
+  const cB = (l.cuerposB == null) ? cA : l.cuerposB;
+  return l.tipo === 'doble' ? Math.min(cA, cB) : cA;
 }
 // De las medidas que hay en almacen, la mas cercana a lo que pide la orilla.
 function _barraProtSku(lIn){
@@ -1017,6 +1066,7 @@ const matVigaSel  = new THREE.MeshStandardMaterial({color:0xda6635,metalness:0.3
 const matPieSel   = new THREE.MeshStandardMaterial({color:0x1f3a26,metalness:0.4,roughness:0.6});
 const matPerno    = new THREE.MeshStandardMaterial({color:0x18181a,metalness:0.5,roughness:0.4});
 const matBota     = new THREE.MeshStandardMaterial({color:0xf2b71d,metalness:0.2,roughness:0.7});
+const matMallaAlam= new THREE.MeshStandardMaterial({color:0xf0c02a,metalness:0.35,roughness:0.5});  // alambre de la malla anticaida
 const matPunt     = new THREE.MeshStandardMaterial({color:0xe1651c,metalness:0.2,roughness:0.7});  // protector de puntal: naranja
 const matTriplay  = new THREE.MeshStandardMaterial({color:0xa8856b,metalness:0.05,roughness:0.85});
 // Muñeco Isaac (imagen real con fondo transparente)
@@ -1172,6 +1222,31 @@ function _mallaProteccion(hM, mat, conico, vert, ala, cara){
 // El perfil se dibuja en XY y se extruye en +Z, que es justo el sentido del
 // fondo del rack, asi que la barra ya sale acostada sin rotarla.
 // La C abre hacia el rack (hacia -X del perfil): el alma queda del lado del golpe.
+// Panel de malla anticaida: alambre soldado en el plano XY con marco amarillo
+// en el perimetro y una barra horizontal en cada junta de panel — que es como se
+// ve en obra cuando se apilan varios de 42".
+function crearMallaAnticaida(anchoM, altoM, pasoPanelM){
+  const g = new THREE.Group();
+  const thk = 0.006, tubo = 0.026, sep = 0.06;
+  const mtx = new THREE.Matrix4();
+  const nV = Math.max(4, Math.floor(anchoM / sep) + 1);
+  const iV = new THREE.InstancedMesh(new THREE.BoxGeometry(thk, altoM, thk), matMallaAlam, nV);
+  for(let i=0; i<nV; i++){ mtx.makeTranslation(-anchoM/2 + (i/(nV-1))*anchoM, 0, 0); iV.setMatrixAt(i, mtx); }
+  iV.instanceMatrix.needsUpdate = true; g.add(iV);
+  const nH = Math.max(4, Math.floor(altoM / sep) + 1);
+  const iH = new THREE.InstancedMesh(new THREE.BoxGeometry(anchoM, thk, thk), matMallaAlam, nH);
+  for(let i=0; i<nH; i++){ mtx.makeTranslation(0, -altoM/2 + (i/(nH-1))*altoM, thk); iH.setMatrixAt(i, mtx); }
+  iH.instanceMatrix.needsUpdate = true; g.add(iH);
+  [-anchoM/2, anchoM/2].forEach(function(x){
+    const b = box(tubo, altoM, tubo, matBota); b.position.set(x, 0, 0); g.add(b);
+  });
+  const ys = [-altoM/2, altoM/2];
+  for(let y = -altoM/2 + pasoPanelM; y < altoM/2 - 0.02; y += pasoPanelM) ys.push(y);
+  ys.forEach(function(y){
+    const b = box(anchoM + tubo, tubo, tubo, matBota); b.position.set(0, y, 0); g.add(b);
+  });
+  return g;
+}
 function _mallaBarraProt(largoM, mat){
   var alto = 0.076, prof = 0.045, esp = 0.006;   // 3" de peralte, como la barra real
   var sh = new THREE.Shape();
@@ -3062,6 +3137,26 @@ function _nivNormaliza(l){
   l.nivelesA = _nivArrRaw(l, 'A', cA);
   if(l.tipo === 'doble') l.nivelesB = _nivArrRaw(l, 'B', cB); else l.nivelesB = null;
 }
+// Resumen de lo que va a cotizar la malla de esta fila, para que se vea antes
+// de mandar la cotizacion.
+function _mallaInfo(l, esD, info){
+  const vigaIn = info && info.largoIn;
+  const sku = _mallaSku(vigaIn);
+  const donde = esD ? 'entre las dos filas' : 'en la cara de atrás (la de la pared)';
+  if(!sku){
+    return '<div style="font-size:9px;color:#c62828;margin-top:3px">⚠ No hay panel de malla para viga de '+(vigaIn||'?')+'". Hay de 96", 108", 120" y 144".</div>';
+  }
+  const nPan = _mallaPaneles(l), nCl = _mallaClaros(l);
+  return '<div style="font-size:9px;color:#888;margin-top:3px">Va '+donde+', de la primera viga de carga al tope.<br>'
+    + '<b>'+(nPan*nCl)+'</b> paneles de '+vigaIn+'"×'+MALLA_ALTO_IN+'" ('+nPan+' apilados × '+nCl+' claro'+(nCl===1?'':'s')+') + '
+    + (nPan*nCl*MALLA_SUJ_POR_PANEL)+' sujeciones.</div>';
+}
+function lnMalla(i, on){
+  lineasAlmacen[i].mallaOn = !!on;
+  renderLineasAlmacen();
+  try{ _syncProtecciones(); }catch(e){}
+  build();
+}
 // Un input por nivel con el claro en pulgadas, y debajo la altura acumulada
 // desde el piso en cm — que es el numero que el instalador busca en la obra.
 function _clarosEditor(l, i){
@@ -3264,6 +3359,10 @@ function renderLineasAlmacen(){
                 + (l.clarosOn ? _clarosEditor(l, i) : ''))
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#b07d00;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.mallaOn?'checked':'')+' onchange="lnMalla('+i+',this.checked)"> 🕸 Malla anticaída</label>'
+          + (l.mallaOn ? _mallaInfo(l, esD, info) : '')
+        + '</div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#993C1D;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.tunelOn?'checked':'')+' onchange="lnTunelOn('+i+',this.checked)"> 🚇 Túnel (paso montacargas)</label>'
           + (l.tunelOn ? ('<div style="font-size:9.5px;color:#888;margin:3px 0 2px">Toca el cuerpo donde va el paso:</div><div style="display:flex;flex-wrap:wrap;gap:4px">' + _tunelChips(l, i, cA) + '</div>') : '')
         + '</div>'
@@ -3393,6 +3492,7 @@ function getConfigSel(){
       escHNivs: (l.escHOn ? (l.escHNivs || []) : []),
       marcoIzqExistente: !!l.marcoIzqExistente,
       marcoDerExistente: !!l.marcoDerExistente,
+      mallaOn: !!l.mallaOn,
       clarosOn: !!l.clarosOn,
       claros: (l.clarosOn ? _clarosNormaliza(l).slice() : []),
       altoM, fondoM, vigaM,
@@ -3420,6 +3520,7 @@ function getConfigSel(){
     botas:   document.getElementById('selChkBot').checked,
     botaSku: (document.getElementById('selMedBota')||{}).value || BOTA_SEL,
     botaBarra: !!(document.getElementById('selChkBotBarra')||{}).checked,
+    sujSku: (document.getElementById('selMedSuj')||{}).value || SUJECION_SEL,
     punt:    document.getElementById('selChkPunt').checked,
     puntSku: (document.getElementById('selMedPunt')||{}).value || PUNTAL_SEL,
     altoM: altoIn*IN_TO_M, fondoM: fondoIn*IN_TO_M, vigaM: vigaIn*IN_TO_M};
@@ -3758,6 +3859,24 @@ function _barrasDeLinea(gLin, cfg, l){
       _barraOrilla(gLin, xIzq + l.vigaM*l.cuerposB, -cf - semi, -cf + semi, 1, yBar);
     }
   });
+}
+// Malla anticaida de una linea: un panel por claro, de la primera viga de carga
+// al tope del marco. En SENCILLA va en la cara de atras (la que se pega a la
+// pared); en DOBLE va en medio de las dos filas.
+function _mallaDeLinea(gLin, cfg, l){
+  if(!l.mallaOn) return;
+  const postD = 0.076;
+  const yIni = _primerVigaM(l), yFin = l.altoM;
+  if(yFin - yIni < 0.20) return;
+  const semi = l.fondoM/2 - postD/2;
+  const zM = (l.tipo === 'doble') ? 0 : -(semi + 0.05);
+  const xIzq = -l.largoM/2;
+  const nClaros = _mallaClaros(l);
+  for(let c=0; c<nClaros; c++){
+    const m = crearMallaAnticaida(l.vigaM - postD, yFin - yIni, MALLA_ALTO_IN * IN_TO_M);
+    m.position.set(xIzq + (c + 0.5) * l.vigaM, (yIni + yFin) / 2, zM);
+    gLin.add(m);
+  }
 }
 // ladoBota: que poste de cada marco lleva bota protectora. En fila DOBLE va una
 // sola por marco, la del lado del pasillo — el poste interior queda entre las dos
@@ -4621,6 +4740,7 @@ function buildSelectivo(){
       buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasDeLineaM(l));
     }
     _barrasDeLinea(gLin, cfg, l);
+    _mallaDeLinea(gLin, cfg, l);
     // El rack se construye centrado en 0 → desplazar para que su borde izq. quede en xInicio
     gLin.position.x = xInicio + l.largoM/2;
     gLin.position.z = zFrente - l.profM/2;
@@ -5090,6 +5210,16 @@ function calcularBomSelectivo(){
       }
     }
     if(cfg.punt  && _intermedios > 0) add(cfg.puntSku || PUNTAL_SEL, _porMarco * _intermedios);
+    // Malla anticaida: un panel del ancho del claro por cada 42" de alto que hay
+    // que cubrir, por cada claro, mas sus sujeciones (2 por poste).
+    if(l.mallaOn){
+      const skuMalla = _mallaSku(l.vigaIn);
+      const nPanTot = _mallaPaneles(l) * _mallaClaros(l);
+      if(skuMalla && nPanTot > 0){
+        add(skuMalla, nPanTot);
+        add(cfg.sujSku || SUJECION_SEL, nPanTot * MALLA_SUJ_POR_PANEL);
+      }
+    }
     if(esD){
       const skuUnion = UNIONES_SEL[cfg.unionIn];
       // La unión también se hereda si el cliente ya tiene ese marco (izq o der).
@@ -5842,6 +5972,8 @@ function configResumen(){
     if(cfg.botas)   extras.push('bota protectora ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt
                       + (cfg.botaBarra ? ' con barra de orilla ' + _largoBarraIn(cfg, (cfg.lineas||[])[0]) + '"' : ' sin barra'));
     if(cfg.punt)    extras.push('protector de puntal ' + _opcDe(PUNTAL_OPC, cfg.puntSku||PUNTAL_SEL).txt + ' (marcos de en medio)');
+    if((cfg.lineas||[]).some(function(l){return l.mallaOn;}))
+                    extras.push('malla anticaída ' + _opcDe(SUJECION_OPC, cfg.sujSku||SUJECION_SEL).txt + ' de sujeción');
     const ex = extras.length ? ' + '+extras.join(', ') : '';
     const nSenR = cfg.lineas.filter(l=>l.tipo==='sencilla').length;
     const nDobR = cfg.lineas.filter(l=>l.tipo==='doble').length;
