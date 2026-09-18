@@ -568,6 +568,9 @@ gtag('config', 'G-XXXXXXXXXX');
   <label class="chk"><input type="checkbox" id="auto" checked> Girar automático</label>
   <button id="wa">📱 Solicitar cotización por WhatsApp</button>
   <button id="reset">Reiniciar vista</button>
+  <!-- Sello de version: sirve para saber si el navegador ya trae el deploy nuevo.
+       Subirlo en CADA cambio del configurador, igual que APP_VERSION en ISA-OS. -->
+  <div style="text-align:center;font-size:9px;color:#b9b5aa;margin-top:6px;letter-spacing:.3px">Configurador <span id="cfgVer"></span></div>
 </div>
 
 <!-- Panel derecho: cotización en vivo -->
@@ -626,6 +629,12 @@ const MED = {
 const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 
 // ─── Constantes PICKING ───
+// Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
+// si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
+const CFG_VERSION = '2026.09.18.01';
+// Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
+// despues, que es justo cuando mas se necesita saber que version se esta viendo.
+try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
 const IN_TO_M = 0.0254;
 // Marco picking integral (alto × fondo): SKU directo
 const MARCOS_PIC = {
