@@ -631,7 +631,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.18.01';
+const CFG_VERSION = '2026.09.18.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -869,6 +869,19 @@ function _mallaLadoDefault(i){
   return 'atras';
 }
 const MALLA_LADO_TXT = {medio:'En medio', adelante:'Adelante', atras:'Atrás'};
+// REGLA DE OBRA (Isaac, 18 sep 2026): donde ya va MALLA ANTICAIDA no se pone
+// PROTECTOR DE PUNTAL — la malla ya cubre el poste por esa cara. Devuelve que
+// cara de la fila queda descartada: 'front' (+Z), 'back' (-Z) o null.
+// En una doble, 'medio' cae del lado interior, que es justo donde esa fila NO
+// lleva puntal, asi que en la practica no descuenta nada.
+function _ladoSinPunt(l, cual){
+  if(!l || !l.mallaOn) return null;
+  const lado = _mallaLado(l);
+  if(l.tipo !== 'doble')
+    return (lado === 'atras') ? 'back' : (lado === 'adelante') ? 'front' : null;
+  if(cual === 'A') return (lado === 'adelante') ? 'front' : (lado === 'medio') ? 'back'  : null;
+  return              (lado === 'atras')    ? 'back'  : (lado === 'medio') ? 'front' : null;
+}
 // Claros con malla. En medio de una doble solo cuentan los claros que tienen
 // fila de los dos lados; en una cara exterior manda la fila de ese lado.
 function _mallaClaros(l){
@@ -3218,6 +3231,8 @@ function _mallaInfo(l, i, esD, info){
           ? '<br><span style="color:#0a6">Cierra al ras del marco.</span>'
           : '<br><span style="color:#b07d00">Cubre todo el marco; el último panel sobresale '+dif+'" y se corta en obra.</span>';
       })()
+    + (_ladoSinPunt(l, 'A') || (l.tipo === 'doble' && _ladoSinPunt(l, 'B'))
+        ? '<br><span style="color:#0a6">Esa cara ya no lleva protector de puntal.</span>' : '')
     + '</div>';
 }
 function lnMallaLado(i, lado){
@@ -3993,7 +4008,7 @@ function _mallaDeLinea(gLin, cfg, l){
 // sola por marco, la del lado del pasillo — el poste interior queda entre las dos
 // filas y nadie lo golpea (Isaac, 17 sep 2026). 'front' = zFront, 'back' = zBack,
 // 'ambos' (default) = fila sencilla, que puede tener pasillo de los dos lados.
-function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota, tienePunt, altoBotaM, altoPuntM, marcosBota2, alturasNivelM){
+function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota, tienePunt, altoBotaM, altoPuntM, marcosBota2, alturasNivelM, sinPunt){
   altoBotaM = altoBotaM || 0.41;   // 16" por omision
   altoPuntM = altoPuntM || 0.61;   // 24" por omision
   const postW = 0.076, postD = 0.076, vigaH = 0.10, vigaD = 0.06;
@@ -4069,7 +4084,10 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
           if(tieneBotas && esExtremo && !_botaDoble){
             _ponerBota(zb, haciaPasillo, giro);
           }
-          if(tienePunt && !esExtremo){
+          // Donde va malla anticaida no va protector de puntal: la malla ya
+          // cubre el poste por esa cara.
+          var _tapado = (sinPunt === 'front' && zb === zFront) || (sinPunt === 'back' && zb === zBack);
+          if(tienePunt && !esExtremo && !_tapado){
             // PROTECTOR DE PUNTAL: recto y SIN placa — va atornillado al puntal,
             // por eso arranca un poco arriba del piso y no toca el pie.
             var yIniP = pieT + 0.02;   // nunca coincide con una bota: van en marcos distintos
@@ -4830,10 +4848,10 @@ function buildSelectivo(){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
       const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasDeLineaM(l));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasDeLineaM(l), _ladoSinPunt(l, 'A'));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasDeLineaM(l));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasDeLineaM(l), _ladoSinPunt(l, 'B'));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = Math.min(l.cuerposA, l.cuerposB) + 1;
@@ -4848,7 +4866,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasDeLineaM(l));
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasDeLineaM(l), _ladoSinPunt(l, 'A'));
     }
     _barrasDeLinea(gLin, cfg, l);
     _mallaDeLinea(gLin, cfg, l);
@@ -5300,7 +5318,6 @@ function calcularBomSelectivo(){
     // llevan proteccion, por eso se descuentan de los extremos, no de los de en medio.
     var _porMarco   = (esD ? 1 : 2);
     var _extremos   = Math.max(0, (esD ? 4 : 2) - nMarcosExis);
-    var _intermedios= Math.max(0, nMarcos - _extremos);
     // Botas: cada orilla lleva 2 (sencilla: los dos postes del marco; doble: el
     // poste de afuera de cada una de las dos filas). La barra que las amarra es
     // un SKU aparte — su largo depende del tipo de fila, ver BARRA_PROT_OPC.
@@ -5320,7 +5337,22 @@ function calcularBomSelectivo(){
         }
       }
     }
-    if(cfg.punt  && _intermedios > 0) add(cfg.puntSku || PUNTAL_SEL, _porMarco * _intermedios);
+    // Protector de puntal por marco de EN MEDIO. Donde ya hay malla anticaida no
+    // va puntal (la malla cubre el poste por esa cara), asi que se cuenta fila
+    // por fila: la sencilla protege sus dos postes, la doble solo el de pasillo.
+    // Los marcos que ya tiene el cliente son de los extremos, no de en medio, por
+    // eso (cA-1) y (cB-1) no dependen de los ghost.
+    var _pPorMarcoA, _pPorMarcoB;
+    if(esD){
+      _pPorMarcoA = _ladoSinPunt(l, 'A') === 'front' ? 0 : 1;   // fila A protege su cara +Z
+      _pPorMarcoB = _ladoSinPunt(l, 'B') === 'back'  ? 0 : 1;   // fila B protege su cara -Z
+    } else {
+      const _sp = _ladoSinPunt(l, 'A');
+      _pPorMarcoA = (_sp === 'front' || _sp === 'back') ? 1 : 2;
+      _pPorMarcoB = 0;
+    }
+    const _puntTot = _pPorMarcoA * Math.max(0, cA - 1) + (esD ? _pPorMarcoB * Math.max(0, cB - 1) : 0);
+    if(cfg.punt && _puntTot > 0) add(cfg.puntSku || PUNTAL_SEL, _puntTot);
     // Malla anticaida: un panel del ancho del claro por cada 42" de alto que hay
     // que cubrir, por cada claro, mas sus sujeciones (2 por poste).
     if(l.mallaOn){
