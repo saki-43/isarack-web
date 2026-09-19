@@ -633,7 +633,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.18.06';
+const CFG_VERSION = '2026.09.19.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2025,11 +2025,12 @@ function huecosMarcoPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   return out;
 }
 
-function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos){
+// Cuerpo que cruza el ramal de acceso, SIN el candado de "solo con pasarela
+// doble": la salida de la escalera lo necesita tambien con una sola pasarela.
+function _cuerpoRamalIdx(cfg, xInicio, anchoCuerpo, nCuerpos){
   if(!cfg.pasarela || !cfg.pasarela.on) return -1;
   if(!modeloPasarela(cfg).despejaModulo) return -1;
   if(cfg.pasarela.escalera === 'no') return -1;
-  if((cfg.pasarela.niveles || 1) < 2) return -1;         // solo con pasarela doble
   const dir = cfg.pasarela.escalera === 'izq' ? -1 : 1;
   const largoTot = anchoCuerpo * nCuerpos;
   const xBorde = dir === 1 ? xInicio + largoTot : xInicio;
@@ -2042,6 +2043,41 @@ function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos){
   const xCen = (xArranque + xAccFin)/2;
   const idx = Math.floor((xCen - xInicio) / anchoCuerpo);
   return (idx >= 0 && idx < nCuerpos) ? idx : -1;
+}
+// El ramal como se usaba hasta hoy: solo con pasarela doble. No se toca para no
+// mover lo que ya cotizaba Picking ni el despeje por bandas de la fila 1.
+function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos){
+  if((cfg.pasarela && (cfg.pasarela.niveles || 1)) < 2) return -1;
+  return _cuerpoRamalIdx(cfg, xInicio, anchoCuerpo, nCuerpos);
+}
+// ── SALIDA DE LA ESCALERA (PS-1) ──
+// REGLA DE OBRA (Isaac, 19 sep 2026): al salir de la escalera hay que cruzar las
+// filas para meterse a los pasillos laterales, y la viga que queda a la altura
+// del piso de la pasarela lo impide. Ese cuerpo pierde UN SOLO nivel: el
+// primero que queda al ras o arriba del piso. Aplica a TODAS las filas, no solo
+// a la primera, y tambien con una sola pasarela.
+function _nivelSalidaPasarela(cfg, l, fila, k){
+  if(!cfg || !cfg.pasarela || !cfg.pasarela.on) return -1;
+  if(cfg.pasarela.escalera === 'no') return -1;
+  const yN = cfg.pasarela.alturaM;
+  const altoM = l.altoM || (l.altoIn * IN_TO_M);
+  const nivC = _nivDeModulo(l, fila, k);
+  const ys = alturasDeCuerpoM(l, fila, k) || alturasDefaultM(altoM, nivC);
+  for(let n = 0; n < Math.min(ys.length, nivC); n++){
+    if(ys[n] >= yN - 0.20) return n;
+  }
+  return -1;
+}
+// [{k, niveles:[n]}] del cuerpo de salida de ESTA fila. Cada fila puede llevar
+// otra viga, asi que el cuerpo se calcula con su propio ancho.
+function salidaEscaleraSel(cfg, l, fila, nCuerpos, anchoCuerpo, xInicio){
+  if(!cfg || !cfg.pasarela || !cfg.pasarela.on) return [];
+  if(idModeloPasarela(cfg) !== 'PS-1') return [];
+  const k = _cuerpoRamalIdx(cfg, xInicio, anchoCuerpo, nCuerpos);
+  if(k < 0) return [];
+  const n = _nivelSalidaPasarela(cfg, l, fila, k);
+  if(n < 0) return [];
+  return [{k: k, niveles: [n]}];
 }
 
 // ── Marcos que cargan la pasarela ──
@@ -3170,6 +3206,13 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
       escMapA.set(it.k, Array.from(new Set(cur.concat(it.niveles))));
     }
   });
+  // Salida de la escalera: mismo cuerpo y mismo nivel que quita el 3D.
+  if(cfg) salidaEscaleraSel(cfg, l, 'A', cA, ancho, -l.largoM/2).forEach(it => {
+    if(it.k < cA){
+      const cur = escMapA.get(it.k) || [];
+      escMapA.set(it.k, Array.from(new Set(cur.concat(it.niveles))));
+    }
+  });
   // Fila B (doble) va rotada 180°: reflejar el índice.
   const escMapB = new Map();
   if(esD){
@@ -3180,6 +3223,14 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
       if(kB >= 0 && kB < cB){
         const cur = escMapB.get(kB) || [];
         escMapB.set(kB, Array.from(new Set(cur.concat(it.niveles))));
+      }
+    });
+    // La salida de la escalera NO se refleja: el 3D del selectivo le pasa el
+    // mismo arreglo de skip a las dos filas, sin rotar el indice.
+    salidaEscaleraSel(cfg, l, 'B', cB, ancho, -l.largoM/2).forEach(it => {
+      if(it.k < cB){
+        const cur = escMapB.get(it.k) || [];
+        escMapB.set(it.k, Array.from(new Set(cur.concat(it.niveles))));
       }
     });
   }
@@ -5023,6 +5074,11 @@ function buildSelectivo(){
     _huecosManualesEsc(lineas[iLn]).forEach(it => {
       if(it.k >= 0 && it.k < nCuerpos) arr.push(it);
     });
+    // SALIDA DE LA ESCALERA: un nivel del cuerpo por donde se sale, en todas las
+    // filas. Va al final a proposito: el bucle del dibujo se queda con la PRIMERA
+    // coincidencia, asi que si la fila 1 ya despejaba por bandas, eso manda.
+    salidaEscaleraSel(cfg, lineas[iLn], 'A', nCuerpos, lineas[iLn].vigaM, xInicio)
+      .forEach(it => arr.push(it));
     return arr.length ? arr : -1;
   };
   lineas.forEach((l, iLn) => {
