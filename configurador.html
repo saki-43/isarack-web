@@ -633,7 +633,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.04';
+const CFG_VERSION = '2026.09.21.05';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1969,6 +1969,16 @@ function filaEscaleraAltaPS2(cfg){
 // Los niveles cortados se calculan segun la altura Y de cada nivel (no hardcoded):
 //  - iBaja (tramo del piso al primer piso): niveles con Y en [0, yN)
 //  - iAlta (segundo tramo): niveles con Y en [yN, 2*yN)
+// Bahias que ocupa un tramo de escalera PS-2 con su descanso. Misma cuenta que
+// dibujarPasarelaEntrepiso: nEscT escalones de 25 cm y el descanso redondea
+// hasta la linea del siguiente marco.
+function _bahiasEscaleraPS2(cfg, anchoCuerpo){
+  const yNivel = (cfg && cfg.pasarela && cfg.pasarela.alturaM) || 0;
+  const ancho = anchoCuerpo > 0 ? anchoCuerpo : 1;
+  const nEscT = Math.max(8, Math.round(yNivel / 0.20));
+  const runT = nEscT * 0.25;
+  return Math.max(1, Math.ceil((runT + 0.001) / ancho));
+}
 function cuerposEscaleraPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   const iBaja = filaEscaleraPS2(cfg), iAlta = filaEscaleraAltaPS2(cfg);
   if(iLn !== iBaja && iLn !== iAlta) return [];
@@ -2002,9 +2012,13 @@ function cuerposEscaleraPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   if(iLn === iBaja) cortarTramo(0,  yN).forEach(n => niveles.add(n));
   if(iLn === iAlta) cortarTramo(yN, 2*yN).forEach(n => niveles.add(n));
   const nivelesArr = Array.from(niveles).sort((a,b)=>a-b);
-  // Solo el cuerpo del rellano de la escalera pierde vigas (no el siguiente).
+  // La escalera NO cabe en una sola bahia: corre runT y el descanso completa
+  // hasta la linea del siguiente marco (ver LARGO_RELL en dibujarPasarelaEntrepiso).
+  // Hay que despejar todas las bahias que ocupa, INCLUIDA la de arriba donde
+  // termina: ahi es donde te bajas y donde estorban las vigas (Isaac, 21 sep 2026).
   const out = [];
-  if(nCuerpos > 0) out.push({k: 0, niveles: nivelesArr});
+  const nB = Math.min(_bahiasEscaleraPS2(cfg, anchoCuerpo), nCuerpos);
+  for(let k = 0; k < nB; k++) out.push({k: k, niveles: nivelesArr});
   return out;
 }
 
@@ -2018,15 +2032,14 @@ function huecosMarcoPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   const yPaso = (iLn === iBaja) ? yN : yN*2;      // altura del piso por donde se circula
   const ALTO_PASO = 2.10;                         // hueco libre para pasar de pie
   const out = [];
+  // El paso se abre en el marco donde TERMINA la escalera, que es el que cierra
+  // la ultima bahia que ocupa — no siempre el marco 1.
+  const kFin = Math.min(_bahiasEscaleraPS2(cfg, anchoCuerpo), nCuerpos);
   if(iLn === iBaja){
-    // Tramo de abajo: el marco 1 pierde solo las diagonales 1-4 (base 0: 0..3)
-    // y el marco 2 abre el paso completo
     out.push({k: 0, diagonales: [0, 1, 2, 3]});
-    out.push({k: 1, y0: yPaso - 0.05, y1: yPaso + ALTO_PASO});
+    out.push({k: kFin, y0: yPaso - 0.05, y1: yPaso + ALTO_PASO});
   } else {
-    // Tramo de arriba: el marco 2 abre el paso completo, y el marco 1
-    // pierde solo las diagonales 5, 6, 7 y 8 (base 0: 4..7)
-    out.push({k: 1, y0: yPaso - 0.05, y1: yPaso + ALTO_PASO});
+    out.push({k: kFin, y0: yPaso - 0.05, y1: yPaso + ALTO_PASO});
     out.push({k: 0, diagonales: [4, 5, 6, 7]});
   }
   return out;
@@ -2056,56 +2069,6 @@ function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos){
 // del piso de la pasarela lo impide. Ese cuerpo pierde UN SOLO nivel: el
 // primero que queda al ras o arriba del piso. Aplica a TODAS las filas, no solo
 // a la primera, y tambien con una sola pasarela.
-// Niveles que hay que quitar para poder SALIR al pasillo. Por cada piso de
-// pasarela son los TRES primeros que quedan al ras o arriba de ese piso: con uno
-// solo la persona sigue sin poder cruzar, porque el de encima le pega a la
-// altura del pecho (Isaac, 21 sep 2026). Es el mismo criterio que ya usaba
-// cuerposEscaleraPS2 para la fila por donde sube la escalera.
-const SALIDA_NIVELES = 3;
-function _nivelesSalidaPasarela(cfg, l, fila, k, pisos){
-  const out = [];
-  if(!cfg || !cfg.pasarela || !cfg.pasarela.on) return out;
-  if(cfg.pasarela.escalera === 'no') return out;
-  if(!pisos || !pisos.length) return out;
-  const yN = cfg.pasarela.alturaM;
-  const altoM = l.altoM || (l.altoIn * IN_TO_M);
-  const nivC = _nivDeModulo(l, fila, k);
-  const ys = alturasDeCuerpoM(l, fila, k) || alturasDefaultM(altoM, nivC);
-  const tope = Math.min(ys.length, nivC);
-  pisos.forEach(function(p){
-    let puestos = 0;
-    for(let i = 0; i < tope && puestos < SALIDA_NIVELES; i++){
-      if(ys[i] >= yN*p - 0.20){ if(out.indexOf(i) < 0) out.push(i); puestos++; }
-    }
-  });
-  return out.sort(function(a,b){return a-b;});
-}
-// [{k, niveles:[n]}] del cuerpo de salida de ESTA fila. Cada fila puede llevar
-// otra viga, asi que el cuerpo se calcula con su propio ancho.
-// SOLO PS-2. En PS-1 la escalera y el corredor van por FUERA del perimetro, asi
-// que no se sale al rack y no hay viga que estorbe (Isaac, 21 sep 2026).
-function salidaEscaleraSel(cfg, l, fila, nCuerpos, anchoCuerpo, xInicio, iLn){
-  if(!cfg || !cfg.pasarela || !cfg.pasarela.on) return [];
-  if(cfg.pasarela.escalera === 'no') return [];
-  if(idModeloPasarela(cfg) !== 'PS-2') return [];
-  // La escalera sube por dentro, siempre por el primer cuerpo. La fila por donde
-  // sube ya pierde esos niveles en cuerposEscaleraPS2, asi que aqui solo se
-  // atienden las DEMAS filas: son las que cierran el paso a los pasillos.
-  // La fila que hay que abrir es la SIGUIENTE a cada escalera: sales del tramo,
-  // cruzas esa fila y ya estas en el pasillo. Antes se abrian todas las que no
-  // fueran de escalera, y con dos pasarelas eso agujereaba la fila 1, que no
-  // tiene nada que ver con la salida (Isaac, 21 sep 2026).
-  const pisos = [];
-  if(iLn - 1 === filaEscaleraPS2(cfg))     pisos.push(1);   // sales del tramo de abajo
-  if(iLn - 1 === filaEscaleraAltaPS2(cfg)) pisos.push(2);   // sales del tramo de arriba
-  if(!pisos.length) return [];
-  // El SEGUNDO modulo: la escalera sube por el primero y el marco 1 es el que
-  // abre el paso (ver huecosMarcoPS2), asi que se desemboca en el cuerpo 1.
-  const k = Math.min(1, nCuerpos - 1);
-  if(k < 0) return [];
-  const niv = _nivelesSalidaPasarela(cfg, l, fila, k, pisos);
-  return niv.length ? [{k: k, niveles: niv}] : [];
-}
 
 // ── Marcos que cargan la pasarela ──
 // Regla de obra: el marco de soporte va 4' (48") más alto que el nivel más alto de pasarela.
@@ -3233,13 +3196,6 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
       escMapA.set(it.k, Array.from(new Set(cur.concat(it.niveles))));
     }
   });
-  // Salida de la escalera: mismo cuerpo y mismo nivel que quita el 3D.
-  if(cfg) salidaEscaleraSel(cfg, l, 'A', cA, ancho, -l.largoM/2, iLn).forEach(it => {
-    if(it.k < cA){
-      const cur = escMapA.get(it.k) || [];
-      escMapA.set(it.k, Array.from(new Set(cur.concat(it.niveles))));
-    }
-  });
   // Fila B (doble) va rotada 180°: reflejar el índice.
   const escMapB = new Map();
   if(esD){
@@ -3250,14 +3206,6 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
       if(kB >= 0 && kB < cB){
         const cur = escMapB.get(kB) || [];
         escMapB.set(kB, Array.from(new Set(cur.concat(it.niveles))));
-      }
-    });
-    // La salida de la escalera NO se refleja: el 3D del selectivo le pasa el
-    // mismo arreglo de skip a las dos filas, sin rotar el indice.
-    salidaEscaleraSel(cfg, l, 'B', cB, ancho, -l.largoM/2, iLn).forEach(it => {
-      if(it.k < cB){
-        const cur = escMapB.get(it.k) || [];
-        escMapB.set(it.k, Array.from(new Set(cur.concat(it.niveles))));
       }
     });
   }
@@ -5104,11 +5052,6 @@ function buildSelectivo(){
     _huecosManualesEsc(lineas[iLn]).forEach(it => {
       if(it.k >= 0 && it.k < nCuerpos) arr.push(it);
     });
-    // SALIDA DE LA ESCALERA: un nivel del cuerpo por donde se sale, en todas las
-    // filas. Va al final a proposito: el bucle del dibujo se queda con la PRIMERA
-    // coincidencia, asi que si la fila 1 ya despejaba por bandas, eso manda.
-    salidaEscaleraSel(cfg, lineas[iLn], 'A', nCuerpos, lineas[iLn].vigaM, xInicio, iLn)
-      .forEach(it => arr.push(it));
     return arr.length ? arr : -1;
   };
   lineas.forEach((l, iLn) => {
