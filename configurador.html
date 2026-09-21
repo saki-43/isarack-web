@@ -426,13 +426,13 @@ gtag('config', 'G-XXXXXXXXXX');
       <option value="doble">Doble</option>
     </select>
     <div class="row" id="selUnionRow" style="display:none">
-      <label>Separación entre filas (unión)</label>
+      <label class="chk" style="margin:0 0 3px"><input type="checkbox" id="selChkUnion" checked> Separación entre filas (unión)</label>
       <select id="selUnion">
         <option value="3.5">3.5" (9 cm)</option>
-        <option value="6" selected>6" (15 cm)</option>
+        <option value="6">6" (15 cm)</option>
         <option value="8">8" (20 cm)</option>
         <option value="10">10" (25 cm)</option>
-        <option value="12">12" (30 cm)</option>
+        <option value="12" selected>12" (30 cm)</option>
         <option value="14">14" (36 cm)</option>
         <option value="16">16" (41 cm)</option>
         <option value="18">18" (46 cm)</option>
@@ -650,7 +650,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.14';
+const CFG_VERSION = '2026.09.21.15';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2962,6 +2962,12 @@ function lineasSync(){
   document.getElementById('selNiveles').value = String(l0.niveles);
   const hayDoble = lineasAlmacen.some(l => l.tipo === 'doble');
   document.getElementById('selUnionRow').style.display = hayDoble ? '' : 'none';
+  // El selector de medida solo se ve si la union esta prendida (tambien al
+  // restaurar un link, donde la casilla puede llegar apagada).
+  {
+    const cU = document.getElementById('selChkUnion'), sU = document.getElementById('selUnion');
+    if(cU && sU) sU.style.display = cU.checked ? '' : 'none';
+  }
   document.getElementById('selPasilloRow').style.display = lineasAlmacen.length > 1 ? '' : 'none';
   document.getElementById('selPasarelaBox').style.display = lineasAlmacen.length > 1 ? '' : 'none';
   if(lineasAlmacen.length <= 1){
@@ -3727,7 +3733,10 @@ function getConfigSel(){
   const vigaSku = document.getElementById('selViga').value;
   const vigaInfo = VIGAS_INFO[vigaSku] || VIGAS_INFO['SEL-0362'];
   const hayDobleLn = lineasAlmacen.some(l => l.tipo === 'doble');
-  const unionIn = hayDobleLn ? parseFloat(document.getElementById('selUnion').value) : 0;
+  // La union es OPCIONAL (Isaac, 21 sep 2026): sin ella las dos filas van
+  // espalda con espalda pegadas y no entra el SKU de union al BOM.
+  const conUnion = !!(document.getElementById('selChkUnion')||{}).checked;
+  const unionIn = (hayDobleLn && conUnion) ? parseFloat(document.getElementById('selUnion').value) : 0;
   const unionM = unionIn * IN_TO_M;
   const vigaIn  = vigaInfo.largoIn;
   const vigaAltIn = vigaInfo.altIn;
@@ -4434,7 +4443,8 @@ function buildGondola(){
   const maxAlto   = Math.max(...filasInfo.map(f=>f.m.alto));
 
   let zFrente = profTotal / 2;
-  filasInfo.forEach(({l, m, central, profM}) => {
+  const pasillosInfoGon = [];   // centro en Z de cada pasillo, para cotearlos
+  filasInfo.forEach(({l, m, central, profM}, iF) => {
     const gLin = new THREE.Group();
     if(l.tipo === 'doble'){
       // Dos góndolas espalda con espalda.
@@ -4455,13 +4465,25 @@ function buildGondola(){
     if(l.tipoGon === 'pared' && l.volteada) gLin.rotation.y = Math.PI;
     gLin.position.z = zFrente - profM/2;
     grupo.add(gLin);
+    if(iF < filasInfo.length - 1) pasillosInfoGon.push(zFrente - profM - pasilloM/2);
     zFrente -= profM + pasilloM;
   });
+
+  // Cotas de los PASILLOS entre filas. Gondola no dibujaba ninguna cota, asi que
+  // el pasillo de 1.6 m solo se veia en el texto de abajo. (Isaac, 21 sep 2026)
+  if(pasillosInfoGon.length){
+    const xPas = -maxLargo/2 - 1.20;
+    pasillosInfoGon.forEach(zc => {
+      cotaDim(grupo, [xPas, -0.10, zc - pasilloM/2], [xPas, -0.10, zc + pasilloM/2],
+              fmtCota(pasilloM), {labelOffset:[-0.34,0,0], escala:[0.52,0.17]});
+    });
+  }
 
   targetY = maxAlto * 0.46;
   const xExt = maxLargo + (filasInfo.some(f=>f.l.cabeceras>0) ? 0 : 0);
   const zExt = profTotal;
   camDist = Math.max(maxAlto*1.7 + 1.25, Math.max(xExt, zExt)*1.05 + 0.9);
+  if(pasillosInfoGon.length) camDist = Math.max(camDist, (maxLargo + 3.0)*1.05 + 0.9);
 
   const dimsEl = document.getElementById('dims');
   const resEl  = document.getElementById('medidasResumen');
@@ -5146,7 +5168,7 @@ function buildSelectivo(){
       buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
-      const nMarcosU = Math.min(l.cuerposA, l.cuerposB) + 1;
+      const nMarcosU = cfg.unionM > 0.01 ? Math.min(l.cuerposA, l.cuerposB) + 1 : 0;
       const x0U = -l.largoM/2;
       const yPositions = [l.altoM * 0.15, l.altoM * 0.5, l.altoM * 0.90];
       for(let k=0; k<nMarcosU; k++){
@@ -7215,6 +7237,11 @@ function addEvents(){
     document.getElementById('selUnionRow').style.display = doble ? '' : 'none';
   }
   document.getElementById('selUnion').addEventListener('change', build);
+  const _chkU = document.getElementById('selChkUnion');
+  if(_chkU) _chkU.addEventListener('change', function(){
+    document.getElementById('selUnion').style.display = this.checked ? '' : 'none';
+    build();
+  });
   document.getElementById('selPasillo').addEventListener('change', build);
   document.getElementById('selChkPasarela').addEventListener('change', ()=>{
     document.getElementById('selPasarelaOpts').style.display =
