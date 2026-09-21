@@ -636,7 +636,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.07';
+const CFG_VERSION = '2026.09.21.08';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1023,6 +1023,9 @@ function calcularFlete(sub){
 
 // ───────── 3D ─────────
 let scene, camera, renderer, grupo, targetY=0.65, camDist=3.4;
+// Centro al que mira la camara en planta. Normalmente 0 (el rack esta centrado),
+// pero con la bodega el rack se recorre a su esquina y la camara sigue al cuarto.
+let targetX=0, targetZ=0;
 let rotY=0.7, rotX=0.32, isDrag=false, lpX, lpY;
 // Unidad de las cotas: 'm' (metros), 'cm' o 'in' (pulgadas)
 let unidadCota = 'm';
@@ -4813,18 +4816,26 @@ function agregarBodega(parent){
   // completas, sobre todo en el celular (pantalla más chica).
   camDist = Math.max(camDist, A*0.72 + 2.2, L*0.72 + 2.2, H*1.5 + 1.6);
   targetY = Math.max(targetY, H*0.46);
+  // El rack se arma centrado en el origen, pero en un layout se acomoda desde la
+  // ESQUINA de la bodega, no flotando en medio (Isaac, 21 sep 2026). En vez de
+  // mover el rack —que se arma en muchos lados— se corre la BODEGA para que su
+  // esquina de -X/-Z coincida con la del rack, y la camara pasa a mirar el centro
+  // del cuarto para que se siga viendo completo.
+  const cx0 = (A - _rackDims.x)/2, cz0 = (L - _rackDims.z)/2;
+  targetX = cx0; targetZ = cz0;
   // Piso semitransparente
   const piso = new THREE.Mesh(new THREE.PlaneGeometry(A, L),
     new THREE.MeshBasicMaterial({color:0xdfe3e8, transparent:true, opacity:0.22, side:THREE.DoubleSide, depthWrite:false}));
-  piso.rotation.x = -Math.PI/2; piso.position.set(0, 0.002, 0); parent.add(piso);
+  piso.rotation.x = -Math.PI/2; piso.position.set(cx0, 0.002, cz0); parent.add(piso);
   // Contorno del cuarto (aristas)
   const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(A, H, L));
   const wire = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0x8a94a3, transparent:true, opacity:0.65}));
-  wire.position.set(0, H/2, 0); wire.renderOrder = 998; parent.add(wire);
+  wire.position.set(cx0, H/2, cz0); wire.renderOrder = 998; parent.add(wire);
   // Cotas de la bodega, por fuera
-  cotaDim(parent, [-A/2, -0.55, L/2+0.5], [A/2, -0.55, L/2+0.5], fmtCota(A), {labelOffset:[0,-0.28,0], escala:[0.6,0.19]});
-  cotaDim(parent, [A/2+0.5, -0.55, -L/2], [A/2+0.5, -0.55, L/2], fmtCota(L), {labelOffset:[0.38,0,0], escala:[0.6,0.19]});
-  cotaDim(parent, [A/2+0.5, 0, L/2+0.5], [A/2+0.5, H, L/2+0.5], fmtCota(H), {labelOffset:[0.40,0,0], escala:[0.6,0.19]});
+  const xIz = cx0 - A/2, xDe = cx0 + A/2, zAt = cz0 - L/2, zAd = cz0 + L/2;
+  cotaDim(parent, [xIz, -0.55, zAd+0.5], [xDe, -0.55, zAd+0.5], fmtCota(A), {labelOffset:[0,-0.28,0], escala:[0.6,0.19]});
+  cotaDim(parent, [xDe+0.5, -0.55, zAt], [xDe+0.5, -0.55, zAd], fmtCota(L), {labelOffset:[0.38,0,0], escala:[0.6,0.19]});
+  cotaDim(parent, [xDe+0.5, 0, zAd+0.5], [xDe+0.5, H, zAd+0.5], fmtCota(H), {labelOffset:[0.40,0,0], escala:[0.6,0.19]});
   // Indicador de ajuste (rack: x=largo, z=fondo, y=alto)
   if(st){
     const rd = _rackDims;
@@ -5215,6 +5226,7 @@ function build(){
   }
   grupo = new THREE.Group();
   _rackDims = null;
+  targetX = 0; targetZ = 0;   // sin bodega, la camara mira al centro del rack
   _COTA_PEND = [];
   if(sistemaActual === 'selectivo') buildSelectivo();
   else if(sistemaActual === 'picking') buildPicking();
@@ -7175,6 +7187,9 @@ function addEvents(){
   renderLineasCantilever();
   document.getElementById('mecPasillo').addEventListener('change', build);
   document.getElementById('canPasillo').addEventListener('change', build);
+  // El bloque de la bodega nace con display:none en el HTML y solo se encendia
+  // al picar una pestana de sistema. Al cargar la pagina quedaba escondido.
+  document.getElementById('bodegaShared').style.display = (sistemaActual==='piezas') ? 'none' : '';
   if(typeof renderLineasGondola === 'function') renderLineasGondola();
   actualizarSelUnion();
 
@@ -7399,8 +7414,8 @@ function animate(){
   requestAnimationFrame(animate);
   if(document.getElementById('auto').checked && !isDrag) rotY += 0.004;
   const cx = Math.cos(rotX);
-  camera.position.set(Math.sin(rotY)*cx*camDist, Math.sin(rotX)*camDist + targetY, Math.cos(rotY)*cx*camDist);
-  camera.lookAt(0, targetY, 0);
+  camera.position.set(targetX + Math.sin(rotY)*cx*camDist, Math.sin(rotX)*camDist + targetY, targetZ + Math.cos(rotY)*cx*camDist);
+  camera.lookAt(targetX, targetY, targetZ);
   // Billboard: el sprite Isaac siempre mira hacia la cámara (sólo en eje Y, mantiene vertical)
   if(grupo){
     grupo.traverse(obj=>{
