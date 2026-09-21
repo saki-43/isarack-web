@@ -256,6 +256,10 @@ gtag('config', 'G-XXXXXXXXXX');
         <button id="btnAddGonSen" onclick="lnAddGon('sencilla')" style="flex:1;padding:6px 8px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">+ Fila</button>
       </div>
     </div>
+    <div class="row" id="gonPasilloRow" style="display:none">
+      <label>Pasillo entre líneas (m)</label>
+      <input type="number" id="gonPasillo" value="1.6" min="0.6" max="10" step="0.1" style="width:100%">
+    </div>
     <!-- Selects espejo (ocultos) — reflejan la fila 1 de lineasGondola. Las funciones
          existentes (buildGondola, calcularBomGondola, configResumen, captura3D) siguen
          leyendo de aqui para no romperse. Un wrapper aparte itera las filas adicionales. -->
@@ -650,7 +654,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.15';
+const CFG_VERSION = '2026.09.21.16';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3063,6 +3067,8 @@ function _gonEspejar(){
 function renderLineasGondola(){
   lineasGondola.forEach(_gonNormaliza);
   _gonEspejar();
+  const _rPas = document.getElementById('gonPasilloRow');
+  if(_rPas) _rPas.style.display = lineasGondola.length > 1 ? '' : 'none';
   const cont = document.getElementById('gonLineasList'); if(!cont) return;
   cont.innerHTML = lineasGondola.map((l, i) => {
     const bg = '#eef4fb', bd = '#b5d4f4', tx = '#185FA5';
@@ -4423,7 +4429,10 @@ function buildGondola(){
         cabeceras: parseInt(document.getElementById('cabeceras').value)
       }];
 
-  const pasilloM = 1.6;   // pasillo peatonal entre filas de góndolas
+  // Pasillo peatonal entre filas. Antes estaba fijo en 1.6 m y no habia forma
+  // de cambiarlo; ahora va en el mismo campo que los otros 4 sistemas.
+  const pasilloM = Math.max(0.6, Math.min(10,
+    parseFloat((document.getElementById('gonPasillo')||{}).value) || 1.6));
 
   // Info geométrica por fila
   const filasInfo = filas.map(l => {
@@ -7243,6 +7252,8 @@ function addEvents(){
     build();
   });
   document.getElementById('selPasillo').addEventListener('change', build);
+  const _gPas = document.getElementById('gonPasillo');
+  if(_gPas){ _gPas.addEventListener('change', build); _gPas.addEventListener('input', build); }
   document.getElementById('selChkPasarela').addEventListener('change', ()=>{
     document.getElementById('selPasarelaOpts').style.display =
       document.getElementById('selChkPasarela').checked ? '' : 'none';
