@@ -569,7 +569,10 @@ gtag('config', 'G-XXXXXXXXXX');
 
   <label class="chk"><input type="checkbox" id="auto" checked> Girar automático</label>
   <button id="wa">📱 Solicitar cotización por WhatsApp</button>
-  <button id="reset">Reiniciar vista</button>
+  <div style="display:flex;gap:6px">
+    <button id="giro90" style="flex:1" title="Cuarto de vuelta: deja el rack de frente">↻ Girar 90°</button>
+    <button id="reset" style="flex:1">Reiniciar vista</button>
+  </div>
   <!-- Sello de version: sirve para saber si el navegador ya trae el deploy nuevo.
        Subirlo en CADA cambio del configurador, igual que APP_VERSION en ISA-OS. -->
   <div style="text-align:center;font-size:9px;color:#b9b5aa;margin-top:6px;letter-spacing:.3px">Configurador <span id="cfgVer"></span></div>
@@ -633,7 +636,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.06';
+const CFG_VERSION = '2026.09.21.07';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -7227,6 +7230,15 @@ function addEvents(){
     });
   });
   document.getElementById('reset').addEventListener('click', ()=>{rotY=0.7; rotX=0.32;});
+  // Cuarto de vuelta. Cuadra al multiplo de 90 mas cercano y avanza uno, asi
+  // picandole se pasa por 0/90/180/270 exactos y el rack queda de frente.
+  // Apaga el giro automatico: si no, la vista se sigue de largo al instante.
+  document.getElementById('giro90').addEventListener('click', ()=>{
+    const auto = document.getElementById('auto');
+    if(auto && auto.checked) auto.checked = false;
+    const q = Math.PI/2;
+    rotY = Math.round(rotY/q)*q + q;
+  });
   document.getElementById('wa').addEventListener('click', function(){ if(typeof gtag==='function') gtag('event','cotizacion_whatsapp',{sistema:sistemaActual}); });
   document.getElementById('wa').addEventListener('click', ()=>{
     const cfg = configResumen();
