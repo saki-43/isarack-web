@@ -569,10 +569,7 @@ gtag('config', 'G-XXXXXXXXXX');
 
   <label class="chk"><input type="checkbox" id="auto" checked> Girar automático</label>
   <button id="wa">📱 Solicitar cotización por WhatsApp</button>
-  <div style="display:flex;gap:6px">
-    <button id="giro90" style="flex:1" title="Cuarto de vuelta: deja el rack de frente">↻ Girar 90°</button>
-    <button id="reset" style="flex:1">Reiniciar vista</button>
-  </div>
+  <button id="reset">Reiniciar vista</button>
   <!-- Sello de version: sirve para saber si el navegador ya trae el deploy nuevo.
        Subirlo en CADA cambio del configurador, igual que APP_VERSION en ISA-OS. -->
   <div style="text-align:center;font-size:9px;color:#b9b5aa;margin-top:6px;letter-spacing:.3px">Configurador <span id="cfgVer"></span></div>
@@ -636,7 +633,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.08';
+const CFG_VERSION = '2026.09.21.09';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2826,6 +2823,8 @@ function _cardLinea(pfx, i, l, extra){
   const tx = esD ? '#993C1D' : '#185FA5';
   const lbl = esD ? 'Doble' : (l.tipo === 'sencillo' ? 'Sencillo' : 'Sencilla');
   const cA = l.cuerpos, cB = (l.cuerposB==null ? l.cuerpos : l.cuerposB);
+  // Flecha opcional para voltear la fila, como la de Gondola.
+  const btnFlip = extra.flip || '';
   const btnDel = extra.total > 1
     ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))'+pfx+'Del('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
     : '';
@@ -2838,6 +2837,7 @@ function _cardLinea(pfx, i, l, extra){
   return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
     +'<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;font-size:10.5px">'
     +'<span onclick="'+pfx+'Tipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';white-space:nowrap" title="Clic para cambiar tipo">'+(i+1)+'· '+lbl+'</span>'
+    + btnFlip
     + btnDel
     +'<span style="flex:1"></span>'
     +'<span onclick="'+pfx+'Cuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
@@ -2898,7 +2898,13 @@ function renderLineasCantilever(){
       '<div><div style="color:#666;margin-bottom:1px">Altura col.</div><select onchange="lcSet('+i+',\'altoFt\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(CAN_ALTOS_OPTS, l.altoFt)+'</select></div>'
       +'<div><div style="color:#666;margin-bottom:1px">Brazo</div><select onchange="lcSet('+i+',\'brazoIn\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(CAN_BRAZOS_OPTS, l.brazoIn)+'</select></div>'
       +'<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Niveles de brazos</div><select onchange="lcSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>';
-    return _cardLinea('lc', i, l, {total: lineasCantilever.length, abPermitido:false,
+    // Los brazos de una fila DOBLE salen de los dos lados, voltearla no cambia
+    // nada; por eso la flecha solo va en las sencillas (igual que en Gondola,
+    // donde la fila central tampoco la lleva).
+    const flip = l.tipo !== 'doble'
+      ? '<span onclick="event.stopPropagation();lcFlip('+i+')" style="cursor:pointer;color:'+(l.tipo==='doble'?'#993C1D':'#185FA5')+';font-size:12px;font-weight:700;padding:1px 4px;line-height:1;flex-shrink:0" title="Voltear: brazos al otro lado">'+(l.volteada?'⇐':'⇒')+'</span>'
+      : '';
+    return _cardLinea('lc', i, l, {total: lineasCantilever.length, abPermitido:false, flip: flip,
       chip: l.altoFt+"' · brazo "+l.brazoIn+'\" · '+l.niveles+' niv', detalle});
   }).join('');
   lineasSyncCan();
@@ -2915,6 +2921,12 @@ function lcCuerpos(i,d){ const l=lineasCantilever[i]; l.cuerpos=Math.max(2,Math.
 function lcTipo(i){ lineasCantilever[i].tipo = lineasCantilever[i].tipo==='doble'?'sencillo':'doble'; renderLineasCantilever(); build(); }
 function lcToggle(i){ lineasCantilever[i].abierta = !lineasCantilever[i].abierta; renderLineasCantilever(); }
 function lcSet(i,c,v){ lineasCantilever[i][c]=v; renderLineasCantilever(); build(); }
+function lcFlip(i){
+  const l = lineasCantilever[i];
+  if(!l || l.tipo === 'doble') return;
+  l.volteada = !l.volteada;
+  renderLineasCantilever(); build();
+}
 
 const SEL_ALTOS  = [[96,'96" (2.44 m)'],[144,'144" (3.66 m)'],[192,'192" (4.88 m)'],[240,'240" (6.10 m)'],[288,'288" (7.32 m)'],[312,'312" (7.92 m) · 26\''],[336,'336" (8.54 m)'],[360,'360" (9.14 m) · 30\'']];
 const SEL_FONDOS = [[24,'24" (0.61 m)'],[36,'36" (0.91 m)'],[42,'42" (1.07 m)'],[48,'48" (1.22 m)']];
@@ -3788,7 +3800,7 @@ function getConfigMec(){
 function getConfigCan(){
   const separacionM = 42 * IN_TO_M;  // 42" C-C
   const lineas = lineasCantilever.map(l => ({
-    tipo: l.tipo, columnas: l.cuerpos,
+    tipo: l.tipo, columnas: l.cuerpos, volteada: (l.tipo !== 'doble' && !!l.volteada),
     altoFt: l.altoFt, brazoIn: l.brazoIn, niveles: l.niveles,
     altoM: l.altoFt * 0.3048,
     brazoM: l.brazoIn * IN_TO_M,
@@ -3934,10 +3946,14 @@ function buildCantilever(){
                      niveles: l.niveles, columnas: l.columnas, separacionM: l.separacionM };
     const alturas = buildCantileverScene(gLin, pseudo, colorHex);
     if(i === 0) alturasBrazosL0 = alturas;
-    // La escena construye columnas en z = 0..largoZM, columna en x≈0
+    // La escena construye columnas en z = 0..largoZM, columna en x~0
     const x0_l = l.tipo === 'doble' ? -l.anchoBaseM/2 : -0.15;
-    gLin.position.x = xCursor - x0_l;
-    gLin.position.z = maxLargoZ/2 - l.largoZM;   // alineadas al frente (+Z)
+    // Voltear = girar la fila 180 grados, igual que la flecha de Gondola. El giro
+    // tambien espeja la X y la Z, asi que hay que recolocarla para que siga
+    // ocupando su mismo carril y su mismo frente; si no, se sale del pasillo.
+    if(l.volteada) gLin.rotation.y = Math.PI;
+    gLin.position.x = l.volteada ? (xCursor + x0_l + l.anchoBaseM) : (xCursor - x0_l);
+    gLin.position.z = l.volteada ? (maxLargoZ/2) : (maxLargoZ/2 - l.largoZM);
     grupo.add(gLin);
     xCursor += l.anchoBaseM + cfg.pasilloM;
   });
@@ -7245,15 +7261,6 @@ function addEvents(){
     });
   });
   document.getElementById('reset').addEventListener('click', ()=>{rotY=0.7; rotX=0.32;});
-  // Cuarto de vuelta. Cuadra al multiplo de 90 mas cercano y avanza uno, asi
-  // picandole se pasa por 0/90/180/270 exactos y el rack queda de frente.
-  // Apaga el giro automatico: si no, la vista se sigue de largo al instante.
-  document.getElementById('giro90').addEventListener('click', ()=>{
-    const auto = document.getElementById('auto');
-    if(auto && auto.checked) auto.checked = false;
-    const q = Math.PI/2;
-    rotY = Math.round(rotY/q)*q + q;
-  });
   document.getElementById('wa').addEventListener('click', function(){ if(typeof gtag==='function') gtag('event','cotizacion_whatsapp',{sistema:sistemaActual}); });
   document.getElementById('wa').addEventListener('click', ()=>{
     const cfg = configResumen();
