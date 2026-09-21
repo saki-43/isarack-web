@@ -237,6 +237,11 @@ gtag('config', 'G-XXXXXXXXXX');
           <div class="bodCampo"><span class="bodLbl">Largo</span><input type="number" id="bodLargo" class="bodInp" value="20" min="1" step="0.5" oninput="build()" title="Largo de la bodega, en metros"></div>
           <div class="bodCampo"><span class="bodLbl">Alto</span><input type="number" id="bodAlto" class="bodInp" value="7" min="1" step="0.5" oninput="build()" title="Alto libre de la bodega, en metros"></div>
         </div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:4px">
+          <span class="bodLbl" style="color:#8a8f95;flex:0 0 auto">Separar de pared</span>
+          <div class="bodCampo"><span class="bodLbl">X</span><input type="number" id="bodSepX" class="bodInp" value="0" min="0" step="0.1" oninput="build()" title="Separación de la pared izquierda, en metros"></div>
+          <div class="bodCampo"><span class="bodLbl">Y</span><input type="number" id="bodSepY" class="bodInp" value="0" min="0" step="0.1" oninput="build()" title="Separación de la pared del fondo, en metros"></div>
+        </div>
         <div id="bodEstado" style="font-size:10px;font-weight:600;margin-top:4px;line-height:1.25"></div>
       </div>
     </div>
@@ -645,7 +650,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.12';
+const CFG_VERSION = '2026.09.21.13';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -4849,7 +4854,11 @@ function agregarBodega(parent){
   // mover el rack —que se arma en muchos lados— se corre la BODEGA para que su
   // esquina de -X/-Z coincida con la del rack, y la camara pasa a mirar el centro
   // del cuarto para que se siga viendo completo.
-  const cx0 = (A - _rackDims.x)/2, cz0 = (L - _rackDims.z)/2;
+  // Separacion de las paredes. El rack se arma centrado en el origen y lo que se
+  // mueve es la BODEGA, asi que separarlo de la pared es correr el cuarto al reves:
+  // restandole la separacion a su centro, el hueco queda del lado -X / -Z.
+  const sx = Math.max(0, gv('bodSepX')), sz = Math.max(0, gv('bodSepY'));
+  const cx0 = (A - _rackDims.x)/2 - sx, cz0 = (L - _rackDims.z)/2 - sz;
   targetX = cx0; targetZ = cz0;
   // Piso semitransparente
   const piso = new THREE.Mesh(new THREE.PlaneGeometry(A, L),
@@ -4864,17 +4873,22 @@ function agregarBodega(parent){
   cotaDim(parent, [xIz, -0.55, zAd+0.5], [xDe, -0.55, zAd+0.5], fmtCota(A), {labelOffset:[0,-0.28,0], escala:[0.6,0.19]});
   cotaDim(parent, [xDe+0.5, -0.55, zAt], [xDe+0.5, -0.55, zAd], fmtCota(L), {labelOffset:[0.38,0,0], escala:[0.6,0.19]});
   cotaDim(parent, [xDe+0.5, 0, zAd+0.5], [xDe+0.5, H, zAd+0.5], fmtCota(H), {labelOffset:[0.40,0,0], escala:[0.6,0.19]});
+  // Hueco contra la pared (solo si se pidio separacion)
+  if(sx > 0.05) cotaDim(parent, [xIz, -0.22, zAd+0.18], [xIz+sx, -0.22, zAd+0.18], fmtCota(sx), {labelOffset:[0,-0.20,0], escala:[0.5,0.16]});
+  if(sz > 0.05) cotaDim(parent, [xDe+0.18, -0.22, zAt], [xDe+0.18, -0.22, zAt+sz], fmtCota(sz), {labelOffset:[0.30,0,0], escala:[0.5,0.16]});
   // Indicador de ajuste (rack: x=largo, z=fondo, y=alto)
   if(st){
     const rd = _rackDims;
-    const cabe = (A >= rd.x - 0.01) && (L >= rd.z - 0.01) && (H >= rd.y - 0.01);
+    // La separacion de pared ocupa espacio igual que el rack: entra en la cuenta.
+    const ocX = rd.x + sx, ocZ = rd.z + sz;
+    const cabe = (A >= ocX - 0.01) && (L >= ocZ - 0.01) && (H >= rd.y - 0.01);
     if(cabe){
-      st.innerHTML = '✓ Cabe · sobra '+fmtCota(A-rd.x)+' de ancho, '+fmtCota(L-rd.z)+' de largo y '+fmtCota(H-rd.y)+' de alto';
+      st.innerHTML = '✓ Cabe · sobra '+fmtCota(A-ocX)+' de ancho, '+fmtCota(L-ocZ)+' de largo y '+fmtCota(H-rd.y)+' de alto';
       st.style.color = '#2e7d32';
     } else {
       const falta = [];
-      if(A < rd.x) falta.push('ancho ('+fmtCota(rd.x-A)+' de más)');
-      if(L < rd.z) falta.push('largo ('+fmtCota(rd.z-L)+' de más)');
+      if(A < ocX) falta.push('ancho ('+fmtCota(ocX-A)+' de más)');
+      if(L < ocZ) falta.push('largo ('+fmtCota(ocZ-L)+' de más)');
       if(H < rd.y) falta.push('alto ('+fmtCota(rd.y-H)+' de más)');
       st.innerHTML = '⚠ NO cabe — falta '+falta.join(', ');
       st.style.color = '#c62828';
@@ -7333,7 +7347,7 @@ function estadoConfigurador(){
   // Bodega y unidad de cota (no tienen prefijo de sistema, se guardan aparte)
   try{
     const gv = id => parseFloat((document.getElementById(id)||{}).value) || 0;
-    st.bod = {on: bodegaOn, a: gv('bodAncho'), l: gv('bodLargo'), h: gv('bodAlto')};
+    st.bod = {on: bodegaOn, a: gv('bodAncho'), l: gv('bodLargo'), h: gv('bodAlto'), sx: gv('bodSepX'), sy: gv('bodSepY')};
     st.u = unidadCota;
   }catch(e){}
   return st;
@@ -7370,6 +7384,7 @@ function aplicarEstado(st){
     bodegaOn = !!st.bod.on;
     const setv = (id,v) => { const e = document.getElementById(id); if(e && v) e.value = v; };
     setv('bodAncho', st.bod.a); setv('bodLargo', st.bod.l); setv('bodAlto', st.bod.h);
+    setv('bodSepX', st.bod.sx); setv('bodSepY', st.bod.sy);
     const chk = document.getElementById('bodChk'); if(chk) chk.checked = bodegaOn;
     const box = document.getElementById('bodBox'); if(box) box.style.display = bodegaOn ? '' : 'none';
   }
