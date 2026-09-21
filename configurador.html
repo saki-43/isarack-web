@@ -633,7 +633,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.01';
+const CFG_VERSION = '2026.09.21.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2032,12 +2032,11 @@ function huecosMarcoPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   return out;
 }
 
-// Cuerpo que cruza el ramal de acceso, SIN el candado de "solo con pasarela
-// doble": la salida de la escalera lo necesita tambien con una sola pasarela.
-function _cuerpoRamalIdx(cfg, xInicio, anchoCuerpo, nCuerpos){
+function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos){
   if(!cfg.pasarela || !cfg.pasarela.on) return -1;
   if(!modeloPasarela(cfg).despejaModulo) return -1;
   if(cfg.pasarela.escalera === 'no') return -1;
+  if((cfg.pasarela.niveles || 1) < 2) return -1;         // solo con pasarela doble
   const dir = cfg.pasarela.escalera === 'izq' ? -1 : 1;
   const largoTot = anchoCuerpo * nCuerpos;
   const xBorde = dir === 1 ? xInicio + largoTot : xInicio;
@@ -2051,43 +2050,47 @@ function _cuerpoRamalIdx(cfg, xInicio, anchoCuerpo, nCuerpos){
   const idx = Math.floor((xCen - xInicio) / anchoCuerpo);
   return (idx >= 0 && idx < nCuerpos) ? idx : -1;
 }
-// El ramal como se usaba hasta hoy: solo con pasarela doble. No se toca para no
-// mover lo que ya cotizaba Picking ni el despeje por bandas de la fila 1.
-function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos){
-  if((cfg.pasarela && (cfg.pasarela.niveles || 1)) < 2) return -1;
-  return _cuerpoRamalIdx(cfg, xInicio, anchoCuerpo, nCuerpos);
-}
 // ── SALIDA DE LA ESCALERA (PS-1) ──
 // REGLA DE OBRA (Isaac, 19 sep 2026): al salir de la escalera hay que cruzar las
 // filas para meterse a los pasillos laterales, y la viga que queda a la altura
 // del piso de la pasarela lo impide. Ese cuerpo pierde UN SOLO nivel: el
 // primero que queda al ras o arriba del piso. Aplica a TODAS las filas, no solo
 // a la primera, y tambien con una sola pasarela.
-function _nivelSalidaPasarela(cfg, l, fila, k){
-  if(!cfg || !cfg.pasarela || !cfg.pasarela.on) return -1;
-  if(cfg.pasarela.escalera === 'no') return -1;
+// Un nivel por CADA piso de pasarela: el primero que queda al ras o arriba de
+// ese piso, que es el que estorba al salir. Con pasarela doble son dos.
+function _nivelesSalidaPasarela(cfg, l, fila, k){
+  const out = [];
+  if(!cfg || !cfg.pasarela || !cfg.pasarela.on) return out;
+  if(cfg.pasarela.escalera === 'no') return out;
   const yN = cfg.pasarela.alturaM;
+  const nPisos = cfg.pasarela.niveles || 1;
   const altoM = l.altoM || (l.altoIn * IN_TO_M);
   const nivC = _nivDeModulo(l, fila, k);
   const ys = alturasDeCuerpoM(l, fila, k) || alturasDefaultM(altoM, nivC);
-  for(let n = 0; n < Math.min(ys.length, nivC); n++){
-    if(ys[n] >= yN - 0.20) return n;
+  const tope = Math.min(ys.length, nivC);
+  for(let p = 1; p <= nPisos; p++){
+    for(let i = 0; i < tope; i++){
+      if(ys[i] >= yN*p - 0.20){ if(out.indexOf(i) < 0) out.push(i); break; }
+    }
   }
-  return -1;
+  return out.sort(function(a,b){return a-b;});
 }
 // [{k, niveles:[n]}] del cuerpo de salida de ESTA fila. Cada fila puede llevar
 // otra viga, asi que el cuerpo se calcula con su propio ancho.
+// SOLO PS-2. En PS-1 la escalera y el corredor van por FUERA del perimetro, asi
+// que no se sale al rack y no hay viga que estorbe (Isaac, 21 sep 2026).
 function salidaEscaleraSel(cfg, l, fila, nCuerpos, anchoCuerpo, xInicio, iLn){
   if(!cfg || !cfg.pasarela || !cfg.pasarela.on) return [];
-  if(idModeloPasarela(cfg) !== 'PS-1') return [];
-  // Con pasarela doble, la fila 1 ya despeja ese mismo cuerpo por bandas. Si
-  // ademas devolvieramos el nivel de salida, el BOM lo descontaria dos veces.
-  if(iLn === 0 && cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos) >= 0) return [];
-  const k = _cuerpoRamalIdx(cfg, xInicio, anchoCuerpo, nCuerpos);
-  if(k < 0) return [];
-  const n = _nivelSalidaPasarela(cfg, l, fila, k);
-  if(n < 0) return [];
-  return [{k: k, niveles: [n]}];
+  if(cfg.pasarela.escalera === 'no') return [];
+  if(idModeloPasarela(cfg) !== 'PS-2') return [];
+  // La escalera sube por dentro, siempre por el primer cuerpo. La fila por donde
+  // sube ya pierde esos niveles en cuerposEscaleraPS2, asi que aqui solo se
+  // atienden las DEMAS filas: son las que cierran el paso a los pasillos.
+  if(iLn === filaEscaleraPS2(cfg) || iLn === filaEscaleraAltaPS2(cfg)) return [];
+  const k = 0;
+  if(k >= nCuerpos) return [];
+  const niv = _nivelesSalidaPasarela(cfg, l, fila, k);
+  return niv.length ? [{k: k, niveles: niv}] : [];
 }
 
 // ── Marcos que cargan la pasarela ──
