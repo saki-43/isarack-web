@@ -633,7 +633,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.19.01';
+const CFG_VERSION = '2026.09.21.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1928,13 +1928,20 @@ function bandasPasarela(cfg){
 }
 
 // Cuántos niveles del módulo del ramal quedan sin viga (para el BOM)
-function nivelesSinVigaPasarela(cfg, altoM, niveles, sistema){
+// Cuantos niveles del cuerpo del ramal quedan sin viga (para el BOM).
+// Si se le pasa la linea, usa SUS alturas reales —claros a la medida y niveles
+// por modulo incluidos—; asi el descuento cuadra con lo que dibuja el 3D. Sin
+// linea se queda como estaba, que es como lo llama Picking.
+function nivelesSinVigaPasarela(cfg, altoM, niveles, sistema, l, fila, k){
   const bandas = bandasPasarela(cfg);
-  const man = getAlturasManualesM(sistema);
+  const reales = l ? alturasDeCuerpoM(l, fila || 'A', k || 0) : null;
+  const man = reales || getAlturasManualesM(sistema);
   const def = alturasDefaultM(altoM, niveles);
   let n = 0;
-  for(let k=0; k<niveles; k++){
-    const y = Math.min(man ? man[k] : def[k], altoM - 0.10);
+  for(let i=0; i<niveles; i++){
+    const yBase = (man && man[i] > 0) ? man[i] : def[i];
+    if(!(yBase > 0)) continue;
+    const y = Math.min(yBase, altoM - 0.10);
     if(bandas.some(b => y >= b[0] && y <= b[1])) n++;
   }
   return n;
@@ -2070,9 +2077,12 @@ function _nivelSalidaPasarela(cfg, l, fila, k){
 }
 // [{k, niveles:[n]}] del cuerpo de salida de ESTA fila. Cada fila puede llevar
 // otra viga, asi que el cuerpo se calcula con su propio ancho.
-function salidaEscaleraSel(cfg, l, fila, nCuerpos, anchoCuerpo, xInicio){
+function salidaEscaleraSel(cfg, l, fila, nCuerpos, anchoCuerpo, xInicio, iLn){
   if(!cfg || !cfg.pasarela || !cfg.pasarela.on) return [];
   if(idModeloPasarela(cfg) !== 'PS-1') return [];
+  // Con pasarela doble, la fila 1 ya despeja ese mismo cuerpo por bandas. Si
+  // ademas devolvieramos el nivel de salida, el BOM lo descontaria dos veces.
+  if(iLn === 0 && cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos) >= 0) return [];
   const k = _cuerpoRamalIdx(cfg, xInicio, anchoCuerpo, nCuerpos);
   if(k < 0) return [];
   const n = _nivelSalidaPasarela(cfg, l, fila, k);
@@ -3207,7 +3217,7 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
     }
   });
   // Salida de la escalera: mismo cuerpo y mismo nivel que quita el 3D.
-  if(cfg) salidaEscaleraSel(cfg, l, 'A', cA, ancho, -l.largoM/2).forEach(it => {
+  if(cfg) salidaEscaleraSel(cfg, l, 'A', cA, ancho, -l.largoM/2, iLn).forEach(it => {
     if(it.k < cA){
       const cur = escMapA.get(it.k) || [];
       escMapA.set(it.k, Array.from(new Set(cur.concat(it.niveles))));
@@ -3227,7 +3237,7 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
     });
     // La salida de la escalera NO se refleja: el 3D del selectivo le pasa el
     // mismo arreglo de skip a las dos filas, sin rotar el indice.
-    salidaEscaleraSel(cfg, l, 'B', cB, ancho, -l.largoM/2).forEach(it => {
+    salidaEscaleraSel(cfg, l, 'B', cB, ancho, -l.largoM/2, iLn).forEach(it => {
       if(it.k < cB){
         const cur = escMapB.get(it.k) || [];
         escMapB.set(it.k, Array.from(new Set(cur.concat(it.niveles))));
@@ -3740,6 +3750,9 @@ function getConfigSel(){
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB, altoIn: l.altoIn, fondoIn: l.fondoIn,
       vigaSku: l.vigaSku, vigaIn: vi.largoIn, vigaAltIn: vi.altIn, capKg: vi.capKg, capLb: vi.capLb,
       niveles: l.niveles, nivMod: !!l.nivMod, nivelesA: l.nivelesA||null, nivelesB: l.nivelesB||null,
+      // tunelOn viaja aparte: _nivCargaSel lo exige para descontar las vigas del
+      // tunel, y sin el la cotizacion cobraba vigas que el 3D ni dibuja.
+      tunelOn: !!l.tunelOn,
       tunel: (l.tunelOn ? (l.tunel || []) : []),
       escHOn: !!l.escHOn,
       escH: (l.escHOn ? (l.escH || []) : []),
@@ -5077,7 +5090,7 @@ function buildSelectivo(){
     // SALIDA DE LA ESCALERA: un nivel del cuerpo por donde se sale, en todas las
     // filas. Va al final a proposito: el bucle del dibujo se queda con la PRIMERA
     // coincidencia, asi que si la fila 1 ya despejaba por bandas, eso manda.
-    salidaEscaleraSel(cfg, lineas[iLn], 'A', nCuerpos, lineas[iLn].vigaM, xInicio)
+    salidaEscaleraSel(cfg, lineas[iLn], 'A', nCuerpos, lineas[iLn].vigaM, xInicio, iLn)
       .forEach(it => arr.push(it));
     return arr.length ? arr : -1;
   };
@@ -5517,7 +5530,7 @@ function calcularBomSelectivo(){
     // Cuerpo de acceso de la escalera (línea frontal): va sin vigas de carga
     // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
     const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.vigaM, cA) : -1;
-    const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'selectivo') * (esD ? 2 : 1) : 0;
+    const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, _nivDeModulo(l, 'A', idxRamal), 'selectivo', l, 'A', idxRamal) * (esD ? 2 : 1) : 0;
     // Vigas SEL-0454 (96"x4" especial pasarela) que reemplazan a la 3" del lado del pasillo,
     // en el nivel donde se apoya el piso. Solo aplica si hay pasarela activa y la viga es de 96".
     let vigasPasarelaEspecial = 0;
