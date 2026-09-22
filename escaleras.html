@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Herramienta interna, no es pagina de venta: que no salga en Google. -->
+<meta name="robots" content="noindex,nofollow">
+<title>Diseñador de Escaleras · ISARACK</title>
+<style>
+:root{
+  /* Marca */
+  --naranja:#DA6635; --naranja-d:#B44E23; --naranja-tint:#FBEDE6; --naranja-ink:#8A4526;
+  /* Grafito / tinta */
+  --tinta:#161c24; --tinta2:#232c37; --acero:#3a4552;
+  --grafito:#5b6673; --gris:#7c8794; --gris-2:#98a2af;
+  /* Superficies */
+  --panel:#ffffff; --fondo:#e8ebee; --inset:#f4f6f8; --plano:#f2f6fb;
+  /* Líneas */
+  --linea:#dee2e7; --linea-2:#c8ced5;
+  /* Apoyo */
+  --azul:#1d557f; --verde:#1f9d57; --verde-d:#178046;
+  --sombra:0 1px 2px rgba(22,28,36,.05), 0 6px 20px rgba(22,28,36,.06);
+  --sombra-fija:0 8px 24px rgba(22,28,36,.16);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--fondo);color:var(--tinta);line-height:1.45;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(rgba(22,28,36,.035) 1px,transparent 1px);background-size:22px 22px}
+.mono{font-family:"SF Mono","JetBrains Mono",Menlo,Consolas,"Roboto Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+/* ---------- Barra superior (instrumento) ---------- */
+header{background:linear-gradient(180deg,#1b232d,#141a22);color:#fff;padding:11px 20px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:20;
+  border-bottom:2px solid var(--naranja);box-shadow:0 2px 14px rgba(0,0,0,.18)}
+.htitle{flex:1;min-width:180px}
+header h1{font-size:18px;font-weight:650;letter-spacing:.2px;line-height:1.1}
+header .sub{font-size:11.5px;color:#9aa6b4;margin-top:3px;letter-spacing:.2px}
+.hex{width:40px;height:44px;background:linear-gradient(160deg,#E8763F,#C0501F);
+  clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff;
+  letter-spacing:.5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),inset 0 -6px 10px rgba(0,0,0,.18);
+  text-shadow:0 1px 1px rgba(0,0,0,.25);flex-shrink:0}
+.hbtns{display:flex;gap:8px;flex-wrap:wrap}
+.hbtns button{height:38px;padding:0 15px;font-size:13.5px;font-weight:600;border:none;border-radius:9px;
+  cursor:pointer;letter-spacing:.2px;transition:transform .06s ease,background .15s ease,box-shadow .15s ease}
+.hbtns button:active{transform:translateY(1px)}
+.hbtns .ghost{background:#2c3540;color:#dfe4ea;box-shadow:inset 0 0 0 1px #3c4653}
+.hbtns .ghost:hover{background:#39424f}
+.hbtns .wa{background:var(--verde);color:#fff;box-shadow:0 2px 8px rgba(31,157,87,.3)}
+.hbtns .wa:hover{background:var(--verde-d)}
+.hbtns .pri{background:var(--naranja);color:#fff;box-shadow:0 2px 8px rgba(218,102,53,.34)}
+.hbtns .pri:hover{background:var(--naranja-d)}
+
+/* ---------- Retícula ---------- */
+.wrap{max-width:1120px;margin:0 auto;padding:20px 18px 40px;display:grid;
+  grid-template-columns:300px 1fr;gap:18px;align-items:start}
+@media(max-width:820px){.wrap{grid-template-columns:1fr;padding:14px 12px 32px}}
+
+/* ---------- Tarjetas ---------- */
+.card{background:var(--panel);border:1px solid var(--linea);border-radius:14px;padding:16px 16px 17px;
+  box-shadow:var(--sombra)}
+.card h2{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--grafito);
+  margin-bottom:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.card h2::before{content:"";width:9px;height:9px;background:var(--naranja);border-radius:2px;
+  box-shadow:0 0 0 3px var(--naranja-tint);flex-shrink:0}
+
+/* ---------- Formulario ---------- */
+label{display:block;font-size:13px;color:var(--tinta2);margin-bottom:11px}
+label span{display:block;margin-bottom:5px;color:var(--grafito);font-size:11.5px;font-weight:500;letter-spacing:.2px}
+input,select{width:100%;height:38px;padding:0 11px;border:1px solid var(--linea-2);
+  border-radius:9px;font-size:15px;background:#fff;color:var(--tinta);transition:border-color .15s,box-shadow .15s}
+select{cursor:pointer;appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' fill='none' stroke='%237c8794' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 11px center;padding-right:30px}
+input[type=number]{font-family:"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+input:hover,select:hover{border-color:#b3bbc4}
+input:focus,select:focus{outline:none;border-color:var(--naranja);box-shadow:0 0 0 3px rgba(218,102,53,.16)}
+.hint{font-size:11px;color:var(--gris);margin-top:-4px;margin-bottom:12px;line-height:1.4}
+
+.left{display:flex;flex-direction:column;gap:16px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px}
+.fgrid label{margin-bottom:0}
+.fgrid .full{grid-column:1/-1}
+.fgrid label span{margin-bottom:3px}
+.inputs input,.inputs select{height:36px}
+.fgrid .hint{margin:2px 0 0}
+
+.stepper{display:flex;align-items:center;gap:8px;background:var(--inset);border:1px solid var(--linea);
+  border-radius:10px;padding:3px}
+.stepper button{height:32px;width:38px;padding:0;font-size:20px;line-height:1;border:1px solid var(--linea-2);
+  background:#fff;border-radius:8px;cursor:pointer;color:var(--tinta2);font-weight:600;transition:background .12s}
+.stepper button:hover{background:var(--naranja-tint);border-color:var(--naranja);color:var(--naranja-d)}
+.stepper #descLbl,.stepper #puntaLbl{flex:1;text-align:center;font-size:14px;font-variant-numeric:tabular-nums;
+  font-family:"SF Mono",Menlo,Consolas,monospace;color:var(--tinta2)}
+
+/* ---------- Resultado ---------- */
+.res{display:flex;flex-direction:column;gap:16px}
+
+/* Lectura de instrumento: métricas */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
+.metric{position:relative;background:var(--inset);border:1px solid var(--linea);border-radius:11px;
+  padding:13px 13px 12px;overflow:hidden}
+.metric::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--naranja);opacity:.85}
+.metric .k{font-size:10px;color:var(--gris);text-transform:uppercase;letter-spacing:.7px;font-weight:600}
+.metric .v{font-size:27px;font-weight:600;margin-top:3px;color:var(--tinta);line-height:1.05;
+  font-family:"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.metric .u{font-size:12px;color:var(--gris);font-weight:400;letter-spacing:0}
+
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{background:var(--naranja-tint);color:var(--naranja-ink);font-size:12px;padding:5px 11px;
+  border-radius:999px;font-weight:600;border:1px solid #F3D8C9;letter-spacing:.1px}
+
+/* Dibujos tipo plano */
+.draws{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.draws{grid-template-columns:1fr}}
+.draw{border:1px solid var(--linea);border-radius:12px;padding:11px;
+  background:linear-gradient(180deg,#fbfcfe,var(--plano))}
+.draw .t{font-size:11px;color:var(--grafito);margin-bottom:7px;text-transform:uppercase;
+  letter-spacing:.8px;font-weight:700;display:flex;align-items:center;gap:6px}
+.draw .t::before{content:"";width:6px;height:6px;border:1.5px solid var(--naranja);border-radius:50%}
+svg{display:block;width:100%;height:auto}
+
+/* Tablas */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 8px;text-align:left;border-bottom:1px solid var(--linea)}
+tr:last-child td{border-bottom:none}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--gris);font-weight:700;
+  border-bottom:1.5px solid var(--linea-2)}
+td.n,th.n{text-align:right}
+.mat td:first-child{font-weight:600;color:var(--tinta)}
+.mat .q{font-weight:700;color:var(--naranja-d);font-size:15px}
+.mat tbody tr:hover{background:var(--inset)}
+
+/* Marcado del montén */
+.marca-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px}
+.marca{background:var(--inset);border:1px solid var(--linea);border-radius:8px;padding:7px 9px;font-size:13px;
+  font-variant-numeric:tabular-nums}
+.marca b{display:block;font-size:10px;color:var(--naranja-d);font-weight:700;margin-bottom:1px;letter-spacing:.3px}
+
+/* Botones generales */
+button{height:40px;padding:0 18px;border-radius:10px;border:1px solid var(--linea-2);
+  background:#fff;font-size:14px;font-weight:600;cursor:pointer;color:var(--tinta);
+  transition:background .14s,border-color .14s,transform .06s}
+button:hover{background:var(--inset);border-color:#b3bbc4}
+button:active{transform:translateY(1px)}
+button.pri{background:var(--naranja);border-color:var(--naranja);color:#fff;box-shadow:0 2px 8px rgba(218,102,53,.28)}
+button.pri:hover{background:var(--naranja-d);border-color:var(--naranja-d)}
+button.wa{background:var(--verde);border-color:var(--verde);color:#fff}
+button.wa:hover{background:var(--verde-d);border-color:var(--verde-d)}
+
+.acciones{display:flex;gap:10px;flex-wrap:wrap}
+.acciones small{color:var(--gris);font-size:12px;align-self:center}
+.alerta{background:linear-gradient(180deg,#FEF6E7,#FDEFD3);color:#7A4A0B;border:1px solid #F1C27A;
+  border-left:4px solid var(--naranja);border-radius:10px;padding:10px 12px;font-size:12.5px;
+  margin-top:13px;line-height:1.45;font-weight:500}
+
+/* Escaleras guardadas */
+.grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--gris);
+  margin:14px 0 5px;font-weight:700}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;
+  border-bottom:1px solid var(--linea)}
+.row:last-child{border-bottom:none}
+.ri b{font-size:13.5px;font-weight:600;display:block;color:var(--tinta)}
+.ri small{font-size:11px;color:var(--gris);font-variant-numeric:tabular-nums}
+.ra{display:flex;gap:6px}
+.ra button{height:31px;padding:0 12px;font-size:12px;border-radius:8px}
+.ra .del{color:#b91c1c;padding:0 10px;border-color:var(--linea-2)}
+.ra .del:hover{background:#fdecec;border-color:#f0b4b4}
+.tag-cal{font-size:12px;color:var(--grafito);margin-top:8px;font-weight:500;
+  background:var(--inset);border-radius:8px;padding:7px 10px;border:1px solid var(--linea)}
+
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--naranja);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---------- Impresión ---------- */
+@media print{
+  @page{size:letter portrait;margin:9mm}
+  html,body{background:#fff;font-size:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact;background-image:none}
+  header{padding:0 0 6px;background:#fff;color:#000;border-bottom:2px solid var(--naranja);gap:8px;position:static;box-shadow:none}
+  header h1{font-size:16px;color:#000} header .sub{font-size:10px;color:var(--gris)}
+  .hex{width:26px;height:30px;font-size:11px;box-shadow:none;background:var(--naranja)}
+  .wrap{display:block;max-width:100%;padding:6px 0 0;margin:0}
+  .inputs,.acciones,.noprint,.left{display:none!important}
+  .res{display:block}
+  .card{border:1px solid var(--linea);border-radius:6px;padding:8px;break-inside:avoid;margin:0 0 6px;box-shadow:none}
+  .card h2{font-size:10px;margin-bottom:6px}
+  .card h2::before{width:7px;height:7px;box-shadow:none}
+  .metrics{gap:6px;grid-template-columns:repeat(7,1fr)}
+  .metric{padding:6px;border-radius:4px}
+  .metric::before{height:2px}
+  .metric .v{font-size:16px} .metric .k{font-size:9px}
+  .draws{gap:10px;grid-template-columns:1fr 1fr}
+  .draw{padding:8px;background:#fff} .draw .t{font-size:10px;margin-bottom:4px}
+  .draw svg{max-height:200px}
+  .marca-grid{grid-template-columns:repeat(7,1fr);gap:5px}
+  .marca{padding:4px 5px;font-size:11px;border-radius:3px} .marca b{font-size:9px}
+  .mat td,.mat th{padding:4px 6px;font-size:11px}
+  .mat .q{font-size:12px}
+  .chip{font-size:10px;padding:4px 8px}
+  .alerta{padding:6px 8px}
+  .hint,.tag-cal{font-size:9px} .tag-cal{background:none;border:none;padding:0}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hex">IS</div>
+  <div class="htitle">
+    <h1>Diseñador de escaleras</h1>
+    <div class="sub">ISARACK · huella y peralte en múltiplos · despiece de materiales</div>
+  </div>
+  <div class="hbtns noprint">
+    <button class="wa" onclick="cotizar()">Cotizar con Blanquita</button>
+    <button class="wa" onclick="enviarSamuel()">Enviar a Samuel</button>
+    <button class="pri" onclick="window.print()">Imprimir / PDF</button>
+    <button class="ghost" onclick="copiar()">Copiar despiece</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="left">
+  <div class="card inputs">
+    <h2>Datos</h2>
+    <div class="fgrid">
+    <label class="full"><span>Cliente</span><input id="cliente" type="text" placeholder="Aceros Ocotlán"></label>
+    <label><span>Nombre / obra</span><input id="nombre" type="text" placeholder="Escalera"></label>
+    <label><span>Unidades</span>
+      <select id="unidad" onchange="changeUnit(this.value)">
+        <option value="cm">cm</option>
+        <option value="in">pulgadas</option>
+      </select>
+    </label>
+    <label><span id="sAltura">Altura total (cm)</span><input id="altura" type="number" value="350" step="1"></label>
+    <label><span id="sHuella">Huella (cm)</span><input id="huella" type="number" value="23" step="0.5"></label>
+    <label id="wrapPeralte"><span id="sPeralte">Peralte objetivo (cm)</span><input id="peralte" type="number" value="20" step="0.5"></label>
+    <label><span id="sAncho">Ancho del pasillo (cm)</span><input id="ancho" type="number" value="92" step="1"></label>
+    <label><span>Tipo</span>
+      <select id="tipo"><option value="L">L con descanso</option><option value="recta">Recta</option></select>
+    </label>
+    <label><span>Giro / posición</span>
+      <select id="pos">
+        <option value="BL">Abajo-izquierda</option>
+        <option value="BR">Abajo-derecha</option>
+        <option value="TL">Arriba-izquierda</option>
+        <option value="TR">Arriba-derecha</option>
+      </select>
+    </label>
+    <label id="wrapT1"><span id="sT1">Tramo 1 orilla a orilla (cm)</span><input id="t1len" type="number" value="276" step="1"></label>
+    <label id="wrapT2"><span id="sT2">Tramo 2 — resultado (cm)</span><input id="t2len" type="number" value="322" step="1"></label>
+    <label id="wrapDesc" class="full"><span>Descanso (múltiplos de huella)</span>
+      <div class="stepper">
+        <button type="button" onclick="stepDesc(-1)" aria-label="menos">−</button>
+        <span id="descLbl">92 cm</span>
+        <button type="button" onclick="stepDesc(1)" aria-label="más">+</button>
+      </div>
+    </label>
+    <label id="wrapPunta" class="full"><span>Descanso en punta / llegada (múltiplos de huella)</span>
+      <div class="stepper">
+        <button type="button" onclick="stepPunta(-1)" aria-label="menos">−</button>
+        <span id="puntaLbl">sin descanso</span>
+        <button type="button" onclick="stepPunta(1)" aria-label="más">+</button>
+      </div>
+    </label>
+    <div class="hint full" id="hintTramos"></div>
+    <div class="hint full" id="hintPeralte"></div>
+    </div>
+  </div>
+
+  <div class="card noprint">
+    <h2>Escaleras guardadas</h2>
+    <button class="pri" style="width:100%;margin-bottom:6px" onclick="guardarEsc()">Guardar escalera actual</button>
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <button style="flex:1" onclick="exportEsc()">Exportar respaldo</button>
+      <button style="flex:1" onclick="document.getElementById('impFile').click()">Importar</button>
+      <input type="file" id="impFile" accept="application/json,.json" style="display:none" onchange="importEsc(event)">
+    </div>
+    <div id="lista"></div>
+  </div>
+  </div>
+
+  <div class="res">
+
+    <div class="card">
+      <h2>Resultado</h2>
+      <div class="metrics" id="metrics"></div>
+      <div class="chips" id="chips" style="margin-top:12px"></div>
+      <div class="tag-cal" id="calnote"></div>
+      <div class="alerta">Alerta: en espacio cerrado (entre muros), si la escalera queda más grande — aunque sea 1" — hay que recortarla para que entre. Verifica el hueco real antes de fabricar.</div>
+    </div>
+
+    <div class="card">
+      <h2>Dibujos</h2>
+      <div class="draws">
+        <div class="draw"><div class="t">Elevación</div><div id="svgElev"></div></div>
+        <div class="draw"><div class="t">Planta</div><div id="svgPlan"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Marcado del montén (diagonal acumulada)</h2>
+      <div class="hint">Mide desde abajo sobre el montén ya colocado. Paso entre marcas = trazo.</div>
+      <div class="marca-grid" id="marcas"></div>
+    </div>
+
+    <div class="card">
+      <h2>Materiales a pedir</h2>
+      <table class="mat"><thead>
+        <tr><th>Material</th><th class="n">Cant.</th><th>Detalle</th></tr>
+      </thead><tbody id="mats"></tbody></table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const PIE=30.48, TIRA=600, SOLERA=47*2.54, IN=2.54;
+
+let unidad='cm';
+function uf(){return unidad==='in'?IN:1;}
+function toU(cm){return unidad==='in'? cm/IN : cm;}
+function UL(){return unidad;}
+function fmt(cm){return toU(cm).toFixed(unidad==='in'?2:1);}
+function fmt2(cm){return toU(cm).toFixed(unidad==='in'?3:2);}
+
+function num(id){return (parseFloat($(id).value)||0)*uf();}
+function ceil(x){return Math.ceil(x-1e-9);}
+
+function updateUnitLabels(){
+  const u=unidad;
+  $('sAltura').textContent=`Altura total (${u})`;
+  $('sHuella').textContent=`Huella (${u})`;
+  $('sPeralte').textContent=`Peralte objetivo (${u})`;
+  $('sAncho').textContent=`Ancho del pasillo (${u})`;
+  $('sT1').textContent=`Tramo 1 orilla a orilla (${u})`;
+  $('sT2').textContent=`Tramo 2 — resultado (${u})`;
+}
+function changeUnit(nu){
+  const ids=['altura','huella','peralte','ancho','t1len','t2len'];
+  const oldF = unidad==='in'?IN:1;
+  const cm={}; ids.forEach(id=>cm[id]=(parseFloat($(id).value)||0)*oldF);
+  unidad=nu;
+  const newF = unidad==='in'?IN:1;
+  ids.forEach(id=>{const v=cm[id]/newF; $(id).value = unidad==='in'? v.toFixed(2) : Math.round(v);});
+  updateUnitLabels();
+  calc();
+}
+
+function calc(snap){
+  const altura=num('altura'), huella=num('huella'), pObj=num('peralte'),
+        ancho=num('ancho'), tipo=$('tipo').value;
+  const esL = tipo==='L';
+
+  ['wrapT1','wrapT2','wrapDesc','wrapPunta','hintTramos'].forEach(id=>$(id).style.display=esL?'block':'none');
+  $('wrapPeralte').style.display='block';
+
+  if(altura<=0||huella<=0||pObj<=0){return;}
+
+  const escalones=Math.max(1,Math.round(altura/pObj));
+  const peralte=altura/escalones;
+  let lower, upper, descH=0, descLen=0, descLenP=0;
+
+  if(esL){
+    descH=Math.max(1,descHuellas);
+    descLen=descH*huella;
+    descLenP=puntaHuellas*huella;
+    $('descLbl').textContent=`${fmt(descLen)} ${UL()} · ${descH} huellas`;
+    $('puntaLbl').textContent = puntaHuellas>0 ? `${fmt(descLenP)} ${UL()} · ${puntaHuellas} huellas` : 'sin descanso';
+    const u=UL();
+    const setLen=(id,cm)=>{ $(id).value = unidad==='in' ? (cm/uf()).toFixed(2) : cm.toFixed(1); };
+    if(driver==='t2'){
+      upper=Math.min(escalones-1, Math.max(1, Math.round((num('t2len')-descLen-descLenP)/huella)));
+      lower=escalones-upper;
+      setLen('t1len', lower*huella+ancho);
+      if(snap) setLen('t2len', upper*huella+descLen+descLenP);
+      $('sT1').textContent=`Tramo 1 — resultado (${u})`;
+      $('sT2').textContent=`Tramo 2 orilla a orilla (${u})`;
+    } else {
+      lower=Math.min(escalones-1, Math.max(1, Math.round((num('t1len')-ancho)/huella)));
+      upper=escalones-lower;
+      setLen('t2len', upper*huella+descLen+descLenP);
+      if(snap) setLen('t1len', lower*huella+ancho);
+      $('sT1').textContent=`Tramo 1 orilla a orilla (${u})`;
+      $('sT2').textContent=`Tramo 2 — resultado (${u})`;
+    }
+    $('hintTramos').textContent=`${escalones} escalones · peralte ${fmt2(peralte)} ${UL()} — tramo 1: ${lower} huellas · tramo 2: ${upper} huellas`;
+  } else {
+    lower=escalones; upper=0;
+    $('hintPeralte').textContent=`${escalones} escalones → peralte real ${fmt2(peralte)} ${UL()}`;
+  }
+
+  const desarrollo=escalones*huella;
+  const diagonal=Math.hypot(altura,desarrollo);
+  const trazo=diagonal/escalones;
+  const grados=Math.atan2(altura,desarrollo)*180/Math.PI;
+
+  const ft=altura/PIE;
+  const calibre = ft>10 ? '12' : '14';
+
+  drawMetrics({escalones,peralte,desarrollo,diagonal,trazo,grados});
+  drawChips({esL,lower,upper,trazo,descH,descLen,peralte,puntaHuellas,descLenP});
+  $('calnote').textContent=`Altura ≈ ${ft.toFixed(1)} ' → montén calibre ${calibre} (regla: ≥10' cal.12 · ~9' cal.14).`;
+
+  drawMarcas(escalones,trazo,peralte);
+  const pos=$('pos').value;
+  const flipX = (pos==='BR'||pos==='TR');
+  const flipY = (pos==='TL'||pos==='TR');
+  const D={escalones,huella,peralte,ancho,esL,lower,upper,descH,descLen,descLenP,altura,desarrollo,diagonal,flipX,flipY};
+  $('svgElev').innerHTML=svgElevacion(D);
+  $('svgPlan').innerHTML=svgPlanta(D);
+
+  drawMats({escalones,huella,diagonal,esL,lower,upper,peralte,calibre});
+}
+
+function drawMetrics(r){
+  const u=UL();
+  const m=[
+    ['Escalones',r.escalones,''],
+    ['Peralte',fmt2(r.peralte),u],
+    ['Huella',fmt(num('huella')),u],
+    ['Desarrollo',fmt(r.desarrollo),u],
+    ['Diagonal',fmt(r.diagonal),u],
+    ['Ángulo',r.grados.toFixed(1),'°'],
+    ['Trazo/escalón',fmt(r.trazo),u],
+  ];
+  $('metrics').innerHTML=m.map(x=>
+    `<div class="metric"><div class="k">${x[0]}</div><div class="v mono">${x[1]}<span class="u"> ${x[2]}</span></div></div>`).join('');
+}
+
+function drawChips(c){
+  let chips=[];
+  if(c.esL){
+    chips.push(`Tramo inferior · ${c.lower} escalones`);
+    chips.push(`Altura descanso · ${fmt(c.lower*c.peralte)} ${UL()}`);
+    chips.push(`Descanso · ${c.descH} huellas (${fmt(c.descLen)} ${UL()})`);
+    if(c.puntaHuellas>0) chips.push(`Descanso punta · ${c.puntaHuellas} huellas (${fmt(c.descLenP)} ${UL()})`);
+    chips.push(`Tramo superior · ${c.upper} escalones`);
+  }else{
+    chips.push('Escalera recta (un tramo)');
+  }
+  $('chips').innerHTML=chips.map(t=>`<span class="chip">${t}</span>`).join('');
+}
+
+function drawMarcas(n,trazo,peralte){
+  let rows=[];
+  for(let i=n;i>=1;i--){
+    rows.push(`<div class="marca mono"><b>#${i}</b>${fmt(i*trazo)} <span style="color:#9aa4b1">/ ${fmt(i*peralte)}</span></div>`);
+  }
+  $('marcas').innerHTML=rows.join('');
+}
+
+function svgElevacion(o){
+  const {escalones,huella,peralte,esL,lower,descLen,descLenP,altura,desarrollo,diagonal,flipX}=o;
+  let pts=[[0,0]], x=0,y=0;
+  for(let i=0;i<escalones;i++){
+    y+=peralte; pts.push([x,y]);
+    const tw = (esL && i===lower-1) ? descLen : huella;
+    x+=tw; pts.push([x,y]);
+  }
+  if(esL && descLenP>0){ x+=descLenP; pts.push([x,y]); }
+  const maxX=x, maxY=y, W=360,H=252, padL=66,padR=28,padT=26,padB=42;
+  const s=Math.min((W-padL-padR)/maxX,(H-padT-padB)/maxY);
+  const X=v=> flipX ? padL+(maxX-v)*s : padL+v*s;
+  const Y=v=>H-padB-v*s;
+  const poly=pts.map(p=>`${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ');
+  const dim='#8a9199', txt='#3b4350';
+  let extra='';
+  if(esL){
+    const hDesc=lower*peralte;
+    const xa=X(lower*huella), xb=X(lower*huella+descLen), xr=Math.max(xa,xb);
+    extra=`<line x1="${padL}" y1="${Y(hDesc).toFixed(1)}" x2="${xr.toFixed(1)}" y2="${Y(hDesc).toFixed(1)}" stroke="#b44e23" stroke-width="0.8" stroke-dasharray="3 3"/>`+
+      `<text x="${(padL+3).toFixed(1)}" y="${(Y(hDesc)-5).toFixed(1)}" font-size="10" fill="#b44e23" text-anchor="start">desc ${fmt(hDesc)}</text>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" font-family="monospace">
+    <line x1="${padL}" y1="${Y(0)}" x2="${X(maxX)+6}" y2="${Y(0)}" stroke="#c7ccd2"/>
+    <path d="M ${X(0)} ${Y(0)} L ${X(maxX)} ${Y(maxY)}" stroke="#9aa4b1" stroke-dasharray="4 3" fill="none"/>
+    <polyline points="${poly}" fill="none" stroke="#DA6635" stroke-width="2" stroke-linejoin="round"/>
+    ${extra}
+    <line x1="${padL-13}" y1="${Y(0)}" x2="${padL-13}" y2="${Y(maxY)}" stroke="${dim}"/>
+    <line x1="${padL-16}" y1="${Y(0)}" x2="${padL-10}" y2="${Y(0)}" stroke="${dim}"/>
+    <line x1="${padL-16}" y1="${Y(maxY)}" x2="${padL-10}" y2="${Y(maxY)}" stroke="${dim}"/>
+    <text x="${padL-19}" y="${((Y(0)+Y(maxY))/2).toFixed(1)}" font-size="12" fill="${txt}" text-anchor="end" dominant-baseline="middle">${fmt(altura)}</text>
+    <line x1="${X(0)}" y1="${H-padB+15}" x2="${X(maxX)}" y2="${H-padB+15}" stroke="${dim}"/>
+    <line x1="${X(0)}" y1="${H-padB+12}" x2="${X(0)}" y2="${H-padB+18}" stroke="${dim}"/>
+    <line x1="${X(maxX)}" y1="${H-padB+12}" x2="${X(maxX)}" y2="${H-padB+18}" stroke="${dim}"/>
+    <text x="${((X(0)+X(maxX))/2).toFixed(1)}" y="${H-padB+30}" font-size="13" fill="${txt}" text-anchor="middle">desarrollo ${fmt(desarrollo)}</text>
+    <text x="${X(maxX*0.5).toFixed(1)}" y="${(Y(maxY*0.1)).toFixed(1)}" font-size="13" fill="${txt}" text-anchor="middle">diag ${fmt(diagonal)}</text>
+    <text x="${padL}" y="${padT-6}" font-size="11" fill="#7a828c">huella ${fmt(huella)} · peralte ${fmt2(peralte)}</text>
+  </svg>`;
+}
+
+function svgPlan_recta(escalones,huella,ancho,flipX){
+  const L=escalones*huella, W=360,H=182,padL=20,padR=54,padT=16,padB=44;
+  const s=Math.min((W-padL-padR)/L,(H-padT-padB)/ancho);
+  const x0=padL,y0=padT+(H-padT-padB-ancho*s)/2;
+  const dim='#8a9199',txt='#3b4350';
+  let lines='',nums='';
+  for(let i=1;i<escalones;i++){const xx=x0+i*huella*s;lines+=`<line x1="${xx.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${xx.toFixed(1)}" y2="${(y0+ancho*s).toFixed(1)}" stroke="#DA6635" stroke-width="0.8" opacity="0.75"/>`;}
+  for(let i=0;i<escalones;i++){const cx=x0+(i+0.5)*huella*s;const n=flipX?i+1:escalones-i;nums+=`<text x="${cx.toFixed(1)}" y="${(y0+ancho*s-5).toFixed(1)}" font-size="10" fill="#b44e23" text-anchor="middle">${n}</text>`;}
+  const yb=y0+ancho*s;
+  return `<svg viewBox="0 0 ${W} ${H}" font-family="monospace">
+    <rect x="${x0}" y="${y0.toFixed(1)}" width="${(L*s).toFixed(1)}" height="${(ancho*s).toFixed(1)}" fill="#FAECE7" stroke="#DA6635" stroke-width="1.5"/>
+    ${lines}${nums}
+    <line x1="${x0}" y1="${(yb+16).toFixed(1)}" x2="${(x0+L*s).toFixed(1)}" y2="${(yb+16).toFixed(1)}" stroke="${dim}"/>
+    <text x="${(x0+L*s/2).toFixed(1)}" y="${(yb+31).toFixed(1)}" font-size="13" fill="${txt}" text-anchor="middle">desarrollo ${fmt(L)}</text>
+    <line x1="${(x0+L*s+13).toFixed(1)}" y1="${y0.toFixed(1)}" x2="${(x0+L*s+13).toFixed(1)}" y2="${yb.toFixed(1)}" stroke="${dim}"/>
+    <text x="${(x0+L*s+18).toFixed(1)}" y="${(y0+ancho*s/2).toFixed(1)}" font-size="13" fill="${txt}" dominant-baseline="middle">${fmt(ancho)}</text>
+  </svg>`;
+}
+
+function svgPlanta(o){
+  const {escalones,huella,ancho,esL,lower,upper,descLen,descLenP,flipX,flipY}=o;
+  if(!esL) return svgPlan_recta(escalones,huella,ancho,flipX);
+  const t1=lower*huella, t2=upper*huella, d=descLen, dP=descLenP||0;
+  const totX=d+t2+dP, totY=t1+ancho;
+  const W=360,H=236,padL=52,padR=60,padT=36,padB=44;
+  const s=Math.min((W-padL-padR)/totX,(H-padT-padB)/totY);
+  const Xr=v=> flipX ? padL+(totX-v)*s : padL+v*s;
+  const Yr=v=> flipY ? padT+v*s : (H-padB)-v*s;
+  const dim='#8a9199',txt='#3b4350',cn='#b44e23';
+  const cx=(Xr(0)+Xr(totX))/2, cy=(Yr(0)+Yr(totY))/2;
+  const P=(a,b)=>`${Xr(a).toFixed(1)},${Yr(b).toFixed(1)}`;
+  const outline=[[0,0],[totX,0],[totX,ancho],[ancho,ancho],[ancho,totY],[0,totY]].map(p=>P(p[0],p[1])).join(' ');
+  const desc=[[0,0],[d,0],[d,ancho],[0,ancho]].map(p=>P(p[0],p[1])).join(' ');
+  let punta='';
+  if(dP>0){
+    const pp=[[d+t2,0],[totX,0],[totX,ancho],[d+t2,ancho]].map(p=>P(p[0],p[1])).join(' ');
+    punta=`<polygon points="${pp}" fill="#DA6635" opacity="0.22"/>`+
+      `<text x="${Xr(d+t2+dP/2).toFixed(1)}" y="${Yr(ancho/2).toFixed(1)}" font-size="9" fill="#8a4a2c" text-anchor="middle" dominant-baseline="middle">${fmt(dP)}</text>`;
+  }
+  let steps='',nums='';
+  for(let i=1;i<lower;i++){const yy=Yr(ancho+i*huella);steps+=`<line x1="${Xr(0).toFixed(1)}" y1="${yy.toFixed(1)}" x2="${Xr(ancho).toFixed(1)}" y2="${yy.toFixed(1)}" stroke="#DA6635" stroke-width="0.8" opacity="0.7"/>`;}
+  for(let i=1;i<upper;i++){const xx=Xr(d+i*huella);steps+=`<line x1="${xx.toFixed(1)}" y1="${Yr(0).toFixed(1)}" x2="${xx.toFixed(1)}" y2="${Yr(ancho).toFixed(1)}" stroke="#DA6635" stroke-width="0.8" opacity="0.7"/>`;}
+  for(let i=0;i<lower;i++){const yc=Yr(ancho+(i+0.5)*huella);nums+=`<text x="${Xr(ancho/2).toFixed(1)}" y="${yc.toFixed(1)}" font-size="10" fill="${cn}" text-anchor="middle" dominant-baseline="middle">${lower-i}</text>`;}
+  for(let i=0;i<upper;i++){const xc=Xr(d+(i+0.5)*huella);nums+=`<text x="${xc.toFixed(1)}" y="${Yr(ancho/2).toFixed(1)}" font-size="10" fill="${cn}" text-anchor="middle" dominant-baseline="middle">${lower+1+i}</text>`;}
+  const exL=Xr(0), outL=exL<cx?-12:12, t1x=exL+outL;
+  const exR=Xr(totX), outR=exR<cx?-12:12, ax=exR+outR;
+  const eyB=Yr(0), outB=eyB>cy?16:-16, t2y=eyB+outB;
+  const t1a=outL<0?'end':'start', t1tx=t1x+(outL<0?-4:4);
+  const axa=outR<0?'end':'start', axtx=ax+(outR<0?-4:4);
+  return `<svg viewBox="0 0 ${W} ${H}" font-family="monospace">
+    <polygon points="${outline}" fill="#FAECE7" stroke="#DA6635" stroke-width="1.5"/>
+    <polygon points="${desc}" fill="#DA6635" opacity="0.22"/>
+    ${punta}${steps}${nums}
+    <text x="${Xr(d/2).toFixed(1)}" y="${Yr(ancho/2).toFixed(1)}" font-size="9" fill="#8a4a2c" text-anchor="middle" dominant-baseline="middle">${fmt(d)}</text>
+    <line x1="${t1x.toFixed(1)}" y1="${Yr(0).toFixed(1)}" x2="${t1x.toFixed(1)}" y2="${Yr(totY).toFixed(1)}" stroke="${dim}"/>
+    <text x="${t1tx.toFixed(1)}" y="${((Yr(0)+Yr(totY))/2).toFixed(1)}" font-size="13" fill="${txt}" text-anchor="${t1a}" dominant-baseline="middle">${fmt(totY)}</text>
+    <line x1="${Xr(0).toFixed(1)}" y1="${t2y.toFixed(1)}" x2="${Xr(totX).toFixed(1)}" y2="${t2y.toFixed(1)}" stroke="${dim}"/>
+    <text x="${((Xr(0)+Xr(totX))/2).toFixed(1)}" y="${(t2y+(outB>0?14:-6)).toFixed(1)}" font-size="13" fill="${txt}" text-anchor="middle">${fmt(totX)}</text>
+    <line x1="${ax.toFixed(1)}" y1="${Yr(0).toFixed(1)}" x2="${ax.toFixed(1)}" y2="${Yr(ancho).toFixed(1)}" stroke="${dim}"/>
+    <text x="${axtx.toFixed(1)}" y="${((Yr(0)+Yr(ancho))/2).toFixed(1)}" font-size="13" fill="${txt}" text-anchor="${axa}" dominant-baseline="middle">${fmt(ancho)}</text>
+  </svg>`;
+}
+
+function drawMats(o){
+  const {escalones,huella,diagonal,esL,lower,upper,peralte,calibre}=o;
+  const porTiraAng=Math.floor(TIRA/huella);
+  const piezasAng=2*escalones;
+  const tirasAng=ceil(piezasAng/porTiraAng);
+
+  let perLado, detMonten;
+  if(esL){
+    const d1=Math.hypot(lower*peralte,lower*huella);
+    const d2=Math.hypot(upper*peralte,upper*huella);
+    perLado=ceil(d1/TIRA)+ceil(d2/TIRA);
+    detMonten=`diag. tramos ${fmt(d1)}+${fmt(d2)} ${UL()} · ${perLado} pza/lado × 2`;
+  }else{
+    perLado=ceil(diagonal/TIRA);
+    detMonten=`diagonal ${fmt(diagonal)} ${UL()} · ${perLado} pza/lado × 2`;
+  }
+  const tirasMonten=perLado*2;
+
+  const secciones=esL?4:2;
+  const piezasSol=3*secciones;
+  const porTiraSol=Math.floor(TIRA/SOLERA);
+  const tirasSol=ceil(piezasSol/porTiraSol);
+
+  const tubos=4;
+
+  const rows=[
+    [`Montén 6" cal.${calibre} × 6 m`, tirasMonten, `laterales · ${detMonten}`],
+    [`Ángulo 1½" × 1/8" × 6 m`, tirasAng, `${piezasAng} tramos de ${fmt(huella)} ${UL()} (${porTiraAng}/tira)`],
+    [`Solera 2" × 1/4" × 6 m`, tirasSol, `${piezasSol} soleras de 47" · ${secciones} secciones`],
+    [`Tubo 1½" ced.30 × 6 m`, tubos, `barandal`],
+  ];
+  $('mats').innerHTML=rows.map(r=>
+    `<tr><td>${r[0]}</td><td class="n q mono">${r[1]}</td><td style="color:#6b7280;font-size:12px">${r[2]}</td></tr>`).join('');
+  window._despiece=rows;
+}
+
+function enviarSamuel(){
+  let tel=localStorage.getItem('tel_samuel');
+  if(!tel){
+    const t=prompt('WhatsApp de Samuel Gómez (soldador). Solo números con lada de país, ej. 5216641234567:');
+    if(!t) return;
+    tel=t.replace(/\D/g,''); localStorage.setItem('tel_samuel',tel);
+  }
+  const nombre=$('nombre').value||'la escalera';
+  const cli=$('cliente').value||'';
+  const msg=`Samuel, te paso el plano de ${nombre}${cli?(' ('+cli+')'):''} para fabricar. Adjunto el PDF.`;
+  window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank');
+  setTimeout(()=>window.print(),400);
+}
+
+function cotizar(){
+  // El telefono se pregunta una vez y se guarda en este equipo, igual que el de
+  // Samuel. Antes venia escrito en el codigo, pero esta pagina ya vive en el
+  // sitio publico y el numero de Blanquita no tiene por que andar ahi.
+  let tel=localStorage.getItem('tel_blanquita');
+  if(!tel){
+    const t=prompt('WhatsApp de Blanquita (Aceros Ocotlán). Solo números con lada de país, ej. 5216641234567:');
+    if(!t) return;
+    tel=t.replace(/\D/g,''); localStorage.setItem('tel_blanquita',tel);
+  }
+  const r=window._despiece||[];
+  let txt=`Hola Blanquita, me cotiza este material por favor:\n\n`;
+  r.forEach(x=>{txt+=`• ${x[1]} pza — ${x[0]}\n`;});
+  txt+=`\nGracias. — ISARACK`;
+  window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(txt),'_blank');
+}
+
+function copiar(){
+  const r=window._despiece||[];
+  const alt=num('altura');
+  let txt=`DESPIECE ESCALERA · ISARACK\nAltura ${alt} cm\n\n`;
+  r.forEach(x=>{txt+=`${x[1]} × ${x[0]}  (${x[2]})\n`;});
+  navigator.clipboard.writeText(txt).then(()=>{
+    const b=event.target; const o=b.textContent; b.textContent='Copiado ✓';
+    setTimeout(()=>b.textContent=o,1400);
+  });
+}
+
+const KEY='isarack_escaleras';
+let descHuellas=4;
+let puntaHuellas=0;
+let driver='t1';
+function stepPunta(d){ puntaHuellas=Math.max(0,puntaHuellas+d); calc(); }
+function stepDesc(d){ descHuellas=Math.max(1,descHuellas+d); calc(); }
+function readAll(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}}
+function writeAll(a){try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){alert('No se pudo guardar en este dispositivo.')}}
+function guardarEsc(){
+  const e={id:Date.now(),
+    nombre:($('nombre').value||'Sin nombre').trim(),
+    cliente:($('cliente').value||'Sin cliente').trim(),
+    altura:num('altura'),huella:num('huella'),peralte:num('peralte'),ancho:num('ancho'),
+    tipo:$('tipo').value,t1len:num('t1len'),t2len:num('t2len'),descH:descHuellas,puntaH:puntaHuellas,pos:$('pos').value,unidad:unidad,
+    fecha:new Date().toLocaleDateString('es-MX')};
+  const a=readAll(); a.unshift(e); writeAll(a); cargarLista();
+}
+function cargarEsc(id){
+  const e=readAll().find(x=>x.id===id); if(!e)return;
+  unidad = e.unidad || 'cm'; $('unidad').value=unidad; updateUnitLabels();
+  const f = uf();
+  const put=(idc,cm)=>{ $(idc).value = unidad==='in' ? (cm/f).toFixed(2) : Math.round(cm); };
+  $('nombre').value=e.nombre;$('cliente').value=e.cliente;$('tipo').value=e.tipo;
+  put('altura',e.altura); put('huella',e.huella); put('peralte',e.peralte); put('ancho',e.ancho);
+  if(e.t1len!=null)put('t1len',e.t1len);
+  if(e.t2len!=null)put('t2len',e.t2len);
+  descHuellas = (e.descH!=null) ? e.descH : (e.descCm!=null ? Math.round(e.descCm/(e.huella||23)) : 4);
+  puntaHuellas = (e.puntaH!=null) ? e.puntaH : 0;
+  if(e.pos)$('pos').value=e.pos;
+  driver='t1';
+  calc();
+}
+function borrarEsc(id){ if(confirm('¿Borrar esta escalera?')){writeAll(readAll().filter(x=>x.id!==id));cargarLista();} }
+function exportEsc(){
+  const data=localStorage.getItem(KEY)||'[]';
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='escaleras_isarack.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+function importEsc(ev){
+  const f=ev.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const arr=JSON.parse(r.result);
+      if(!Array.isArray(arr)) throw 0;
+      const cur=readAll();
+      const ids=new Set(cur.map(x=>x.id));
+      let n=0;
+      arr.forEach(e=>{ if(e&&e.id&&!ids.has(e.id)){cur.push(e);n++;} });
+      writeAll(cur); cargarLista();
+      alert('Escaleras importadas: '+n);
+    }catch(e){ alert('Archivo no válido.'); }
+  };
+  r.readAsText(f);
+  ev.target.value='';
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function cargarLista(){
+  const a=readAll();
+  if(!a.length){$('lista').innerHTML='<div class="hint">Aún no hay escaleras guardadas.</div>';return;}
+  const g={}; a.forEach(e=>{(g[e.cliente]=g[e.cliente]||[]).push(e);});
+  let html='';
+  Object.keys(g).forEach(cli=>{
+    html+=`<div class="grp">${esc(cli)}</div>`;
+    g[cli].forEach(e=>{
+      html+=`<div class="row"><div class="ri"><b>${esc(e.nombre)}</b><small>${e.altura} cm · ${e.tipo} · ${e.fecha}</small></div>`+
+        `<div class="ra"><button onclick="cargarEsc(${e.id})">Cargar</button><button class="del" onclick="borrarEsc(${e.id})">✕</button></div></div>`;
+    });
+  });
+  $('lista').innerHTML=html;
+}
+
+['altura','huella','peralte','ancho','pos','tipo'].forEach(id=>{
+  $(id).addEventListener('input',calc);
+  $(id).addEventListener('change',calc);
+});
+['t1len','t2len'].forEach(id=>{
+  const d=id==='t2len'?'t2':'t1';
+  $(id).addEventListener('input',()=>{driver=d;calc();});
+  $(id).addEventListener('change',()=>{driver=d;calc(true);});
+});
+calc();
+cargarLista();
+</script>
+</body>
+</html>
