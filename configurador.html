@@ -661,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.08';
+const CFG_VERSION = '2026.09.22.10';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -4092,6 +4092,7 @@ function buildCantilever(){
   const W = cfg.anchoTotalM;
   const maxLargoZ = cfg.maxLargoZM;
   let xCursor = -W/2;
+  const pasillosInfoCan = [];   // centro en X de cada pasillo, para cotearlos
   let alturasBrazosL0 = null;
   lineas.forEach((l, i) => {
     const gLin = new THREE.Group();
@@ -4108,8 +4109,15 @@ function buildCantilever(){
     gLin.position.x = l.volteada ? (xCursor + x0_l + l.anchoBaseM) : (xCursor - x0_l);
     gLin.position.z = l.volteada ? (maxLargoZ/2) : (maxLargoZ/2 - l.largoZM);
     grupo.add(gLin);
+    if(i < lineas.length - 1) pasillosInfoCan.push(xCursor + l.anchoBaseM + cfg.pasilloM/2);
     xCursor += l.anchoBaseM + cfg.pasilloM;
   });
+  // Cotas de los PASILLOS entre lineas. Aqui las filas van lado a lado, asi que
+  // el pasillo se mide a lo ANCHO y la cota va por delante del rack.
+  if(cfg.pasilloM && pasillosInfoCan.length){
+    const zPasC = maxLargoZ/2 + 1.15;
+    pasillosInfoCan.forEach(xc => cotaPasillo(grupo, xc, cfg.pasilloM, zPasC, 'x'));
+  }
   targetY = cfg.maxAltoM * 0.46;
   camDist = Math.max(cfg.maxAltoM*1.35 + 1.2, maxLargoZ*0.85 + 1.5, W*1.1 + 1.2);
   // ── Cotas ──
@@ -4603,10 +4611,7 @@ function buildGondola(){
   // el pasillo de 1.6 m solo se veia en el texto de abajo. (Isaac, 21 sep 2026)
   if(pasillosInfoGon.length){
     const xPas = -maxLargo/2 - 1.20;
-    pasillosInfoGon.forEach(zc => {
-      cotaDim(grupo, [xPas, -0.10, zc - pasilloM/2], [xPas, -0.10, zc + pasilloM/2],
-              fmtCota(pasilloM), {labelOffset:[-0.34,0,0], escala:[0.52,0.17]});
-    });
+    pasillosInfoGon.forEach(zc => cotaPasillo(grupo, zc, pasilloM, xPas, 'z'));
   }
 
   targetY = maxAlto * 0.46;
@@ -4881,6 +4886,16 @@ function crearLineaCota(start, end, color){
 
 // Cota profesional estilo plano: remates perpendiculares + flechas + etiqueta centrada
 var _COTA_PEND = [];
+// Cota del ancho de pasillo. Va igual en los 5 sistemas: por fuera del costado
+// izquierdo, con el mismo tamano, para que siempre se vea. (Isaac, 22 sep 2026)
+// eje 'z' = filas apiladas al fondo (Gondola, Picking, Selectivo, Mecano)
+// eje 'x' = filas lado a lado (Cantilever)
+function cotaPasillo(parent, centro, ancho, fuera, eje){
+  if(!(ancho > 0.05)) return;
+  const a = centro - ancho/2, b = centro + ancho/2;
+  if(eje === 'x') cotaDim(parent, [a, -0.12, fuera], [b, -0.12, fuera], fmtCota(ancho), {labelOffset:[0,-0.26,0], escala:[0.5,0.16]});
+  else            cotaDim(parent, [fuera, -0.12, a], [fuera, -0.12, b], fmtCota(ancho), {labelOffset:[-0.34,0,0], escala:[0.5,0.16]});
+}
 function cotaDim(parent, a, b, texto, opts){
   opts = opts || {};
   // Todo lo que cuelgue de aquí queda marcado como cota: _dimsDesde3D() lo ignora,
@@ -4890,7 +4905,17 @@ function cotaDim(parent, a, b, texto, opts){
   // la vista en planta se miran de punta: no se leen y ensucian el plano, asi que
   // se esconden. (Isaac, 22 sep 2026)
   const _esVert = Math.abs(b[1] - a[1]) > Math.max(Math.abs(b[0] - a[0]), Math.abs(b[2] - a[2]));
-  const _marcarCotas = () => { for(let i=_nAntes;i<parent.children.length;i++){ const o = parent.children[i]; o.userData = o.userData || {}; o.userData.cota = true; if(_esVert) o.userData.cotaVert = true; } };
+  // El marcado corre DESPUES (en _COTA_PEND), asi que el final del rango se
+  // apunta al terminar de dibujar ESTA cota. Antes se leia parent.children.length
+  // en el momento de correr, o sea el final de TODAS: una cota vertical terminaba
+  // marcando como verticales a todas las que venian despues, y en la vista en
+  // planta se escondian de mas (por eso no se veian las cotas de pasillo ni el
+  // fondo del rack). (Isaac, 22 sep 2026)
+  let _nFin = -1;
+  const _marcarCotas = () => {
+    const fin = (_nFin >= 0) ? _nFin : parent.children.length;
+    for(let i=_nAntes;i<fin;i++){ const o = parent.children[i]; o.userData = o.userData || {}; o.userData.cota = true; if(_esVert) o.userData.cotaVert = true; }
+  };
   _COTA_PEND.push(_marcarCotas);
   const color = opts.color || 0x1a1a1a;
   const A = new THREE.Vector3(a[0],a[1],a[2]), B = new THREE.Vector3(b[0],b[1],b[2]);
@@ -4933,6 +4958,7 @@ function cotaDim(parent, a, b, texto, opts){
   const f = (typeof camDist === 'number' && camDist > 0) ? Math.max(1, Math.min(3, camDist/8)) : 1;
   s.scale.set(e[0]*1.5*f, e[1]*1.5*f, 1);
   parent.add(s);
+  _nFin = parent.children.length;   // hasta aqui llega ESTA cota
 }
 
 function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
@@ -5137,6 +5163,11 @@ function buildPicking(){
     }
     zAtras += l.profM + cfg.pasilloM;
   });
+  // Cotas de los PASILLOS entre lineas, por fuera del costado izquierdo
+  if(cfg.pasilloM && pasillosInfo.length){
+    const xPas = -maxLen/2 - 1.6;
+    pasillosInfo.forEach(p => cotaPasillo(grupo, p.zCentro, cfg.pasilloM, xPas, 'z'));
+  }
   // ── Pasarela (compartida) ──
   if(cfg.pasarela.on && pasillosInfo.length){
     const l0 = lineas[0];
@@ -5385,10 +5416,7 @@ function buildSelectivo(){
   // (frente-derecha, mundo -X), afuera para que no se enciman ni floten.
   if(cfg.pasilloM && pasillosInfoSel.length){
     const xPas = -totalLen/2 - 1.6;
-    pasillosInfoSel.forEach(function(p){
-      const z0 = p.zCentro - cfg.pasilloM/2, z1 = p.zCentro + cfg.pasilloM/2;
-      cotaDim(grupo, [xPas, -0.12, z0], [xPas, -0.12, z1], fmtCota(cfg.pasilloM), {labelOffset:[-0.34,0,0], escala:[0.42,0.13]});
-    });
+    pasillosInfoSel.forEach(function(p){ cotaPasillo(grupo, p.zCentro, cfg.pasilloM, xPas, 'z'); });
   }
   // Cota(s) de la altura de la pasarela, más afuera que las de pasillo
   if(cfg.pasarela.on) agregarCotasPasarela(grupo, cfg.pasarela.alturaM, cfg.pasarela.niveles, -totalLen/2 - 2.3, profTotal/2 + 0.10);
@@ -5533,7 +5561,8 @@ function buildMecano(){
   const profTotal = cfg.profTotalM;
   const xInicio = -maxLen/2;
   let zAtras = -profTotal/2;   // la fila 1 nace al fondo: ver nota del orden en planta
-  lineas.forEach(l => {
+  const pasillosInfoMec = [];   // centro en Z de cada pasillo, para cotearlos
+  lineas.forEach((l, iMec) => {
     const gLin = new THREE.Group();
     if(l.tipo === 'doble'){
       const filaA = new THREE.Group();
@@ -5554,8 +5583,14 @@ function buildMecano(){
     gLin.position.x = xInicio + l.largoTotM/2;
     gLin.position.z = zAtras + l.profM/2;
     grupo.add(gLin);
+    if(iMec < lineas.length - 1) pasillosInfoMec.push(zAtras + l.profM + cfg.pasilloM/2);
     zAtras += l.profM + cfg.pasilloM;
   });
+  // Cotas de los PASILLOS entre lineas, por fuera del costado izquierdo
+  if(cfg.pasilloM && pasillosInfoMec.length){
+    const xPasM = -maxLen/2 - 1.2;
+    pasillosInfoMec.forEach(zc => cotaPasillo(grupo, zc, cfg.pasilloM, xPasM, 'z'));
+  }
   targetY = cfg.maxAltoM * 0.46;
   camDist = Math.max(cfg.maxAltoM*1.5 + 1.0, maxLen*0.9 + 1.2, profTotal*1.6 + 1.0);
   agregarCotas(grupo, maxLen, profTotal, cfg.maxAltoM, null, 0);
