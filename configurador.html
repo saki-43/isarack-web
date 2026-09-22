@@ -657,7 +657,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.01';
+const CFG_VERSION = '2026.09.22.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -5980,7 +5980,13 @@ function aplicarModoPiezas(on){
   set('cv', on ? 'none' : '');
   set('dims', on ? 'none' : '');
   set('hint', on ? 'none' : '');
-  set('rowColorRack', on ? 'none' : '');
+  // Al SALIR de piezas no se muestra a ciegas: cada sistema decide si lleva
+  // selector de color (Gondola, Mecano y Cantilever no lo llevan). Mostrarlo
+  // aqui volvia a prender el renglon justo despues de que ajustarSelectorColor()
+  // ya lo habia apagado, y por eso en Gondola se alcanzaba a ver al arrancar
+  // hasta que tocabas algo. (Isaac, 22 sep 2026)
+  if(on) set('rowColorRack', 'none');
+  else if(typeof ajustarSelectorColor === 'function') ajustarSelectorColor();
   const car = document.getElementById('pzCarrito');
   if(car) car.classList.toggle('on', !!on);
   ['auto','wa','reset'].forEach(id => {
