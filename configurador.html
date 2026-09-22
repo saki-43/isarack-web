@@ -661,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.12';
+const CFG_VERSION = '2026.09.22.13';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2929,6 +2929,14 @@ function gonDup(i){
   if(_dupFila(lineasGondola, i, renderLineasGondola) && typeof renderCotizacion === 'function') renderCotizacion();
 }
 
+// Como le llama cada sistema a lo que cuenta el −/+. Sale del mismo lenguaje
+// que ya usan sus resumenes: Gondola y Mecano cuentan "mód", Cantilever "col"
+// y Selectivo/Picking "cpos". (Isaac, 22 sep 2026)
+function _nombreConteo(pfx){
+  if(pfx === 'gon' || pfx === 'lm') return 'Módulos';
+  if(pfx === 'lc') return 'Columnas';
+  return 'Cuerpos';
+}
 function _cardLinea(pfx, i, l, extra){
   // Card genérico de línea: pfx = prefijo de funciones (lm/lc), extra = html del detalle
   const esD = l.tipo === 'doble';
@@ -2961,17 +2969,30 @@ function _cardLinea(pfx, i, l, extra){
     ? '<div style="background:#fff;border-top:1px solid '+bd+';padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:10px">'+extra.detalle+'</div>'
     : '');
   return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
-    +'<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;font-size:10.5px">'
-    +'<span onclick="'+pfx+'Tipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';white-space:nowrap" title="Clic para cambiar tipo">'+(i+1)+'· '+lbl+'</span>'
+    // flex-wrap: sin el, una fila con chip de marco existente pedia 255 px en un
+    // panel de 224 y la flechita de abrir se cortaba. (Isaac, 22 sep 2026)
+    +'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:4px 6px;font-size:10.5px">'
+    +'<span style="font-weight:700;color:'+tx+';flex-shrink:0">'+(i+1)+'·</span>'
+    // El tipo iba como texto pelon y solo se sabia que era boton por el title,
+    // que en celular ni existe: "SI ERES NUEVO NO HAY MANERA DE QUE ALGUIEN SEPA
+    // QUE SI PRESIONAS LA PALABRA SENCILLA SE PASA A DOBLE" (Isaac). Ahora es una
+    // pastilla con borde y flecha de intercambio, que se lee como boton sola.
+    +'<span onclick="'+pfx+'Tipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';background:#fff;border:1px solid '+bd+';border-radius:5px;padding:1px 7px;white-space:nowrap;flex-shrink:0" title="Cambiar a '+(esD?'sencilla':'doble')+'">⇄ '+lbl+'</span>'
     + chipExtra
     + btnFlip
     + btnDup
     + btnDel
     +'<span style="flex:1"></span>'
-    +'<span onclick="'+pfx+'Cuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
-    +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+conteo+'</b>'
-    +'<span onclick="'+pfx+'Cuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
     +'<span onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
+    +'</div>'
+    // El contador bajo a su propio renglon por dos razones: arriba ya no cabia,
+    // y asi se le pudo poner nombre — antes era un "− 1 +" pelon y nadie de
+    // nuevo ingreso sabia que estaba contando. (Isaac, 22 sep 2026)
+    +'<div style="display:flex;align-items:center;gap:5px;padding:0 6px 4px;font-size:10.5px;color:#8a8f95">'
+      +'<span style="flex:1">'+_nombreConteo(pfx)+'</span>'
+      +'<span onclick="'+pfx+'Cuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none">−</span>'
+      +'<b style="min-width:16px;text-align:center;color:'+tx+'">'+conteo+'</b>'
+      +'<span onclick="'+pfx+'Cuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none">＋</span>'
     +'</div>'
     + chip
     + detalle
