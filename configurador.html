@@ -661,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.11';
+const CFG_VERSION = '2026.09.22.12';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2900,6 +2900,35 @@ function lineasSyncMec(){
   document.getElementById('mecPasilloRow').style.display = lineasMecano.length > 1 ? '' : 'none';
 }
 
+// Duplica la fila i y mete la copia justo DEBAJO del original.
+// La copia es PROFUNDA por dos razones (Isaac, 22 sep 2026):
+//  · que se lleve tambien lo que se captura adentro de la fila — niveles por
+//    modulo, claros de viga a la medida, malla, marcos del cliente — que es
+//    justo lo que "+ Fila sencilla" NO heredaba;
+//  · que las dos filas queden independientes: mover un claro en una no debe
+//    tocar la otra. Con una copia plana compartirian los arreglos.
+// tope: maximo de filas del sistema (Gondola no tiene, por eso es opcional).
+function _dupFila(arr, i, render, tope){
+  if(!Array.isArray(arr) || !arr[i]) return false;
+  if(tope && arr.length >= tope) return false;
+  let copia;
+  try{ copia = JSON.parse(JSON.stringify(arr[i])); }catch(e){ return false; }
+  arr.forEach(f => { f.abierta = false; });
+  copia.abierta = false;               // entra cerrada, para no brincar el panel
+  arr.splice(i + 1, 0, copia);
+  render();
+  if(typeof build === 'function') build();
+  return true;
+}
+function lnDup(i){  _dupFila(lineasAlmacen,    i, renderLineasAlmacen,    8); }
+function lpDup(i){  _dupFila(lineasPicking,    i, renderLineasPicking,    8); }
+function lmDup(i){  _dupFila(lineasMecano,     i, renderLineasMecano,     8); }
+function lcDup(i){  _dupFila(lineasCantilever, i, renderLineasCantilever, 8); }
+function gonDup(i){
+  // Gondola no tiene tope de filas y ademas refresca la cotizacion aparte.
+  if(_dupFila(lineasGondola, i, renderLineasGondola) && typeof renderCotizacion === 'function') renderCotizacion();
+}
+
 function _cardLinea(pfx, i, l, extra){
   // Card genérico de línea: pfx = prefijo de funciones (lm/lc), extra = html del detalle
   const esD = l.tipo === 'doble';
@@ -2920,6 +2949,9 @@ function _cardLinea(pfx, i, l, extra){
   const btnDel = extra.total > 1
     ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))'+pfx+'Del('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
     : '';
+  // Duplicar: "+ Fila sencilla" solo heredaba las medidas; este se lleva la
+  // fila completa, con niveles por modulo y claros a la medida. (Isaac, 22 sep)
+  const btnDup = '<span onclick="'+pfx+'Dup('+i+')" style="cursor:pointer;color:'+tx+';background:#fff;border:1px solid '+bd+';font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Duplicar esta fila con todo lo que trae">⧉</span>';
   // chipHtml/detalleHtml: el sistema ya los trae envueltos (Picking y Selectivo).
   // chip/detalle: solo el contenido, y aqui se envuelve (Mecano, Cantilever, Gondola).
   const chip = (extra.chipHtml != null) ? extra.chipHtml : (!l.abierta
@@ -2933,6 +2965,7 @@ function _cardLinea(pfx, i, l, extra){
     +'<span onclick="'+pfx+'Tipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';white-space:nowrap" title="Clic para cambiar tipo">'+(i+1)+'· '+lbl+'</span>'
     + chipExtra
     + btnFlip
+    + btnDup
     + btnDel
     +'<span style="flex:1"></span>'
     +'<span onclick="'+pfx+'Cuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
