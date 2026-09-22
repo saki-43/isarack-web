@@ -564,16 +564,17 @@ function drawMats(o){
   const piezasAng=2*escalones;
   const tirasAng=ceil(piezasAng/porTiraAng);
 
-  let perLado, detMonten, diagBar=diagonal;
+  let perLado, detMonten, tramosBar;
   if(esL){
     const d1=Math.hypot(lower*peralte,lower*huella);
     const d2=Math.hypot(upper*peralte,upper*huella);
     perLado=ceil(d1/TIRA)+ceil(d2/TIRA);
     detMonten=`diag. tramos ${fmt(d1)}+${fmt(d2)} ${UL()} · ${perLado} pza/lado × 2`;
-    diagBar=Math.max(d1,d2);
+    tramosBar=[d1,d2];
   }else{
     perLado=ceil(diagonal/TIRA);
     detMonten=`diagonal ${fmt(diagonal)} ${UL()} · ${perLado} pza/lado × 2`;
+    tramosBar=[diagonal];
   }
   const tirasMonten=perLado*2;
 
@@ -582,18 +583,26 @@ function drawMats(o){
   const porTiraSol=Math.floor(TIRA/SOLERA);
   const tirasSol=ceil(piezasSol/porTiraSol);
 
-  // BARANDAL (Isaac, 22 sep 2026): son 4 corridas, 2 por lado. La tira es de
-  // 6 m, asi que cuando la diagonal no pasa de 3 m salen DOS corridas de una
-  // sola tira y basta la mitad de los tubos. Antes siempre cotizaba 4, midiera
-  // lo que midiera la escalera.
-  const corridasBar = 4;
-  const porTiraBar = Math.max(1, Math.floor(TIRA/diagBar));
-  const tubos = (diagBar > TIRA)
-    ? corridasBar * ceil(diagBar/TIRA)          // no cabe en una tira: se empalma
-    : ceil(corridasBar/porTiraBar);
-  const detBar = (diagBar > TIRA)
-    ? `${corridasBar} corridas de ${fmt(diagBar)} ${UL()} · empalmadas`
-    : `${corridasBar} corridas de ${fmt(diagBar)} ${UL()} · ${porTiraBar} por tira`;
+  // BARANDAL (Isaac, 22 sep 2026). Reglas de taller:
+  //  · Son 4 corridas por tramo inclinado: 2 por lado.
+  //  · La tira es de 6 m, asi que cuando la corrida no pasa de 3 m salen DOS de
+  //    una sola tira y basta la mitad de los tubos. Si pasa de 6 m se empalma.
+  //  · En L el barandal corre por los DOS tramos, y el DESCANSO no lleva:
+  //    "al ser L significa que corre sobre paredes". Por eso solo se suman los
+  //    tramos inclinados y el descanso no entra en la cuenta.
+  // Se cuenta tramo por tramo y no todo junto porque las corridas de cada tramo
+  // miden distinto: no se pueden sacar de la misma tira sin desperdicio.
+  const CORRIDAS_POR_TRAMO = 4;
+  let tubos = 0;
+  const detPartes = tramosBar.map(L => {
+    const porTira = Math.max(1, Math.floor(TIRA/L));
+    if(L > TIRA){ tubos += CORRIDAS_POR_TRAMO*ceil(L/TIRA); return `${fmt(L)} ${UL()} empalmadas`; }
+    tubos += ceil(CORRIDAS_POR_TRAMO/porTira);
+    return `${fmt(L)} ${UL()}${porTira>1?' ('+porTira+' por tira)':''}`;
+  });
+  const detBar = esL
+    ? `${CORRIDAS_POR_TRAMO} corridas por tramo · ${detPartes.join(' + ')} · el descanso no lleva (paredes)`
+    : `${CORRIDAS_POR_TRAMO} corridas de ${detPartes[0]}`;
 
   const rows=[
     [`Montén 6" cal.${calibre} × 6 m`, tirasMonten, `laterales · ${detMonten}`],
