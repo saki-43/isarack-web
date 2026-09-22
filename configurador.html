@@ -216,6 +216,15 @@ gtag('config', 'G-XXXXXXXXXX');
     <div class="tab" id="tabPiezas" data-sys="piezas" style="display:none"><svg class="tabico" viewBox="0 0 16 16"><path d="M8 2.2 12.6 4.9v5.4L8 13l-4.6-2.7V4.9z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><circle cx="8" cy="7.6" r="2" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>Piezas</div>
   </div>
 
+  <div class="row" id="rowUnidadCota">
+    <label>Unidades de cota</label>
+    <select id="selUnidad" onchange="unidadCota=this.value; if(typeof build==='function') build();" style="width:100%">
+      <option value="m">Metros (m)</option>
+      <option value="cm">Centímetros (cm)</option>
+      <option value="in">Pulgadas (in)</option>
+    </select>
+  </div>
+
   <div class="row" id="rowColorRack">
     <label>Color del rack</label>
     <select id="colorRack">
@@ -253,7 +262,8 @@ gtag('config', 'G-XXXXXXXXXX');
       <label>Distribución del almacén</label>
       <div id="gonLineasList" style="display:flex;flex-direction:column;gap:4px;margin:4px 0"></div>
       <div style="display:flex;gap:6px;margin-top:4px">
-        <button id="btnAddGonSen" onclick="lnAddGon('sencilla')" style="flex:1;padding:6px 8px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">+ Fila</button>
+        <button type="button" id="btnAddGonSen" onclick="lnAddGon('sencilla')" style="flex:1;font-size:10.5px;padding:5px 4px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>
+        <button type="button" id="btnAddGonDob" onclick="lnAddGon('doble')" style="flex:1;font-size:10.5px;padding:5px 4px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila doble</button>
       </div>
     </div>
     <div class="row" id="gonPasilloRow" style="display:none">
@@ -379,14 +389,6 @@ gtag('config', 'G-XXXXXXXXXX');
         <button type="button" onclick="lnAdd('sencilla')" style="flex:1;font-size:10.5px;padding:5px 4px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>
         <button type="button" onclick="lnAdd('doble')" style="flex:1;font-size:10.5px;padding:5px 4px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila doble</button>
       </div>
-    </div>
-    <div class="row">
-      <label>Unidades de cota</label>
-      <select id="selUnidad" onchange="unidadCota=this.value; if(typeof build==='function') build();" style="width:100%">
-        <option value="m">Metros (m)</option>
-        <option value="cm">Centímetros (cm)</option>
-        <option value="in">Pulgadas (in)</option>
-      </select>
     </div>
     <div class="row" id="selPasilloRow" style="display:none">
       <label>Pasillo entre líneas (m)</label>
@@ -654,7 +656,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.16';
+const CFG_VERSION = '2026.09.21.17';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2698,19 +2700,8 @@ function renderLineasPicking(){
         + '</div>'
         +'</div>'
       : '';
-    return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
-      +'<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;font-size:10.5px">'
-      +'<span onclick="lpTipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';white-space:nowrap" title="Clic para cambiar tipo">'+(i+1)+'· '+lbl+'</span>'
-      + btnDel
-      +'<span style="flex:1"></span>'
-      +'<span onclick="lpCuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
-      +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
-      +'<span onclick="lpCuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
-      +'<span onclick="lpToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
-      +'</div>'
-      + chip
-      + detalle
-      +'</div>';
+    // Mismo recuadro que los otros 4 sistemas (Isaac, 21 sep 2026).
+    return _cardLinea('lp', i, l, {total: lineasPicking.length, chipHtml: chip, detalleHtml: detalle});
   }).join('');
   lineasSyncPic();
 }
@@ -2842,27 +2833,37 @@ function _cardLinea(pfx, i, l, extra){
   const bg = esD ? '#faf0ea' : '#eef4fb';
   const bd = esD ? '#f0c4ae' : '#b5d4f4';
   const tx = esD ? '#993C1D' : '#185FA5';
-  const lbl = esD ? 'Doble' : (l.tipo === 'sencillo' ? 'Sencillo' : 'Sencilla');
+  // Mismo nombre en los 5 sistemas: Cantilever decia "Sencillo" y los demas
+  // "Sencilla". El valor interno no cambia, solo la palabra que se lee.
+  const lbl = esD ? 'Doble' : 'Sencilla';
   const cA = l.cuerpos, cB = (l.cuerposB==null ? l.cuerpos : l.cuerposB);
   // Flecha opcional para voltear la fila, como la de Gondola.
   const btnFlip = extra.flip || '';
+  // Chip extra pegado al nombre (Selectivo lo usa para "marco existente").
+  const chipExtra = extra.extraChip || '';
+  // Numero del contador. Por omision son los cuerpos; Gondola cuenta modulos.
+  const conteo = (extra.conteo != null) ? extra.conteo
+               : ((esD && cB !== cA) ? cA+'·'+cB : l.cuerpos);
   const btnDel = extra.total > 1
     ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))'+pfx+'Del('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
     : '';
-  const chip = !l.abierta
+  // chipHtml/detalleHtml: el sistema ya los trae envueltos (Picking y Selectivo).
+  // chip/detalle: solo el contenido, y aqui se envuelve (Mecano, Cantilever, Gondola).
+  const chip = (extra.chipHtml != null) ? extra.chipHtml : (!l.abierta
     ? '<div onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+extra.chip+'</div>'
-    : '';
-  const detalle = l.abierta
+    : '');
+  const detalle = (extra.detalleHtml != null) ? extra.detalleHtml : (l.abierta
     ? '<div style="background:#fff;border-top:1px solid '+bd+';padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:10px">'+extra.detalle+'</div>'
-    : '';
+    : '');
   return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
     +'<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;font-size:10.5px">'
     +'<span onclick="'+pfx+'Tipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';white-space:nowrap" title="Clic para cambiar tipo">'+(i+1)+'· '+lbl+'</span>'
+    + chipExtra
     + btnFlip
     + btnDel
     +'<span style="flex:1"></span>'
     +'<span onclick="'+pfx+'Cuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
-    +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && extra.abPermitido && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
+    +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+conteo+'</b>'
     +'<span onclick="'+pfx+'Cuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
     +'<span onclick="'+pfx+'Toggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
     +'</div>'
@@ -3071,7 +3072,9 @@ function renderLineasGondola(){
   if(_rPas) _rPas.style.display = lineasGondola.length > 1 ? '' : 'none';
   const cont = document.getElementById('gonLineasList'); if(!cont) return;
   cont.innerHTML = lineasGondola.map((l, i) => {
-    const bg = '#eef4fb', bd = '#b5d4f4', tx = '#185FA5';
+    const esD = l.tipo === 'doble';
+    const bd = esD ? '#f0c4ae' : '#b5d4f4';
+    const tx = esD ? '#993C1D' : '#185FA5';
     const tipoLbl = l.tipoGon === 'central' ? 'Central' : 'Pared';
     const nFilas = lineasGondola.length;
     const btnDel = nFilas > 1
@@ -3092,19 +3095,27 @@ function renderLineasGondola(){
         + '<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Cabeceras (141×100)</div><select onchange="lnSetGon('+i+',\'cabeceras\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_CABECERAS, l.cabeceras)+'</select></div>'
         + '</div>'
       : '';
-    return '<div style="border:1px solid '+bd+';border-radius:6px;background:'+bg+';overflow:hidden">'
-      + '<div style="display:flex;align-items:center;gap:4px;padding:3px 6px;cursor:pointer" onclick="lnToggleGon('+i+')">'
-      + '<span style="background:'+tx+';color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;flex-shrink:0">L'+(i+1)+'</span>'
-      + '<span style="font-size:10px;color:'+tx+';font-weight:600;flex:1">'+tipoLbl+'</span>'
-      + btnFlip
-      + '<span style="font-size:10px;color:'+tx+'">'+(l.abierta?'▲':'▼')+'</span>'
-      + btnDel
-      + '</div>'
-      + chip
-      + detalle
-      + '</div>';
+    // Mismo recuadro que los otros 4 sistemas (Isaac, 21 sep 2026). El contador
+    // cuenta MODULOS, que es lo que se agrega o se quita en una gondola.
+    return _cardLinea('gon', i, l, {total: nFilas, flip: btnFlip, conteo: l.modulos,
+      chipHtml: chip, detalleHtml: detalle});
   }).join('');
 }
+
+// Puentes para que Gondola use el recuadro compartido (_cardLinea llama a
+// pfx+'Tipo' / 'Cuerpos' / 'Del' / 'Toggle'). El contador mueve MODULOS.
+function gonTipo(i){
+  const l = lineasGondola[i]; if(!l) return;
+  l.tipo = (l.tipo === 'doble') ? 'sencilla' : 'doble';
+  renderLineasGondola(); build();
+}
+function gonCuerpos(i, d){
+  const l = lineasGondola[i]; if(!l) return;
+  l.modulos = Math.max(1, Math.min(6, (Number(l.modulos) || 1) + d));
+  renderLineasGondola(); build();
+}
+function gonDel(i){ lnDelGon(i); }
+function gonToggle(i){ lnToggleGon(i); }
 
 function lnAddGon(tipo){
   // Colapsar todas las filas existentes para que la nueva se vea sin scroll.
@@ -3661,20 +3672,9 @@ function renderLineasAlmacen(){
     const chipMarcoExist = (l.marcoIzqExistente || l.marcoDerExistente)
       ? '<span title="Marco(s) del cliente que se descuentan del cotizado" style="font-size:9px;color:'+tx+';background:#fff;border:1px solid '+bd+';border-radius:3px;padding:1px 4px;line-height:1;flex-shrink:0">🔗 '+(l.marcoIzqExistente?'←':'')+(l.marcoDerExistente?'→':'')+'</span>'
       : '';
-    return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;overflow:hidden">'
-      +'<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;font-size:10.5px">'
-      +'<span onclick="lnTipo('+i+')" style="cursor:pointer;font-weight:700;color:'+tx+';white-space:nowrap" title="Clic para cambiar tipo">'+(i+1)+'· '+lbl+'</span>'
-      + chipMarcoExist
-      + btnDel
-      +'<span style="flex:1"></span>'
-      +'<span onclick="lnCuerpos('+i+',-1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">−</span>'
-      +'<b style="min-width:16px;text-align:center;flex-shrink:0">'+(esD && cB!==cA ? cA+'·'+cB : l.cuerpos)+'</b>'
-      +'<span onclick="lnCuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none;flex-shrink:0">＋</span>'
-      +'<span onclick="lnToggle('+i+')" style="cursor:pointer;color:'+tx+';padding:2px 6px;font-size:16px;line-height:1;flex-shrink:0" title="Medidas de esta línea">'+(l.abierta?'▴':'▾')+'</span>'
-      +'</div>'
-      + chip
-      + detalle
-      +'</div>';
+    // Mismo recuadro que los otros 4 sistemas (Isaac, 21 sep 2026).
+    return _cardLinea('ln', i, l, {total: lineasAlmacen.length, extraChip: chipMarcoExist,
+      chipHtml: chip, detalleHtml: detalle});
   }).join('');
   lineasSync();
 }
