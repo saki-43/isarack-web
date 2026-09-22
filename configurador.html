@@ -217,8 +217,8 @@ gtag('config', 'G-XXXXXXXXXX');
   </div>
 
   <div class="row" id="rowUnidadCota">
-    <label>Unidades de cota</label>
-    <select id="selUnidad" onchange="unidadCota=this.value; if(typeof build==='function') build();" style="width:100%">
+    <label>Unidades</label>
+    <select id="selUnidad" onchange="cambiarUnidad(this.value)" style="width:100%">
       <option value="m">Metros (m)</option>
       <option value="cm">Centímetros (cm)</option>
       <option value="in">Pulgadas (in)</option>
@@ -245,6 +245,7 @@ gtag('config', 'G-XXXXXXXXXX');
           <div class="bodCampo"><span class="bodLbl">Ancho</span><input type="number" id="bodAncho" class="bodInp" value="12" min="1" step="0.5" oninput="build()" title="Ancho de la bodega, en metros"></div>
           <div class="bodCampo"><span class="bodLbl">Largo</span><input type="number" id="bodLargo" class="bodInp" value="20" min="1" step="0.5" oninput="build()" title="Largo de la bodega, en metros"></div>
           <div class="bodCampo"><span class="bodLbl">Alto</span><input type="number" id="bodAlto" class="bodInp" value="7" min="1" step="0.5" oninput="build()" title="Alto libre de la bodega, en metros"></div>
+          <span class="bodLbl" id="bodUnidad" style="flex:0 0 auto;color:#8a8f95;font-weight:700">m</span>
         </div>
         <div style="display:flex;align-items:center;gap:5px;margin-top:4px">
           <span class="bodLbl" style="color:#8a8f95;flex:0 0 auto">Separar de pared</span>
@@ -267,7 +268,7 @@ gtag('config', 'G-XXXXXXXXXX');
       </div>
     </div>
     <div class="row" id="gonPasilloRow" style="display:none">
-      <label>Pasillo entre líneas (m)</label>
+      <label class="lblPasillo">Pasillo entre líneas (m)</label>
       <input type="number" id="gonPasillo" value="1.6" min="0.6" max="10" step="0.1" style="width:100%">
     </div>
     <!-- Selects espejo (ocultos) — reflejan la fila 1 de lineasGondola. Las funciones
@@ -309,7 +310,7 @@ gtag('config', 'G-XXXXXXXXXX');
       </div>
     </div>
     <div class="row" id="picPasilloRow" style="display:none">
-      <label>Pasillo entre líneas (m)</label>
+      <label class="lblPasillo">Pasillo entre líneas (m)</label>
       <input type="number" id="picPasillo" value="2.0" min="0.8" max="10" step="0.1" style="width:100%">
     </div>
     <div id="picPasarelaBox" style="display:none">
@@ -391,7 +392,7 @@ gtag('config', 'G-XXXXXXXXXX');
       </div>
     </div>
     <div class="row" id="selPasilloRow" style="display:none">
-      <label>Pasillo entre líneas (m)</label>
+      <label class="lblPasillo">Pasillo entre líneas (m)</label>
       <input type="number" id="selPasillo" value="3.5" min="1" max="10" step="0.1" style="width:100%">
     </div>
     <div id="selPasarelaBox" style="display:none">
@@ -504,7 +505,7 @@ gtag('config', 'G-XXXXXXXXXX');
       </div>
     </div>
     <div class="row" id="mecPasilloRow" style="display:none">
-      <label>Pasillo entre líneas (m)</label>
+      <label class="lblPasillo">Pasillo entre líneas (m)</label>
       <input type="number" id="mecPasillo" value="1.2" min="0.8" max="10" step="0.1" style="width:100%">
     </div>
     <div style="display:none">
@@ -538,7 +539,7 @@ gtag('config', 'G-XXXXXXXXXX');
       </div>
     </div>
     <div class="row" id="canPasilloRow" style="display:none">
-      <label>Pasillo entre líneas (m)</label>
+      <label class="lblPasillo">Pasillo entre líneas (m)</label>
       <input type="number" id="canPasillo" value="3.5" min="1" max="10" step="0.1" style="width:100%">
     </div>
     <div style="display:none">
@@ -656,7 +657,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.21.17';
+const CFG_VERSION = '2026.09.22.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1049,6 +1050,47 @@ let targetX=0, targetZ=0;
 let rotY=0.7, rotX=0.32, isDrag=false, lpX, lpY;
 // Unidad de las cotas: 'm' (metros), 'cm' o 'in' (pulgadas)
 let unidadCota = 'm';
+// La unidad elegida ya no es solo para las cotas del dibujo: TODOS los campos de
+// medida que se escriben a mano (bodega y pasillos) se capturan y se muestran en
+// esa unidad. Antes decian "(m)" siempre, asi que con pulgadas seleccionadas un
+// "120" se leia como 120 METROS. (Isaac, 22 sep 2026)
+const _UNI_F = {m: 1, cm: 0.01, in: 0.0254};   // cuantos metros vale 1 de cada una
+let _uniPrev = 'm';
+// Campos que se capturan en la unidad elegida
+const _UNI_CAMPOS = ['bodAncho','bodLargo','bodAlto','bodSepX','bodSepY',
+                     'gonPasillo','picPasillo','selPasillo','mecPasillo','canPasillo'];
+function _uniFactor(u){ return _UNI_F[u || unidadCota] || 1; }
+// texto del campo -> metros
+function _uniAM(v){ return (parseFloat(v) || 0) * _uniFactor(); }
+// metros -> numero para escribir en el campo, con decimales razonables
+function _uniDeM(m, u){
+  // Dos decimales en metros y pulgadas, uno en centimetros: con menos precision
+  // el ida y vuelta arrastra (12 m -> 472.4 in -> 1199.9 cm en vez de 1200).
+  const uu = u || unidadCota;
+  const dec = (uu === 'cm') ? 1 : 2;
+  const f = Math.pow(10, dec);
+  return String(Math.round((m / _uniFactor(uu)) * f) / f);
+}
+function _uniSufijo(u){ return (u || unidadCota) === 'in' ? 'in' : (u || unidadCota); }
+// Reescribe las etiquetas para que siempre digan en que unidad se esta capturando
+function _uniEtiquetas(){
+  const suf = _uniSufijo();
+  document.querySelectorAll('.lblPasillo').forEach(e => { e.textContent = 'Pasillo entre líneas (' + suf + ')'; });
+  const b = document.getElementById('bodUnidad'); if(b) b.textContent = suf;
+}
+// Cambio de unidad: se conserva la MEDIDA REAL y se reescribe el numero.
+// 12 m con pulgadas seleccionadas pasa a 472.4 in, no a 12 in.
+function cambiarUnidad(nueva){
+  const ant = _uniPrev;
+  _UNI_CAMPOS.forEach(id => {
+    const e = document.getElementById(id); if(!e) return;
+    const metros = (parseFloat(e.value) || 0) * (_UNI_F[ant] || 1);
+    e.value = _uniDeM(metros, nueva);
+  });
+  unidadCota = nueva; _uniPrev = nueva;
+  _uniEtiquetas();
+  if(typeof build === 'function') build();
+}
 // Bodega (cuarto con medidas para ver cuánto entra) + dimensiones actuales del rack
 let bodegaOn = false;
 let _rackDims = null;   // {x: largo total, z: fondo total, y: alto} en metros
@@ -1633,7 +1675,7 @@ function getConfigPic(){
   const largoCm = parseInt(document.getElementById('picLargo').value);
   const niveles = parseInt(document.getElementById('picNiveles').value);
   const cuerpos = parseInt(document.getElementById('picCuerpos').value);
-  const pasilloM = Math.max(0.8, Math.min(10, parseFloat(document.getElementById('picPasillo').value) || 2.0));
+  const pasilloM = Math.max(0.8, Math.min(10, _uniAM(document.getElementById('picPasillo').value) || 2.0));
   const lineas = lineasPicking.map(l => {
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, largoM = l.largoCm/100;
     const cuerposA = l.cuerpos;
@@ -3751,7 +3793,7 @@ function getConfigSel(){
   const niveles = parseInt(document.getElementById('selNiveles').value);
   const cuerpos = parseInt(document.getElementById('selCuerpos').value);
   const filas = tipoFila==='doble' ? 2 : 1;
-  const pasilloM = Math.max(1, Math.min(10, parseFloat(document.getElementById('selPasillo').value) || 3.5));
+  const pasilloM = Math.max(1, Math.min(10, _uniAM(document.getElementById('selPasillo').value) || 3.5));
   const lineas = lineasAlmacen.map(l => {
     const vi = VIGAS_INFO[l.vigaSku] || VIGAS_INFO['SEL-0362'];
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, vigaM = vi.largoIn * IN_TO_M;
@@ -3818,7 +3860,7 @@ function getConfigMec(){
     largoTotM: anchoM * l.cuerpos,
     profM: fondoM * (l.tipo === 'doble' ? 2 : 1)
   }));
-  const pasilloM = Math.max(0.8, Math.min(10, parseFloat(document.getElementById('mecPasillo').value) || 1.2));
+  const pasilloM = Math.max(0.8, Math.min(10, _uniAM(document.getElementById('mecPasillo').value) || 1.2));
   const cuerposTot = lineas.reduce((a,l)=>a + l.cuerpos * (l.tipo==='doble'?2:1), 0);
   const maxLenM = Math.max(...lineas.map(l=>l.largoTotM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -3840,7 +3882,7 @@ function getConfigCan(){
     anchoBaseM: (l.brazoIn * IN_TO_M) * (l.tipo === 'doble' ? 2 : 1) + 0.30,
     largoZM: (l.cuerpos - 1) * separacionM
   }));
-  const pasilloM = Math.max(1, Math.min(10, parseFloat(document.getElementById('canPasillo').value) || 3.5));
+  const pasilloM = Math.max(1, Math.min(10, _uniAM(document.getElementById('canPasillo').value) || 3.5));
   const anchoTotalM = lineas.reduce((a,l)=>a+l.anchoBaseM,0) + pasilloM*(lineas.length-1);
   const maxLargoZM = Math.max(...lineas.map(l=>l.largoZM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -4432,7 +4474,7 @@ function buildGondola(){
   // Pasillo peatonal entre filas. Antes estaba fijo en 1.6 m y no habia forma
   // de cambiarlo; ahora va en el mismo campo que los otros 4 sistemas.
   const pasilloM = Math.max(0.6, Math.min(10,
-    parseFloat((document.getElementById('gonPasillo')||{}).value) || 1.6));
+    _uniAM((document.getElementById('gonPasillo')||{}).value) || 1.6));
 
   // Info geométrica por fila
   const filasInfo = filas.map(l => {
@@ -4874,7 +4916,7 @@ function agregarBodega(parent){
   const st = document.getElementById('bodEstado');
   if(!bodegaOn || !_rackDims){ if(st) st.innerHTML=''; return; }
   const gv = id => parseFloat((document.getElementById(id)||{}).value) || 0;
-  const A = gv('bodAncho'), L = gv('bodLargo'), H = gv('bodAlto');   // metros
+  const A = _uniAM(gv('bodAncho')), L = _uniAM(gv('bodLargo')), H = _uniAM(gv('bodAlto'));   // a metros
   if(A<=0 || L<=0 || H<=0){ if(st){ st.innerHTML='Pon las 3 medidas de la bodega'; st.style.color='#888'; } return; }
   // Encuadrar TODA la bodega (más grande que el rack) para que sus cotas se vean
   // completas, sobre todo en el celular (pantalla más chica).
@@ -4888,7 +4930,7 @@ function agregarBodega(parent){
   // Separacion de las paredes. El rack se arma centrado en el origen y lo que se
   // mueve es la BODEGA, asi que separarlo de la pared es correr el cuarto al reves:
   // restandole la separacion a su centro, el hueco queda del lado -X / -Z.
-  const sx = Math.max(0, gv('bodSepX')), sz = Math.max(0, gv('bodSepY'));
+  const sx = Math.max(0, _uniAM(gv('bodSepX'))), sz = Math.max(0, _uniAM(gv('bodSepY')));
   const cx0 = (A - _rackDims.x)/2 - sx, cz0 = (L - _rackDims.z)/2 - sz;
   targetX = cx0 + 0.85; targetZ = cz0 + 0.85;   // recentrado por la banda de cotas
   // Piso semitransparente
@@ -7264,7 +7306,7 @@ function addEvents(){
   document.getElementById('selPasarelaEscalera').addEventListener('change', build);
   document.getElementById('selPasarelaNivel2').addEventListener('change', build);
   document.getElementById('selPasarelaViga').addEventListener('change', function(){
-    document.getElementById('selPasillo').value = this.value === '122' ? '1.22' : '1.0';
+    document.getElementById('selPasillo').value = _uniDeM(this.value === '122' ? 1.22 : 1.0);
     build();
   });
   document.getElementById('picPasillo').addEventListener('change', build);
@@ -7278,7 +7320,7 @@ function addEvents(){
   document.getElementById('picPasarelaEscalera').addEventListener('change', build);
   document.getElementById('picPasarelaNivel2').addEventListener('change', build);
   document.getElementById('picPasarelaViga').addEventListener('change', function(){
-    document.getElementById('picPasillo').value = this.value === '122' ? '1.22' : '1.0';
+    document.getElementById('picPasillo').value = _uniDeM(this.value === '122' ? 1.22 : 1.0);
     build();
   });
   renderLineasAlmacen();
@@ -7435,7 +7477,9 @@ function aplicarEstado(st){
     piezasCarrito = st.pz.filter(x => Array.isArray(x) && x[0]).map(x => ({sku:String(x[0]), cant:Math.max(0, Math.round(Number(x[1])||0))})).filter(c => c.cant > 0);
     const tp = document.getElementById('tabPiezas'); if(tp) tp.style.display = '';
   }
-  if(st.u){ unidadCota = st.u; const su = document.getElementById('selUnidad'); if(su) su.value = st.u; }
+  if(st.u){ unidadCota = st.u; _uniPrev = st.u;
+    const su = document.getElementById('selUnidad'); if(su) su.value = st.u;
+    try{ _uniEtiquetas(); }catch(e){} }
   if(st.bod){
     bodegaOn = !!st.bod.on;
     const setv = (id,v) => { const e = document.getElementById(id); if(e && v) e.value = v; };
