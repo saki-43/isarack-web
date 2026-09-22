@@ -237,6 +237,10 @@ gtag('config', 'G-XXXXXXXXXX');
        sistema para que salga en el mismo lugar en todos; antes vivia entre las
        opciones de Selectivo y las de Mecano, asi que en unos aparecia abajo y en
        otros arriba. (Isaac, 21 sep 2026) -->
+  <div class="row" id="rowVistaPlanta" style="margin-bottom:6px">
+    <label class="chk" style="margin:0"><input type="checkbox" id="chkPlanta" onchange="toggleVistaPlanta(this.checked)"> Vista en planta (plano a escala)</label>
+  </div>
+
   <div id="bodegaShared" style="display:none">
     <div class="row" style="margin-bottom:8px">
       <label class="chk" style="margin:0"><input type="checkbox" id="bodChk" onchange="bodegaOn=this.checked; document.getElementById('bodBox').style.display=this.checked?'':'none'; build();"> Mostrar bodega</label>
@@ -657,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.03';
+const CFG_VERSION = '2026.09.22.04';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1044,6 +1048,11 @@ function calcularFlete(sub){
 
 // ───────── 3D ─────────
 let scene, camera, renderer, grupo, targetY=0.65, camDist=3.4;
+// VISTA EN PLANTA: camara ortografica mirando de frente hacia abajo. En
+// perspectiva las medidas no son proporcionales (lo de atras se ve mas chico),
+// asi que de ahi no se puede escalar nada. Con ortografica si: dos cosas del
+// mismo largo se dibujan del mismo largo, este donde este. (Isaac, 22 sep 2026)
+let camPersp = null, camOrto = null, vistaPlanta = false;
 // Centro al que mira la camara en planta. Normalmente 0 (el rack esta centrado),
 // pero con la bodega el rack se recorre a su esquina y la camara sigue al cuarto.
 let targetX=0, targetZ=0;
@@ -1503,16 +1512,51 @@ function resize3D(){
   const w = cv.clientWidth || innerWidth;
   const h = cv.clientHeight || innerHeight;
   if(w>0 && h>0){
-    camera.aspect = w/h;
+    if(vistaPlanta) _marcoOrto(w/h);
+    else camera.aspect = w/h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);   // sin el false: actualiza también el style del canvas
   }
+}
+// El "zoom" de la planta es que tan grande es el pedazo de piso que se ve.
+// camDist sigue mandando, para que la rueda del raton funcione igual.
+function _marcoOrto(asp){
+  const medio = Math.max(0.6, camDist * 0.52);
+  camOrto.top = medio; camOrto.bottom = -medio;
+  camOrto.left = -medio * asp; camOrto.right = medio * asp;
+}
+function toggleVistaPlanta(on){
+  vistaPlanta = !!on;
+  camera = vistaPlanta ? camOrto : camPersp;
+  if(!vistaPlanta) camera.up.set(0, 1, 0);
+  const au = document.getElementById('auto');
+  if(au){ if(vistaPlanta) au.checked = false; au.disabled = vistaPlanta; }
+  resize3D();
+  build();   // re-escala las cotas y esconde/muestra el muneco
+  if(vistaPlanta) _encuadrarPlanta();
+}
+// Al prender la planta se encuadra sola para que quepa TODO el dibujo, cotas
+// incluidas. Despues ya no se mete: si el usuario acerca o aleja, se respeta.
+function _encuadrarPlanta(){
+  if(!vistaPlanta || !grupo || typeof THREE === 'undefined') return;
+  try{
+    grupo.updateMatrixWorld(true);
+    const caja = new THREE.Box3().setFromObject(grupo);
+    if(caja.isEmpty() || !isFinite(caja.min.x)) return;
+    const W = caja.max.x - caja.min.x, L = caja.max.z - caja.min.z;
+    const cv = document.getElementById('cv');
+    const asp = Math.max(0.25, (cv.clientWidth || innerWidth) / (cv.clientHeight || innerHeight));
+    // medio marco = camDist * 0.52 (ver _marcoOrto); 12 % de respiro alrededor
+    camDist = Math.max(1.6, Math.min(60, Math.max(L, W / asp) / 1.04 * 1.12));
+  }catch(e){ console.warn('encuadre planta', e); }
 }
 
 function init(){
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xeef0f2);
-  camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100);
+  camPersp = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100);
+  camOrto  = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 400);
+  camera = camPersp;
   renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   document.getElementById('cv').appendChild(renderer.domElement);
@@ -4807,7 +4851,11 @@ function cotaDim(parent, a, b, texto, opts){
   // Todo lo que cuelgue de aquí queda marcado como cota: _dimsDesde3D() lo ignora,
   // si no, las flechas y etiquetas inflarían la medida del rack.
   const _nAntes = parent.children.length;
-  const _marcarCotas = () => { for(let i=_nAntes;i<parent.children.length;i++){ parent.children[i].userData = parent.children[i].userData || {}; parent.children[i].userData.cota = true; } };
+  // Ademas de marcarlas como cota, se apunta si son VERTICALES (miden alto). En
+  // la vista en planta se miran de punta: no se leen y ensucian el plano, asi que
+  // se esconden. (Isaac, 22 sep 2026)
+  const _esVert = Math.abs(b[1] - a[1]) > Math.max(Math.abs(b[0] - a[0]), Math.abs(b[2] - a[2]));
+  const _marcarCotas = () => { for(let i=_nAntes;i<parent.children.length;i++){ const o = parent.children[i]; o.userData = o.userData || {}; o.userData.cota = true; if(_esVert) o.userData.cotaVert = true; } };
   _COTA_PEND.push(_marcarCotas);
   const color = opts.color || 0x1a1a1a;
   const A = new THREE.Vector3(a[0],a[1],a[2]), B = new THREE.Vector3(b[0],b[1],b[2]);
@@ -4874,6 +4922,7 @@ function agregarCotas(parent, largoM, fondoM, altoM, capacidadKg, largoVigaM){
   // Capacidad (KG)
   if(capacidadKg){
     const sCap = crearTextoSprite(capacidadKg+' KG', '#da6635', '#000000');
+    sCap.userData.cota = true; sCap.userData.cotaVert = true;   // fuera del plano
     sCap.position.set(xDer, altoM * 0.5, zF);   // costado izquierdo en pantalla, separado de las cotas
     const fc = (typeof camDist === 'number' && camDist > 0) ? Math.max(1, Math.min(3, camDist/8)) : 1;
     sCap.scale.set(1.05*fc, 0.33*fc, 1);   // crece con el layout
@@ -5423,8 +5472,15 @@ function build(){
     const mods = parseInt(document.getElementById('modulos').value);
     extremoIzq = (m.ancho * mods) / 2 + 1.0;
   }
-  if(posMuneco) buildPersonaIsaac(grupo, posMuneco.x, posMuneco.z);
-  else buildPersonaIsaac(grupo, -extremoIzq, 0.3);
+  if(vistaPlanta){
+    // Un plano no lleva las cotas de alto ni el peso: se ven de punta y ensucian.
+    try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
+    grupo.traverse(o => { if(o.userData && o.userData.cotaVert) o.visible = false; });
+  }
+  if(!vistaPlanta){   // en un plano el muneco no va
+    if(posMuneco) buildPersonaIsaac(grupo, posMuneco.x, posMuneco.z);
+    else buildPersonaIsaac(grupo, -extremoIzq, 0.3);
+  }
   // Ajustar cámara para que el muñeco quepa
   camDist = Math.max(camDist, extremoIzq + 1.8);
   scene.add(grupo);
@@ -7206,6 +7262,7 @@ function addEvents(){
   addEventListener('mouseup', ()=>isDrag=false);
   addEventListener('mousemove', e=>{
     if(!isDrag) return;
+    if(vistaPlanta){ lpX=e.clientX; lpY=e.clientY; return; }   // un plano no se gira
     rotY += (e.clientX-lpX)*0.008;
     rotX += (e.clientY-lpY)*0.008;
     rotX = Math.max(-0.2, Math.min(1.2, rotX));
@@ -7486,6 +7543,12 @@ function aplicarEstado(st){
   if(st.u){ unidadCota = st.u; _uniPrev = st.u;
     const su = document.getElementById('selUnidad'); if(su) su.value = st.u;
     try{ _uniEtiquetas(); }catch(e){} }
+  // La vista en planta es un MODO, no un dato del diseno: si el link viene con la
+  // casilla prendida hay que prender el modo, no nada mas la palomita.
+  try{
+    const cp = document.getElementById('chkPlanta');
+    if(cp && !!cp.checked !== !!vistaPlanta) toggleVistaPlanta(cp.checked);
+  }catch(e){}
   if(st.bod){
     bodegaOn = !!st.bod.on;
     const setv = (id,v) => { const e = document.getElementById(id); if(e && v) e.value = v; };
@@ -7560,9 +7623,24 @@ function resumenVisor(){
 function animate(){
   requestAnimationFrame(animate);
   if(document.getElementById('auto').checked && !isDrag) rotY += 0.004;
-  const cx = Math.cos(rotX);
-  camera.position.set(targetX + Math.sin(rotY)*cx*camDist, Math.sin(rotX)*camDist + targetY, targetZ + Math.cos(rotY)*cx*camDist);
-  camera.lookAt(targetX, targetY, targetZ);
+  if(vistaPlanta){
+    // De frente hacia abajo. El "arriba" de la pantalla es -Z para que el dibujo
+    // se lea igual que el 3D: +X a la derecha y el frente del rack hacia abajo.
+    _marcoOrto(camera.right !== camera.left ? (camera.right - camera.left) / (camera.top - camera.bottom) : 1);
+    camera.updateProjectionMatrix();
+    camera.up.set(0, 0, -1);
+    // El panel de controles flota encima del canvas por la izquierda. En un plano
+    // (que es ancho y plano) taparia parte del dibujo, asi que se recorre el
+    // centro para que el plano quede en el espacio libre. En pantalla angosta el
+    // panel no va al lado, asi que no se recorre.
+    const desp = (innerWidth > 900) ? (camera.right - camera.left) * 0.11 : 0;
+    camera.position.set(targetX - desp, 80, targetZ);
+    camera.lookAt(targetX - desp, 0, targetZ);
+  } else {
+    const cx = Math.cos(rotX);
+    camera.position.set(targetX + Math.sin(rotY)*cx*camDist, Math.sin(rotX)*camDist + targetY, targetZ + Math.cos(rotY)*cx*camDist);
+    camera.lookAt(targetX, targetY, targetZ);
+  }
   // Billboard: el sprite Isaac siempre mira hacia la cámara (sólo en eje Y, mantiene vertical)
   if(grupo){
     grupo.traverse(obj=>{
