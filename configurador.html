@@ -376,7 +376,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <label class="chk"><input type="checkbox" id="picAlturaManual"> Personalizar claros de viga</label>
     <div class="alturas-nivel" id="picAlturasContainer"></div>
-    <label class="chk"><input type="checkbox" id="picChkRej" checked> Rejilla electrosoldada por nivel</label>
+    <label class="chk"><input type="checkbox" id="picChkRej" checked> Rejilla electrosoldada</label>
     <label class="chk"><input type="checkbox" id="picChkPanel"> Panel beige (corte a medida)</label>
     <label class="chk"><input type="checkbox" id="picChkMadera"> Madera (triplay + soportes)</label>
   </div>
@@ -657,7 +657,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.02';
+const CFG_VERSION = '2026.09.22.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
