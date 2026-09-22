@@ -661,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.05';
+const CFG_VERSION = '2026.09.22.06';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -5507,7 +5507,10 @@ function build(){
     // Un plano no lleva las cotas de alto ni el peso: se ven de punta y ensucian.
     try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
     grupo.traverse(o => { if(o.userData && o.userData.cotaVert) o.visible = false; });
-    _medirPlanta();
+    // Se re-encuadra en CADA cambio, no solo al prender la casilla: al agregar una
+    // fila el dibujo crece y antes el zoom se quedaba igual, asi que se salia de
+    // cuadro. Un plano siempre debe mostrarse completo. (Isaac, 22 sep 2026)
+    _encuadrarPlanta();
   }
   if(!vistaPlanta){   // en un plano el muneco no va
     if(posMuneco) buildPersonaIsaac(grupo, posMuneco.x, posMuneco.z);
