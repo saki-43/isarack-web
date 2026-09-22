@@ -661,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.04';
+const CFG_VERSION = '2026.09.22.05';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1537,17 +1537,48 @@ function toggleVistaPlanta(on){
 }
 // Al prender la planta se encuadra sola para que quepa TODO el dibujo, cotas
 // incluidas. Despues ya no se mete: si el usuario acerca o aleja, se respeta.
-function _encuadrarPlanta(){
-  if(!vistaPlanta || !grupo || typeof THREE === 'undefined') return;
+// Caja del dibujo completo (rack + bodega + cotas), en metros.
+let _plantaCaja = null;
+function _medirPlanta(){
+  if(!grupo || typeof THREE === 'undefined') return;
   try{
     grupo.updateMatrixWorld(true);
-    const caja = new THREE.Box3().setFromObject(grupo);
-    if(caja.isEmpty() || !isFinite(caja.min.x)) return;
-    const W = caja.max.x - caja.min.x, L = caja.max.z - caja.min.z;
-    const cv = document.getElementById('cv');
-    const asp = Math.max(0.25, (cv.clientWidth || innerWidth) / (cv.clientHeight || innerHeight));
-    // medio marco = camDist * 0.52 (ver _marcoOrto); 12 % de respiro alrededor
-    camDist = Math.max(1.6, Math.min(60, Math.max(L, W / asp) / 1.04 * 1.12));
+    const c = new THREE.Box3().setFromObject(grupo);
+    if(c.isEmpty() || !isFinite(c.min.x)) return;
+    _plantaCaja = {xc:(c.min.x+c.max.x)/2, zc:(c.min.z+c.max.z)/2,
+                   W:(c.max.x-c.min.x), L:(c.max.z-c.min.z)};
+  }catch(e){}
+}
+// Los dos paneles (controles a la izquierda, cotizacion a la derecha) flotan
+// ENCIMA del canvas. El plano se centra en lo que queda libre entre ellos, no
+// en el canvas completo: si no, se mete abajo de un panel. (Isaac, 22 sep 2026)
+function _huecoPantalla(){
+  const cv = document.getElementById('cv');
+  const W = cv.clientWidth || innerWidth, H = cv.clientHeight || innerHeight;
+  const ancho = el => { const e = document.getElementById(el);
+    if(!e || getComputedStyle(e).display === 'none' || getComputedStyle(e).visibility === 'hidden') return null;
+    const r = e.getBoundingClientRect();
+    return (r.width > 4 && r.height > 4) ? r : null; };
+  const rI = ancho('ctrl'), rD = ancho('cotz');
+  // En pantalla angosta los paneles no van a los lados: no quitan ancho.
+  const lado = innerWidth > 980;
+  const izq = (lado && rI) ? Math.max(0, rI.right) : 0;
+  const der = (lado && rD) ? Math.max(0, W - rD.left) : 0;
+  const libre = Math.max(120, W - izq - der);
+  return {W, H, izq, der, libre, centroPx: izq + libre/2};
+}
+function _encuadrarPlanta(){
+  if(!vistaPlanta) return;
+  _medirPlanta();
+  if(!_plantaCaja) return;
+  try{
+    const h = _huecoPantalla();
+    // El marco en metros mide camDist*1.04 de alto y eso por (W/H) de ancho.
+    // Para que el dibujo quepa a lo ANCHO dentro del hueco libre:
+    const porAncho = _plantaCaja.W * h.H / (1.04 * h.libre);
+    // y a lo LARGO en la altura util (se deja 8 % para el pie de pagina):
+    const porLargo = _plantaCaja.L / (1.04 * 0.92);
+    camDist = Math.max(1.6, Math.min(60, Math.max(porAncho, porLargo) * 1.12));
   }catch(e){ console.warn('encuadre planta', e); }
 }
 
@@ -5476,6 +5507,7 @@ function build(){
     // Un plano no lleva las cotas de alto ni el peso: se ven de punta y ensucian.
     try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
     grupo.traverse(o => { if(o.userData && o.userData.cotaVert) o.visible = false; });
+    _medirPlanta();
   }
   if(!vistaPlanta){   // en un plano el muneco no va
     if(posMuneco) buildPersonaIsaac(grupo, posMuneco.x, posMuneco.z);
@@ -7629,13 +7661,15 @@ function animate(){
     _marcoOrto(camera.right !== camera.left ? (camera.right - camera.left) / (camera.top - camera.bottom) : 1);
     camera.updateProjectionMatrix();
     camera.up.set(0, 0, -1);
-    // El panel de controles flota encima del canvas por la izquierda. En un plano
-    // (que es ancho y plano) taparia parte del dibujo, asi que se recorre el
-    // centro para que el plano quede en el espacio libre. En pantalla angosta el
-    // panel no va al lado, asi que no se recorre.
-    const desp = (innerWidth > 900) ? (camera.right - camera.left) * 0.11 : 0;
-    camera.position.set(targetX - desp, 80, targetZ);
-    camera.lookAt(targetX - desp, 0, targetZ);
+    // Se apunta al CENTRO DEL DIBUJO (no al de la bodega) y se corre para que
+    // caiga en medio del hueco que dejan los dos paneles.
+    const h = _huecoPantalla();
+    const xc = _plantaCaja ? _plantaCaja.xc : targetX;
+    const zc = _plantaCaja ? _plantaCaja.zc : targetZ;
+    const metrosPorPx = (camDist * 1.04) / h.H;          // mismo en X y en Z
+    const camX = xc - (h.centroPx - h.W / 2) * metrosPorPx;
+    camera.position.set(camX, 80, zc);
+    camera.lookAt(camX, 0, zc);
   } else {
     const cx = Math.cos(rotX);
     camera.position.set(targetX + Math.sin(rotY)*cx*camDist, Math.sin(rotX)*camDist + targetY, targetZ + Math.cos(rotY)*cx*camDist);
