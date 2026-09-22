@@ -397,11 +397,15 @@ function calc(snap){
   const grados=Math.atan2(altura,desarrollo)*180/Math.PI;
 
   const ft=altura/PIE;
+  // CALIBRE DEL MONTEN (Isaac, 22 sep 2026): pasando los 10 pies la escalera se
+  // va colgando conforme subes — se resortea. Por eso al EXCEDER los 10' se
+  // sube a calibre 12; con eso se acabo el pandeo y ya no hay que ir a ponerle
+  // refuerzos despues. Hasta 10' cerrados va calibre 14.
   const calibre = ft>10 ? '12' : '14';
 
   drawMetrics({escalones,peralte,desarrollo,diagonal,trazo,grados});
   drawChips({esL,lower,upper,trazo,descH,descLen,peralte,puntaHuellas,descLenP});
-  $('calnote').textContent=`Altura ≈ ${ft.toFixed(1)} ' → montén calibre ${calibre} (regla: ≥10' cal.12 · ~9' cal.14).`;
+  $('calnote').textContent=`Altura ≈ ${ft.toFixed(1)} ' → montén calibre ${calibre} (regla: pasando los 10' va cal.12, porque se resortea y se pandea; hasta 10' va cal.14).`;
 
   drawMarcas(escalones,trazo,peralte);
   const pos=$('pos').value;
@@ -560,12 +564,13 @@ function drawMats(o){
   const piezasAng=2*escalones;
   const tirasAng=ceil(piezasAng/porTiraAng);
 
-  let perLado, detMonten;
+  let perLado, detMonten, diagBar=diagonal;
   if(esL){
     const d1=Math.hypot(lower*peralte,lower*huella);
     const d2=Math.hypot(upper*peralte,upper*huella);
     perLado=ceil(d1/TIRA)+ceil(d2/TIRA);
     detMonten=`diag. tramos ${fmt(d1)}+${fmt(d2)} ${UL()} · ${perLado} pza/lado × 2`;
+    diagBar=Math.max(d1,d2);
   }else{
     perLado=ceil(diagonal/TIRA);
     detMonten=`diagonal ${fmt(diagonal)} ${UL()} · ${perLado} pza/lado × 2`;
@@ -577,13 +582,24 @@ function drawMats(o){
   const porTiraSol=Math.floor(TIRA/SOLERA);
   const tirasSol=ceil(piezasSol/porTiraSol);
 
-  const tubos=4;
+  // BARANDAL (Isaac, 22 sep 2026): son 4 corridas, 2 por lado. La tira es de
+  // 6 m, asi que cuando la diagonal no pasa de 3 m salen DOS corridas de una
+  // sola tira y basta la mitad de los tubos. Antes siempre cotizaba 4, midiera
+  // lo que midiera la escalera.
+  const corridasBar = 4;
+  const porTiraBar = Math.max(1, Math.floor(TIRA/diagBar));
+  const tubos = (diagBar > TIRA)
+    ? corridasBar * ceil(diagBar/TIRA)          // no cabe en una tira: se empalma
+    : ceil(corridasBar/porTiraBar);
+  const detBar = (diagBar > TIRA)
+    ? `${corridasBar} corridas de ${fmt(diagBar)} ${UL()} · empalmadas`
+    : `${corridasBar} corridas de ${fmt(diagBar)} ${UL()} · ${porTiraBar} por tira`;
 
   const rows=[
     [`Montén 6" cal.${calibre} × 6 m`, tirasMonten, `laterales · ${detMonten}`],
     [`Ángulo 1½" × 1/8" × 6 m`, tirasAng, `${piezasAng} tramos de ${fmt(huella)} ${UL()} (${porTiraAng}/tira)`],
     [`Solera 2" × 1/4" × 6 m`, tirasSol, `${piezasSol} soleras de 47" · ${secciones} secciones`],
-    [`Tubo 1½" ced.30 × 6 m`, tubos, `barandal`],
+    [`Tubo 1½" ced.30 × 6 m`, tubos, `barandal · ${detBar}`],
   ];
   $('mats').innerHTML=rows.map(r=>
     `<tr><td>${r[0]}</td><td class="n q mono">${r[1]}</td><td style="color:#6b7280;font-size:12px">${r[2]}</td></tr>`).join('');
