@@ -661,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.06';
+const CFG_VERSION = '2026.09.22.07';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -7663,14 +7663,21 @@ function animate(){
     // se lea igual que el 3D: +X a la derecha y el frente del rack hacia abajo.
     _marcoOrto(camera.right !== camera.left ? (camera.right - camera.left) / (camera.top - camera.bottom) : 1);
     camera.updateProjectionMatrix();
-    camera.up.set(0, 0, -1);
+    // "Arriba" de la pantalla es +Z. Las filas se arman de mayor a menor Z, asi
+    // que con -Z arriba la fila 1 caia ABAJO y la ultima arriba: al reves de como
+    // se leen en el panel. Con +Z arriba la fila 1 queda arriba, la 2 debajo y
+    // asi. Esto es un GIRO de 180 grados, no un espejo: el plano sigue siendo
+    // correcto y las etiquetas son sprites, asi que se siguen leyendo derechas.
+    // (Isaac, 22 sep 2026)
+    camera.up.set(0, 0, 1);
     // Se apunta al CENTRO DEL DIBUJO (no al de la bodega) y se corre para que
-    // caiga en medio del hueco que dejan los dos paneles.
+    // caiga en medio del hueco que dejan los dos paneles. Con el giro de 180,
+    // +X queda hacia la izquierda de la pantalla, asi que el corrimiento va al reves.
     const h = _huecoPantalla();
     const xc = _plantaCaja ? _plantaCaja.xc : targetX;
     const zc = _plantaCaja ? _plantaCaja.zc : targetZ;
     const metrosPorPx = (camDist * 1.04) / h.H;          // mismo en X y en Z
-    const camX = xc - (h.centroPx - h.W / 2) * metrosPorPx;
+    const camX = xc + (h.centroPx - h.W / 2) * metrosPorPx;
     camera.position.set(camX, 80, zc);
     camera.lookAt(camX, 0, zc);
   } else {
