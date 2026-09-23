@@ -661,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.23.01';
+const CFG_VERSION = '2026.09.23.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1867,21 +1867,42 @@ function dibujarPasarelaEntrepiso(cfg, pasillosInfo, xInicio, matVigaLocal){
   // Ejes Z de cada fila, mismo cálculo que usa el armado de líneas
   const lineas = cfg.lineas || [];
   const profTotal = lineas.reduce((a,l)=>a+(l.profM||0),0) + cfg.pasilloM*Math.max(0,lineas.length-1);
+  // OJO (Isaac, 23 sep 2026): esto armaba los ejes desde +profTotal/2 hacia
+  // ABAJO, que era como el rack se armaba hasta el 22 sep. Ese dia se invirtio
+  // el cursor (la fila 1 nace al fondo, para que en planta salga arriba) en los
+  // 5 sistemas y en la PS-1, pero aqui se quedo el viejo: los ejes salian
+  // ESPEJEADOS contra el rack. Resultado: la escalera se dibujaba en una fila y
+  // las vigas se quitaban de otra. Con 3 filas la de en medio cae igual en los
+  // dos ordenes y no se notaba; con 4 o mas se destapa.
+  // Dos arreglos distintos a proposito:
+  //  · ejesLinea — uno por LINEA, con el MISMO indice que cfg.lineas, para que
+  //    case con filaEscaleraPS2()/filaEscaleraAltaPS2(), que es lo que decide
+  //    de que fila se quitan las vigas.
+  //  · ejesFilas — uno por CARA fisica (una doble son dos), que es lo que
+  //    necesita el corredor de afuera. Va ordenado de +z a -z porque el calculo
+  //    de los claros del barandal recorre de arriba hacia abajo.
+  const ejesLinea = [];
   const ejesFilas = [];
-  { let zCur = profTotal/2;
+  { let zAtras = -profTotal/2;          // mismo cursor que usa el armado del rack
     lineas.forEach(l => {
-      // Fila doble = 2 marcos (uno por cada fila), como hace PS-1.
+      const prof = l.profM || 0;
+      const c = zAtras + prof/2;        // centro de la linea, como lo pone buildSelectivo
       if(l.tipo === 'doble' && l.fondoM){
-        const union = Math.max(0, l.profM - 2*l.fondoM);
-        ejesFilas.push({ z: zCur - l.fondoM/2, prof: l.fondoM });
-        ejesFilas.push({ z: zCur - l.fondoM - union - l.fondoM/2, prof: l.fondoM });
+        const zCaraA = c - prof/2 + l.fondoM/2;
+        const zCaraB = c + prof/2 - l.fondoM/2;
+        // La escalera sube por UNA de las dos caras; el corte ya cubre las dos.
+        ejesLinea.push({ z: zCaraA, prof: l.fondoM });
+        ejesFilas.push({ z: zCaraA, prof: l.fondoM });
+        ejesFilas.push({ z: zCaraB, prof: l.fondoM });
       } else {
-        ejesFilas.push({ z: zCur - l.profM/2, prof: l.profM });
+        ejesLinea.push({ z: c, prof: prof });
+        ejesFilas.push({ z: c, prof: prof });
       }
-      zCur -= l.profM + cfg.pasilloM;
+      zAtras += prof + cfg.pasilloM;
     });
   }
-  if(!ejesFilas.length) return;
+  ejesFilas.sort((a, b) => b.z - a.z);
+  if(!ejesFilas.length || !ejesLinea.length) return;
 
   // Pasillos peatonales POR FUERA del rack, en la parte de ENFRENTE y de ATRÁS.
   // Se arman IGUAL que en PS-1: marcos propios (más cortos que los del rack)
@@ -1956,11 +1977,14 @@ function dibujarPasarelaEntrepiso(cfg, pasillosInfo, xInicio, matVigaLocal){
       });
   }
 
-  // Fila del tramo de abajo y del de arriba (la siguiente)
-  const iFila = Math.min(1, ejesFilas.length - 1);
-  const iFilaAlta = Math.min(iFila + 1, ejesFilas.length - 1);
-  const fila = ejesFilas[iFila];
-  const filaAlta = ejesFilas[iFilaAlta];
+  // Fila del tramo de abajo y del de arriba. Se preguntan a las MISMAS funciones
+  // que deciden de que fila se quitan las vigas, en vez de repetir la cuenta
+  // aqui: asi no se pueden volver a separar. (Isaac, 23 sep 2026)
+  const iFila = Math.max(0, Math.min(filaEscaleraPS2(cfg), ejesLinea.length - 1));
+  const iAltaCfg = filaEscaleraAltaPS2(cfg);
+  const iFilaAlta = (iAltaCfg >= 0) ? Math.min(iAltaCfg, ejesLinea.length - 1) : iFila;
+  const fila = ejesLinea[iFila];
+  const filaAlta = ejesLinea[iFilaAlta];
   const zCen = fila.z;
   const zAlta = filaAlta.z;
   const largoTot = pasillosInfo[0].largoM;
