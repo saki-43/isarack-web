@@ -675,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.23.05';
+const CFG_VERSION = '2026.09.23.06';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2573,9 +2573,14 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
         grupo.add(vg);
       });
       // Barandal del rellano: costado exterior y frente (el lado del rack queda abierto a la escalera)
+      // El que corre PEGADO al carril de la escalera va marcado barEsc: la
+      // escalera se compra armada y trae su propio pasamanos, asi que esos
+      // metros no se cotizan aparte. El del frente del rellano SI se cotiza:
+      // ese es borde del corredor, no de la escalera. (Isaac, 23 sep 2026)
       BAR_TUBOS.forEach(dy => {
         const t1b = box(0.03, 0.03, anchoEsc, matBarandalTubo);
         t1b.position.set(xCorExt, yPas + dy, zEsc);
+        t1b.userData.barEsc = true;
         grupo.add(t1b);
         const t2b = box(ANCHO_COR, 0.03, 0.03, matBarandalTubo);
         t2b.position.set(xCorCentro, yPas + dy, zRellano);
@@ -2751,26 +2756,32 @@ function bomPasarelaEntrepiso(cfg, add, lineasInfo){
     add(skuViga, nFilas * 2 * EXTREMOS);                                   // 2 postes por fila
     add(PASARELA_PISO_3M, Math.ceil(anchoCor / 0.20) * Math.ceil(profTotal / 3) * EXTREMOS);
     // Barandal solo en los claros (los pasillos entre filas) + remate en los 2 extremos
-    const clarosM = Math.max(0, nFilas - 1) * cfg.pasilloM;
-    add(PASARELA_BARANDAL, Math.ceil((clarosM + anchoCor * 2)) * EXTREMOS);
-    add(PASARELA_POSTE_BAR, (Math.max(0, nFilas - 1) * 2 + 2) * EXTREMOS);
+    // El barandal se suma una sola vez al final, medido del 3D.
   }
 
   // 3) Escaleras internas: una por planta
   add(PASARELA_ESCALERAS[cfg.pasarela.alturaIn] || PASARELA_ESCALERAS[96], nNiveles);
   // Barandal del módulo 1 en cada fila con escalera
-  for(let nv=1; nv<=nNiveles; nv++){
-    add(PASARELA_BARANDAL, Math.ceil(2.44 * 2));
-    add(PASARELA_POSTE_BAR, 4);
-  }
 }
 
 // ── Pasarela compartida: piezas individuales para el BOM ──
 // lineasInfo: [{largoTotM, cuerpos}] por línea
+// BARANDAL (Isaac, 23 sep 2026): se vende por METRO LINEAL, y cada metro lleva
+// sus 4 tubos. El tramo que ISARACK compra es mas largo, pero eso no se le
+// refleja al cliente: "si les vendo un metro lineal seguira siendo un metro
+// lineal de 4 piezas". Y van 2 postes por metro.
+// Se suma UNA sola vez, con los metros medidos del 3D, para que la lista de
+// materiales no se pueda volver a separar de lo que se dibuja.
+function _addBarandalPas(add){
+  const ml = Math.ceil(_barandalMLDesde3D(typeof grupo !== 'undefined' ? grupo : null));
+  if(ml <= 0) return;
+  add(PASARELA_BARANDAL, ml);
+  add(PASARELA_POSTE_BAR, ml * 2);
+}
 function bomPasarela(cfg, add, lineasInfo){
   const nNiveles = cfg.pasarela.niveles || 1;
   const escActiva = cfg.pasarela.escalera !== 'no';
-  if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); return; }
+  if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); _addBarandalPas(add); return; }
   // El piso del pasillo se apoya directo en las vigas de carga de los racks (naranjas).
   // No se cotiza viga extra de 48" por marco: no van en obra (referencia proyecto real).
   for(let i=0; i<lineasInfo.length-1; i++){
@@ -2779,9 +2790,7 @@ function bomPasarela(cfg, add, lineasInfo){
     for(let nv=1; nv<=nNiveles; nv++){
       add(PASARELA_PISO_3M, Math.ceil(cfg.pasilloM / 0.20) * Math.ceil(largoM / 3));
       // El corredor abre un extremo de cada pasillo en cada nivel
-      const extremos = escActiva ? 1 : 2;
-      add(PASARELA_POSTE_BAR, 2 * extremos);
-      add(PASARELA_BARANDAL, Math.ceil(extremos * cfg.pasilloM));
+      // El barandal ya no se cuenta aqui: va todo junto al final, medido del 3D.
     }
   }
   // Corredor transversal de 48" (cruza todas las líneas por el extremo)
@@ -2791,9 +2800,7 @@ function bomPasarela(cfg, add, lineasInfo){
       add(skuVigaCorredor(cfg), Math.max(2, Math.round(profT / 1.5) + 1));       // vigas 48 del corredor
       add(PASARELA_PISO_3M, Math.ceil(anchoCorredorM(cfg) / 0.20) * Math.ceil(profT / 3)); // piso del corredor
       // Barandal exterior SOLO en los claros entre marcos (los pasillos)
-      const clarosB = Math.max(0, lineasInfo.length - 1);
-      add(PASARELA_BARANDAL, Math.ceil(clarosB * cfg.pasilloM) + 1);   // tramos de claro + tope del fondo
-      add(PASARELA_POSTE_BAR, clarosB * 2);
+      // idem: el barandal se suma una sola vez al final.
     }
     add(PASARELA_ESCALERAS[cfg.pasarela.alturaIn] || PASARELA_ESCALERAS[96], nNiveles);
 
@@ -2812,6 +2819,7 @@ function bomPasarela(cfg, add, lineasInfo){
       }
     }
   }
+  _addBarandalPas(add);   // los metros de barandal, una sola vez
 }
 let lineasPicking = [{tipo:'sencilla', cuerpos:1, cuerposB:null, altoIn:96, fondoIn:24, largoCm:120, niveles:4, abierta:true}];
 
@@ -5505,6 +5513,26 @@ function _hayPasarela(){
   if(!id) return false;
   const el = document.getElementById(id);
   return !!(el && el.checked);
+}
+// Metros lineales de barandal de la pasarela, medidos de lo que se dibuja.
+// Se mide en vez de recalcularlo en el BOM porque el barandal se traza en 5
+// lugares distintos (puntas de pasillo, claros del corredor, remate del fondo,
+// rellano, ramal) y la cuenta del BOM se habia quedado corta: cotizaba 3 ML y 4
+// postes donde van 5 y 10. (Isaac, 23 sep 2026)
+// Cada corrida lleva 4 tubos (BAR_TUBOS), asi que el largo total de tubo entre 4
+// da los metros de barandal. El del rellano de la escalera no cuenta: la
+// escalera se compra armada con su pasamanos.
+function _barandalMLDesde3D(g){
+  if(!g || typeof THREE === 'undefined') return 0;
+  let tubo = 0;
+  g.traverse(o => {
+    if(!o.isMesh || !o.geometry || o.geometry.type !== 'BoxGeometry') return;
+    if(o.userData && (o.userData.cota || o.userData.barEsc)) return;
+    if(o.material !== matBarandalTubo) return;
+    const p = o.geometry.parameters || {};
+    tubo += Math.max(p.width || 0, p.depth || 0);
+  });
+  return tubo / BAR_TUBOS.length;
 }
 function _dimsDesde3D(g){
   if(!g || typeof THREE === 'undefined') return null;
