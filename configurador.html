@@ -661,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.23.02';
+const CFG_VERSION = '2026.09.23.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1888,9 +1888,12 @@ function dibujarPasarelaEntrepiso(cfg, pasillosInfo, xInicio, matVigaLocal){
       const prof = l.profM || 0;
       const c = zAtras + prof/2;        // centro de la linea, como lo pone buildSelectivo
       if(l.tipo === 'doble' && l.fondoM){
-        const zCaraA = c - prof/2 + l.fondoM/2;
-        const zCaraB = c + prof/2 - l.fondoM/2;
-        // La escalera sube por UNA de las dos caras; el corte ya cubre las dos.
+        // Mismos centros que arma buildSelectivo: filaA en +centroFila, filaB en
+        // -centroFila respecto al centro de la linea.
+        const centroFila = l.fondoM/2 + (cfg.unionM || 0)/2;
+        const zCaraA = c + centroFila;
+        const zCaraB = c - centroFila;
+        // La escalera sube por la cara A, y SOLO ahi se quitan las vigas.
         ejesLinea.push({ z: zCaraA, prof: l.fondoM });
         ejesFilas.push({ z: zCaraA, prof: l.fondoM });
         ejesFilas.push({ z: zCaraB, prof: l.fondoM });
@@ -2120,12 +2123,26 @@ function nivelesSinVigaPasarela(cfg, altoM, niveles, sistema, l, fila, k){
 
 // PS-2: la escalera va DENTRO del rack y se come cuerpos de una fila.
 // Devuelve el índice de la fila donde sube, o -1 si no aplica.
+// La escalera NO se mete en una fila doble: ahi las dos caras van espalda con
+// espalda y no hay por donde subir. "La fila doble deberia quedar normal"
+// (Isaac, 23 sep 2026). Se busca la sencilla mas cercana a partir del indice
+// que tocaba; si TODAS son dobles se queda donde estaba, y entonces solo pierde
+// vigas la cara A (ver _caraLlevaEscaleraPS2).
+function _sencillaCercaPS2(cfg, desde){
+  const ls = cfg.lineas || [];
+  const n = ls.length;
+  if(!n) return -1;
+  const i0 = Math.max(0, Math.min(desde, n - 1));
+  for(let i = i0; i < n; i++)  if(ls[i] && ls[i].tipo !== 'doble') return i;
+  for(let i = i0 - 1; i >= 0; i--) if(ls[i] && ls[i].tipo !== 'doble') return i;
+  return i0;
+}
 function filaEscaleraPS2(cfg){
   if(!cfg.pasarela || !cfg.pasarela.on) return -1;
   if(idModeloPasarela(cfg) !== 'PS-2') return -1;
   const n = (cfg.lineas || []).length;
   if(!n) return -1;
-  return Math.min(1, n - 1);
+  return _sencillaCercaPS2(cfg, Math.min(1, n - 1));
 }
 // El tramo de arriba sube por la fila SIGUIENTE, no por la misma
 function filaEscaleraAltaPS2(cfg){
@@ -2133,7 +2150,7 @@ function filaEscaleraAltaPS2(cfg){
   if(iBaja < 0) return -1;
   if((cfg.pasarela.niveles || 1) < 2) return -1;
   const n = (cfg.lineas || []).length;
-  return Math.min(iBaja + 1, n - 1);
+  return _sencillaCercaPS2(cfg, Math.min(iBaja + 1, n - 1));
 }
 // Cuerpos (bahías) que atraviesa la escalera de PS-2, incluida su PUNTA:
 // por ahí sube la gente, así que esos cuerpos van sin vigas de carga.
@@ -2149,6 +2166,17 @@ function _bahiasEscaleraPS2(cfg, anchoCuerpo){
   const nEscT = Math.max(8, Math.round(yNivel / 0.20));
   const runT = nEscT * 0.25;
   return Math.max(1, Math.ceil((runT + 0.001) / ancho));
+}
+// En una fila DOBLE la escalera PS-2 sube por UNA sola cara: la del frente
+// (filaA). La de atras no la toca, asi que no tiene por que perder vigas.
+// Antes el corte se aplicaba a las dos y la cara B amanecia con huecos sin que
+// nada pasara por ahi (Isaac, 23 sep 2026: "si le pongo doble crea espacios que
+// no deberia"). Vive aqui, en un solo lugar, para que el 3D y el BOM no se
+// puedan separar.
+const CARA_ESC_PS2 = 'A';
+function _caraLlevaEscaleraPS2(l, fila){
+  if(!l || l.tipo !== 'doble') return true;      // sencilla: es la unica cara
+  return (fila || 'A') === CARA_ESC_PS2;
 }
 function cuerposEscaleraPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
   const iBaja = filaEscaleraPS2(cfg), iAlta = filaEscaleraAltaPS2(cfg);
@@ -2195,7 +2223,9 @@ function cuerposEscaleraPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
 
 // Marcos donde se quita la celosía para poder circular al salir de la escalera.
 // Devuelve [{k, y0, y1}] con k = índice de marco (0..cuerpos)
-function huecosMarcoPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos){
+function huecosMarcoPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos, fila){
+  // La cara sin escalera no lleva paso: no hay por donde salir ahi.
+  if(!_caraLlevaEscaleraPS2((cfg.lineas || [])[iLn], fila)) return [];
   const ks = cuerposEscaleraPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos);
   if(!ks.length) return [];
   const yN = cfg.pasarela.alturaM;
@@ -3411,7 +3441,8 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
   const tunN = tun.length ? _tunelNiveles(l) : [];
   // Escalera PS-2: {k, niveles} por cuerpo (base 0). Solo aplica a la fila iBaja/iAlta.
   const ancho = anchoCuerpo || l.vigaM || l.largoM || 1;
-  const ksEscA = (cfg && iLn != null) ? cuerposEscaleraPS2(cfg, iLn, -l.largoM/2, ancho, cA) : [];
+  const ksEscA = (cfg && iLn != null && _caraLlevaEscaleraPS2(l, 'A'))
+    ? cuerposEscaleraPS2(cfg, iLn, -l.largoM/2, ancho, cA) : [];
   const escMapA = new Map();
   ksEscA.forEach(it => escMapA.set(it.k, it.niveles));
   // Hueco escalera manual: se combina con lo anterior
@@ -3422,9 +3453,13 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
     }
   });
   // Fila B (doble) va rotada 180°: reflejar el índice.
+  // La escalera PS-2 NO entra aqui: sube por la cara A y la B se queda completa
+  // (Isaac, 23 sep 2026). El hueco MANUAL si sigue cruzando las dos caras, que
+  // es como se ha capturado siempre.
   const escMapB = new Map();
   if(esD){
-    const ksEscB = (cfg && iLn != null) ? cuerposEscaleraPS2(cfg, iLn, -l.largoM/2, ancho, cB) : [];
+    const ksEscB = (cfg && iLn != null && _caraLlevaEscaleraPS2(l, 'B'))
+      ? cuerposEscaleraPS2(cfg, iLn, -l.largoM/2, ancho, cB) : [];
     ksEscB.forEach(it => escMapB.set(cB - 1 - it.k, it.niveles));
     _huecosManualesEsc(l).forEach(it => {
       const kB = cB - 1 - it.k;
@@ -5275,10 +5310,12 @@ function buildSelectivo(){
     const escLat = cfg.pasarela.on && cfg.pasarela.escalera !== 'no' && lineas.length > 1;
   // La escalera y el corredor van por FUERA del rack: ya no se sacrifica ningún cuerpo
   // Solo la línea frontal pierde las vigas del módulo que cruza el ramal de acceso
-  const skipDe = (nCuerpos, iLn) => {
+  // fila: 'A' o 'B'. En una doble solo la cara con escalera pierde vigas.
+  const skipDe = (nCuerpos, iLn, fila) => {
     // base: escalera/pasarela
     let base;
-    const ksEsc = cuerposEscaleraPS2(cfg, iLn, xInicio, lineas[iLn].vigaM, nCuerpos);
+    const ksEsc = _caraLlevaEscaleraPS2(lineas[iLn], fila)
+      ? cuerposEscaleraPS2(cfg, iLn, xInicio, lineas[iLn].vigaM, nCuerpos) : [];
     if(ksEsc.length) base = ksEsc;
     else if(iLn === 0) base = cuerpoRamalPasarela(cfg, xInicio, lineas[0].vigaM, nCuerpos);
     else base = -1;
@@ -5311,10 +5348,10 @@ function buildSelectivo(){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
       const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasPorCuerpoM(l, 'A', l.cuerposA), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA, 'A'), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasPorCuerpoM(l, 'A', l.cuerposA), _ladoSinPunt(l, 'A'));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn, 'B'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB, 'B'), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = cfg.unionM > 0.01 ? Math.min(l.cuerposA, l.cuerposB) + 1 : 0;
@@ -5329,7 +5366,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasPorCuerpoM(l, 'A', l.cuerpos), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos, 'A'), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasPorCuerpoM(l, 'A', l.cuerpos), _ladoSinPunt(l, 'A'));
     }
     _barrasDeLinea(gLin, cfg, l);
     _mallaDeLinea(gLin, cfg, l);
