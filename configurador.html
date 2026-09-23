@@ -675,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.23.07';
+const CFG_VERSION = '2026.09.23.08';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2267,11 +2267,13 @@ function huecosMarcoPS2(cfg, iLn, xInicio, anchoCuerpo, nCuerpos, fila){
   return out;
 }
 
-function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos){
+function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos, todas){
   if(!cfg.pasarela || !cfg.pasarela.on) return -1;
   if(!modeloPasarela(cfg).despejaModulo) return -1;
   if(cfg.pasarela.escalera === 'no') return -1;
-  if((cfg.pasarela.niveles || 1) < 2) return -1;         // solo con pasarela doble
+  // Con una sola pasarela tambien hay que salir de la escalera; el tope de
+  // "solo con pasarela doble" dejaba la salida tapada. (Isaac, 23 sep 2026)
+  if(!todas && (cfg.pasarela.niveles || 1) < 2) return -1;
   const dir = cfg.pasarela.escalera === 'izq' ? -1 : 1;
   const largoTot = anchoCuerpo * nCuerpos;
   const xBorde = dir === 1 ? xInicio + largoTot : xInicio;
@@ -2284,6 +2286,29 @@ function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos){
   const xCen = (xArranque + xAccFin)/2;
   const idx = Math.floor((xCen - xInicio) / anchoCuerpo);
   return (idx >= 0 && idx < nCuerpos) ? idx : -1;
+}
+// Nivel que hay que quitar en el cuerpo por donde se baja de la escalera (PS-1).
+// Se decide por la ALTURA contra el piso de pasarela, NUNCA por el numero de
+// nivel: "si te digo el nivel 2 o 3 y luego mueves la cantidad de niveles por el
+// diseno del cliente eso se alteraria; no es lo mismo poner 8 niveles a 11
+// niveles" (Isaac, 23 sep 2026). Por eso el ancla es el piso, que no se mueve
+// aunque el rack pase de 8 a 11 niveles.
+// El piso que cuenta es el de ARRIBA: ahi es donde te bajas del descanso. "La
+// inferior no lleva".
+function nivelSalidaEscaleraPS1(cfg, l, fila, k){
+  if(!cfg || !cfg.pasarela || !cfg.pasarela.on) return [];
+  if(idModeloPasarela(cfg) !== 'PS-1') return [];
+  if(cfg.pasarela.escalera === 'no') return [];
+  const yPiso = cfg.pasarela.alturaM * (cfg.pasarela.niveles || 1);
+  const reales = alturasDeCuerpoM(l, fila || 'A', k || 0);
+  const nv = _nivDeModulo(l, fila || 'A', k || 0);
+  const ys = reales || alturasDefaultM(l.altoM, nv);
+  if(!ys || !ys.length) return [];
+  // El PRIMERO al ras o arriba del piso: ese es el que tapa la salida.
+  for(let n = 0; n < ys.length; n++){
+    if(ys[n] >= yPiso - 0.10) return [n];
+  }
+  return [];
 }
 // ── SALIDA DE LA ESCALERA (PS-1) ──
 // REGLA DE OBRA (Isaac, 19 sep 2026): al salir de la escalera hay que cruzar las
@@ -3497,6 +3522,25 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
         escMapB.set(kB, Array.from(new Set(cur.concat(it.niveles))));
       }
     });
+  }
+  // SALIDA DE LA ESCALERA (PS-1): el cuerpo por donde se baja pierde el nivel que
+  // tapa el piso de pasarela. Va AQUI —y ya no aparte en la cotizacion— para que
+  // el 3D, las vigas y las posiciones de tarima cuenten exactamente lo mismo:
+  // antes el 3D quitaba las vigas pero las tarimas seguian contandose.
+  if(cfg && iLn != null && typeof cuerpoRamalPasarela === 'function'){
+    const x0 = -(cfg.maxLenM || 0)/2;
+    const kA = cuerpoRamalPasarela(cfg, x0, ancho, cA, true);
+    if(kA >= 0){
+      const ns = nivelSalidaEscaleraPS1(cfg, l, 'A', kA);
+      if(ns.length) escMapA.set(kA, Array.from(new Set((escMapA.get(kA) || []).concat(ns))));
+    }
+    if(esD){
+      const kB = cuerpoRamalPasarela(cfg, x0, ancho, cB, true);
+      if(kB >= 0){
+        const ns = nivelSalidaEscaleraPS1(cfg, l, 'B', kB);
+        if(ns.length) escMapB.set(kB, Array.from(new Set((escMapB.get(kB) || []).concat(ns))));
+      }
+    }
   }
   const cuentaFila = (fila, nCuerpos, escMap) => {
     const arr = l.nivMod ? _nivArrRaw(l, fila, nCuerpos) : null;
@@ -5382,8 +5426,16 @@ function buildSelectivo(){
     const ksEsc = _caraLlevaEscaleraPS2(lineas[iLn], fila)
       ? cuerposEscaleraPS2(cfg, iLn, xInicio, lineas[iLn].vigaM, nCuerpos) : [];
     if(ksEsc.length) base = ksEsc;
-    else if(iLn === 0) base = cuerpoRamalPasarela(cfg, xInicio, lineas[0].vigaM, nCuerpos);
-    else base = -1;
+    else {
+      // SALIDA DE LA ESCALERA (PS-1). Va en TODAS las filas, no solo en la
+      // primera —asi estaba escrita la regla desde el 19 sep y el codigo solo la
+      // aplicaba a iLn === 0— y quita el nivel por ALTURA contra el piso, no por
+      // banda fija: la banda de 25 cm dejaba pasar el nivel que tapa la salida.
+      const kRamal = cuerpoRamalPasarela(cfg, xInicio, lineas[iLn].vigaM, nCuerpos, true);
+      const nivSal = (kRamal >= 0)
+        ? nivelSalidaEscaleraPS1(cfg, lineas[iLn], fila || 'A', kRamal) : [];
+      base = (kRamal >= 0 && nivSal.length) ? [{k: kRamal, niveles: nivSal}] : -1;
+    }
     let arr = Array.isArray(base) ? base.slice() : (typeof base === 'number' && base >= 0 ? [base] : []);
     // TÚNELES: hueco a ras de piso (saltar niveles bajos) en los cuerpos elegidos
     const tun = lineas[iLn].tunel || [];
@@ -5903,10 +5955,10 @@ function calcularBomSelectivo(){
     const nMarcos = (esD ? (cA + 1) + (cB + 1) : (cA + 1)) - nMarcosExis;
     const marcoSku = MARCOS_SEL[l.altoIn] && MARCOS_SEL[l.altoIn][l.fondoIn];
     if(marcoSku && nMarcos > 0) add(marcoSku, nMarcos);
-    // Cuerpo de acceso de la escalera (línea frontal): va sin vigas de carga
-    // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera
-    const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.vigaM, cA) : -1;
-    const nivQuitados = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, _nivDeModulo(l, 'A', idxRamal), 'selectivo', l, 'A', idxRamal) * (esD ? 2 : 1) : 0;
+    // Cuerpo de salida de la escalera: el claro que cruza el ramal de acceso se
+    // queda sin vigas, en TODAS las filas (antes solo en la frontal). El
+    // descuento ya viene dentro de nivCarga (ver _nivCargaSel); descontarlo otra
+    // vez aqui lo contaba doble y ademas dejaba las posiciones de tarima infladas.
     // Vigas SEL-0454 (96"x4" especial pasarela) que reemplazan a la 3" del lado del pasillo,
     // en el nivel donde se apoya el piso. Solo aplica si hay pasarela activa y la viga es de 96".
     let vigasPasarelaEspecial = 0;
@@ -5924,7 +5976,7 @@ function calcularBomSelectivo(){
         vigasPasarelaEspecial = cA * pasillosAdy * nNivP;
       }
     }
-    const vigasNormales = 2 * (nivCarga - nivQuitados) - vigasPasarelaEspecial;
+    const vigasNormales = 2 * nivCarga - vigasPasarelaEspecial;
     if(vigasNormales > 0) add(l.vigaSku, vigasNormales);
     if(vigasPasarelaEspecial > 0) add(VIGA_PASARELA_LADO, vigasPasarelaEspecial);
     add(ANCLA_STD_SEL, 4 * nMarcos);
