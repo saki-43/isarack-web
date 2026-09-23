@@ -675,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.23.06';
+const CFG_VERSION = '2026.09.23.07';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2099,6 +2099,9 @@ function dibujarTramoEscaleraPS2(g, xBase, zBase, yBase, subeH, anchoEsc, matVig
 // Bandas de altura que la pasarela despeja en el módulo del ramal:
 // desde el piso de cada nivel hasta la altura de paso. Fuera de esas bandas
 // el módulo conserva sus niveles normales (abajo y arriba).
+// Hueco libre que tiene que quedar arriba de un piso de pasarela para poder
+// caminar de pie. Mismo valor que el paso que se abre en los marcos.
+const ALTO_PASO_PASARELA = 2.10;
 function bandasPasarela(cfg){
   const nNiveles = cfg.pasarela.niveles || 1;
   const yN = cfg.pasarela.alturaM;
@@ -2107,9 +2110,13 @@ function bandasPasarela(cfg){
   if(idModeloPasarela(cfg) === 'PS-2') return [];
   for(let nv=1; nv<=nNiveles; nv++){
     const y0 = yN*nv - 0.15;
-    // Entre pasarelas se despeja todo el paso; encima de la última solo el nivel
-    // que choca con el piso, para que arriba queden los niveles normales.
-    const y1 = nv < nNiveles ? yN*(nv+1) - 0.20 : yN*nv + 0.25;
+    // Entre pasarelas se despeja todo el paso. Encima de la ULTIMA se despeja la
+    // altura de una persona de pie: antes solo se quitaban 25 cm —"nada mas el
+    // nivel que choca con el piso"— y con un rack de 7.32 m a 3 niveles el de
+    // 5.49 quedaba a 61 cm del piso de 4.88, cruzando por donde se camina.
+    // "Simula que eres una persona, como vas a subir si tienes vigas ahi
+    // metidas" (Isaac, 23 sep 2026). Es la misma medida del paso en los marcos.
+    const y1 = nv < nNiveles ? yN*(nv+1) - 0.20 : yN*nv + ALTO_PASO_PASARELA;
     b.push([y0, y1]);
   }
   return b;
@@ -4933,6 +4940,20 @@ function crearTextoSprite(texto, color, contorno){
   return sprite;
 }
 
+// Etiqueta "F2-M3" al pie de cada modulo, para poder senalar sin ambiguedad de
+// que fila y que cuerpo se habla. Antes habia que contar niveles o cambiar a la
+// vista en planta para saber cual era cual. (Isaac, 23 sep 2026)
+// Van marcadas como cota: no cuentan para medir el rack contra la bodega, y la
+// vista en planta las esconde igual que las demas etiquetas.
+function etiquetaFilaModulo(parent, x, y, z, fila, modulo){
+  const sp = crearTextoSprite('F' + fila + '-M' + modulo, '#B44E23', '#ffffff');
+  sp.position.set(x, y, z);
+  sp.scale.set(0.74, 0.24, 1);
+  sp.renderOrder = 999;
+  sp.userData.cota = true;
+  sp.userData.etiquetaFM = true;
+  parent.add(sp);
+}
 function crearLineaCota(start, end, color){
   const mat = new THREE.LineBasicMaterial({color: color, depthTest: false});
   const geo = new THREE.BufferGeometry().setFromPoints([
@@ -5414,6 +5435,12 @@ function buildSelectivo(){
     }
     _barrasDeLinea(gLin, cfg, l);
     _mallaDeLinea(gLin, cfg, l);
+    // Etiqueta F#-M# al pie de cada modulo, al frente de la fila.
+    { const nMod = Math.max(l.cuerposA, l.cuerposB || 0) || l.cuerpos;
+      for(let k = 0; k < nMod; k++){
+        etiquetaFilaModulo(gLin, -l.largoM/2 + (k + 0.5)*l.vigaM, 0.30,
+                           l.profM/2 + 0.12, iLn + 1, k + 1);
+      } }
     // El rack se construye centrado en 0 → desplazar para que su borde izq. quede en xInicio
     gLin.position.x = xInicio + l.largoM/2;
     gLin.position.z = zAtras + l.profM/2;
