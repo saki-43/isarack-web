@@ -661,7 +661,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.22.13';
+const CFG_VERSION = '2026.09.23.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1023,8 +1023,12 @@ const MARCO_BOM = {
   '360': {posteSize:'360', postePartes:1, diagonalD:14, diagonalH:3, pie:2}
 };
 let tcCache = 17.32;
-let monedaSel = 'MXN';     // moneda mostrada en panel
-let requiereInstalacion = false;   // 5% del subtotal, mín $80 USD
+// Arranca en USD: es como ISARACK cotiza y evita que el vendedor tenga que
+// cambiarlo cada vez que abre. (Isaac, 23 sep 2026)
+let monedaSel = 'USD';     // moneda mostrada en panel
+// Arranca palomeada: casi todo lo que se vende se instala, y antes se olvidaba
+// y el precio salia corto. Se puede quitar. (Isaac, 23 sep 2026)
+let requiereInstalacion = true;    // 5% del subtotal, mín $80 USD
 let requiereEnvio = true;          // flete/envío
 const IVA_FIJO = 8;        // BC frontera, no editable
 
@@ -3362,6 +3366,22 @@ function _nivTotBom(l, cA, cB, esD){
 // Posiciones (cuerpo × nivel) que SÍ llevan carga (viga/rejilla/panel), descontando los
 // huecos del túnel + escalera PS-2 CUERPO POR CUERPO. Respeta niveles por módulo: si un
 // cuerpo tiene menos niveles que los que abre el hueco, solo se quitan los que existen.
+// Cuantas tarimas entran por claro segun el largo de la viga. Es la cuenta de
+// obra, no un calculo de holguras. (Isaac, 23 sep 2026)
+function _tarimasPorClaro(vigaIn){
+  return (Number(vigaIn) >= 144) ? 3 : 2;
+}
+// Posiciones de tarima de TODO el arreglo. Se apoya en _nivCargaSel, asi que ya
+// respeta niveles por modulo y los huecos viejos de tunel/escalera: cuenta solo
+// los claros que de verdad llevan viga.
+function _posicionesTarima(cfg){
+  if(!cfg || !Array.isArray(cfg.lineas)) return 0;
+  return cfg.lineas.reduce((tot, l, iLn) => {
+    const esD = l.tipo === 'doble';
+    const cA = l.cuerposA, cB = esD ? l.cuerposB : 0;
+    return tot + _nivCargaSel(l, cA, cB, esD, cfg, iLn) * _tarimasPorClaro(l.vigaIn);
+  }, 0);
+}
 function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
   const tun  = (l.tunelOn && Array.isArray(l.tunel) && l.tunel.length) ? l.tunel : [];
   const tunN = tun.length ? _tunelNiveles(l) : [];
@@ -5327,9 +5347,13 @@ function buildSelectivo(){
   const filaTxt = lineas.length===1
     ? (lineas[0].tipo==='doble' ? '2 filas (doble)' : '1 fila (sencilla)')
     : (nSen? nSen+' sencilla'+(nSen>1?'s':'') : '') + (nSen&&nDob?' + ':'') + (nDob? nDob+' doble'+(nDob>1?'s':'') : '');
+  // Posiciones de tarima: va solo en Selectivo, que es donde se almacena en
+  // tarima. Es lo primero que pregunta el cliente. (Isaac, 23 sep 2026)
+  const posTarima = _posicionesTarima(cfg);
   document.getElementById('dims').innerHTML =
     filaTxt+' · Largo <b>'+totalLen.toFixed(2)+' m</b> · Alto <b>'+cfg.maxAltoM.toFixed(2)+' m</b> · '+
-    cfg.cuerposTot+' cuerpo'+(cfg.cuerposTot>1?'s':'');
+    cfg.cuerposTot+' cuerpo'+(cfg.cuerposTot>1?'s':'')+
+    (posTarima>0 ? ' · <b style="color:#da6635">'+posTarima+'</b> posiciones tarima' : '');
   // Resumen: desglose por línea cuando hay varias
   const lineasHtml = lineas.length > 1
     ? lineas.map((l,i)=>{
