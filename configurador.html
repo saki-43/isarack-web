@@ -117,6 +117,14 @@
 .pz-stp button{width:22px;height:24px;padding:0;background:#fff;color:#6a6f75;font-size:13px;font-weight:700;border-radius:0;line-height:1}
 /* Botones chicos en linea: el button{width:100%} de arriba los apilaba a lo ancho */
 .btn-chip{width:auto!important;padding:2px 9px!important;font-size:10px!important;border-radius:5px!important;line-height:1.5}
+/* La caja de pasarela usaba el select global (12.5px) mientras el detalle de la
+   fila va en 10px, y se veia de otro tamaño. Misma medida para los dos, y en un
+   solo lugar para que no se vuelvan a desfasar. (Isaac, 23 sep 2026) */
+.pasCaja{font-size:10px}
+.pasCaja .pasLbl{color:#666;margin-bottom:1px;font-size:10px}
+.pasCaja select{font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis}
+.pasCaja .chk{font-size:10px}
+.pasCaja .pasTip{font-size:9px;color:#888;margin-top:4px}
 .pz-stp button:hover{background:#f4f6f7;color:#D85A30}
 .pz-stp b{font-size:12.5px;min-width:28px;text-align:center;font-variant-numeric:tabular-nums;border-left:1px solid #ebedef;border-right:1px solid #ebedef;height:24px;display:grid;place-items:center}
 .pz-stp.on{border-color:#D85A30}
@@ -318,36 +326,39 @@ gtag('config', 'G-XXXXXXXXXX');
       <input type="number" id="picPasillo" value="2.0" min="0.8" max="10" step="0.1" style="width:100%">
     </div>
     <div id="picPasarelaBox" style="display:none">
-      <label class="chk"><input type="checkbox" id="picChkPasarela"> Pasarela (2° piso sobre pasillos)</label>
-      <div class="row" id="picPasarelaOpts" style="display:none;background:#f7f4ef;border:1px solid #e3ddd2;border-radius:6px;padding:6px;margin-top:2px">
-        <div style="display:grid;grid-template-columns:1fr;gap:6px;font-size:10.5px">
-          <div><div style="color:#666;margin-bottom:1px">Modelo de pasarela</div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <label class="chk" style="flex:1;min-width:0"><input type="checkbox" id="picChkPasarela"> Pasarela (2° piso sobre pasillos)</label>
+        <button type="button" class="btn-chip" id="picPasarelaFold" onclick="_foldPasarela('pic')" title="Ocultar" style="display:none;border:1px solid #ddd;background:#fff;color:#999;cursor:pointer">▾</button>
+      </div>
+      <div class="row pasCaja" id="picPasarelaOpts" style="display:none;background:#f7f4ef;border:1px solid #e3ddd2;border-radius:6px;padding:6px;margin-top:2px">
+        <div style="display:grid;grid-template-columns:1fr;gap:6px">
+          <div><div class="pasLbl">Modelo de pasarela</div>
             <select id="picPasarelaModelo" style="width:100%">
               <option value="PS-1" selected>PS-1 · Escaleras exteriores</option>
               <option value="PS-2">PS-2 · Escaleras internas</option>
             </select>
           </div>
-          <div><div style="color:#666;margin-bottom:1px">Altura</div>
+          <div><div class="pasLbl">Altura</div>
             <select id="picPasarelaAltura" style="width:100%">
               <option value="96" selected>8' (2.44 m)</option>
             </select>
           </div>
-          <div><div style="color:#666;margin-bottom:1px">Escalera</div>
+          <div><div class="pasLbl">Escalera</div>
             <select id="picPasarelaEscalera" style="width:100%">
               <option value="der" selected>Costado derecho</option>
               <option value="izq">Costado izquierdo</option>
               <option value="no">Sin escalera</option>
             </select>
           </div>
-          <div><div style="color:#666;margin-bottom:1px">Viga cruce de pasillos (el corredor siempre lleva 48")</div>
+          <div><div class="pasLbl">Viga cruce de pasillos (el corredor siempre lleva 48")</div>
             <select id="picPasarelaViga" style="width:100%">
               <option value="100" selected>1 m (estándar)</option>
               <option value="122">48" (1.22 m) — pasillo a lo largo</option>
             </select>
           </div>
-          <label class="chk" style="margin:2px 0 0;font-size:10.5px"><input type="checkbox" id="picPasarelaNivel2"> 2° nivel de pasarela (3er piso)</label>
+          <label class="chk" style="margin:2px 0 0"><input type="checkbox" id="picPasarelaNivel2"> 2° nivel de pasarela (3er piso)</label>
         </div>
-        <div style="font-size:9.5px;color:#888;margin-top:4px">Sugerencia: con pasarela usa pasillo de 0.90–1.0 m</div>
+        <div class="pasTip">Sugerencia: con pasarela usa pasillo de 0.90–1.0 m</div>
       </div>
     </div>
     <div style="display:none">
@@ -400,36 +411,39 @@ gtag('config', 'G-XXXXXXXXXX');
       <input type="number" id="selPasillo" value="3.5" min="1" max="10" step="0.1" style="width:100%">
     </div>
     <div id="selPasarelaBox" style="display:none">
-      <label class="chk"><input type="checkbox" id="selChkPasarela"> Pasarela (2° piso sobre pasillos)</label>
-      <div class="row" id="selPasarelaOpts" style="display:none;background:#f7f4ef;border:1px solid #e3ddd2;border-radius:6px;padding:6px;margin-top:2px">
-        <div style="display:grid;grid-template-columns:1fr;gap:6px;font-size:10.5px">
-          <div><div style="color:#666;margin-bottom:1px">Modelo de pasarela</div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <label class="chk" style="flex:1;min-width:0"><input type="checkbox" id="selChkPasarela"> Pasarela (2° piso sobre pasillos)</label>
+        <button type="button" class="btn-chip" id="selPasarelaFold" onclick="_foldPasarela('sel')" title="Ocultar" style="display:none;border:1px solid #ddd;background:#fff;color:#999;cursor:pointer">▾</button>
+      </div>
+      <div class="row pasCaja" id="selPasarelaOpts" style="display:none;background:#f7f4ef;border:1px solid #e3ddd2;border-radius:6px;padding:6px;margin-top:2px">
+        <div style="display:grid;grid-template-columns:1fr;gap:6px">
+          <div><div class="pasLbl">Modelo de pasarela</div>
             <select id="selPasarelaModelo" style="width:100%">
               <option value="PS-1" selected>PS-1 · Escaleras exteriores</option>
               <option value="PS-2">PS-2 · Escaleras internas</option>
             </select>
           </div>
-          <div><div style="color:#666;margin-bottom:1px">Altura</div>
+          <div><div class="pasLbl">Altura</div>
             <select id="selPasarelaAltura" style="width:100%">
               <option value="96" selected>8' (2.44 m)</option>
             </select>
           </div>
-          <div><div style="color:#666;margin-bottom:1px">Escalera</div>
+          <div><div class="pasLbl">Escalera</div>
             <select id="selPasarelaEscalera" style="width:100%">
               <option value="der" selected>Costado derecho</option>
               <option value="izq">Costado izquierdo</option>
               <option value="no">Sin escalera</option>
             </select>
           </div>
-          <div><div style="color:#666;margin-bottom:1px">Viga cruce de pasillos (el corredor siempre lleva 48")</div>
+          <div><div class="pasLbl">Viga cruce de pasillos (el corredor siempre lleva 48")</div>
             <select id="selPasarelaViga" style="width:100%">
               <option value="100" selected>1 m (estándar)</option>
               <option value="122">48" (1.22 m) — pasillo a lo largo</option>
             </select>
           </div>
-          <label class="chk" style="margin:2px 0 0;font-size:10.5px"><input type="checkbox" id="selPasarelaNivel2"> 2° nivel de pasarela (3er piso)</label>
+          <label class="chk" style="margin:2px 0 0"><input type="checkbox" id="selPasarelaNivel2"> 2° nivel de pasarela (3er piso)</label>
         </div>
-        <div style="font-size:9.5px;color:#888;margin-top:4px">Sugerencia: con pasarela usa pasillo de 0.90–1.0 m</div>
+        <div class="pasTip">Sugerencia: con pasarela usa pasillo de 0.90–1.0 m</div>
       </div>
     </div>
     <select id="selTipoFila" style="display:none">
@@ -661,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.23.04';
+const CFG_VERSION = '2026.09.23.05';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2813,7 +2827,7 @@ function lineasSyncPic(){
   if(lineasPicking.length <= 1){
     const chkPas = document.getElementById('picChkPasarela');
     if(chkPas) chkPas.checked = false;
-    document.getElementById('picPasarelaOpts').style.display = 'none';
+    _pintarPasarela('pic');
   }
   const chkClaros = document.getElementById('picAlturaManual');
   const lblClaros = chkClaros ? chkClaros.closest('label') : null;
@@ -3163,7 +3177,7 @@ function lineasSync(){
   if(lineasAlmacen.length <= 1){
     const chkPasS = document.getElementById('selChkPasarela');
     if(chkPasS) chkPasS.checked = false;
-    document.getElementById('selPasarelaOpts').style.display = 'none';
+    _pintarPasarela('sel');
   }
   // Pasarela solo se fabrica con viga 96" (SEL-0454 96"x4" no existe en otros largos).
   // Si alguna fila tiene 108"/144", bloqueamos el checkbox y desactivamos si estaba on.
@@ -3176,7 +3190,7 @@ function lineasSync(){
       });
       const lblPas = chkPasS.closest('label');
       if(vigasNoSonDe96){
-        if(chkPasS.checked){ chkPasS.checked = false; document.getElementById('selPasarelaOpts').style.display = 'none'; }
+        if(chkPasS.checked){ chkPasS.checked = false; _pintarPasarela('sel'); }
         chkPasS.disabled = true;
         if(lblPas){ lblPas.style.opacity = '0.5'; lblPas.title = 'Las pasarelas solo se fabrican con viga de 96". Cambia las vigas de 108"/144" para poder activarla.'; }
       } else {
@@ -3612,6 +3626,26 @@ function lnFold(i, k){
 }
 // Renglon de encabezado: la casilla a la izquierda y la flecha de plegar a la
 // derecha. La flecha solo sale si hay algo que mostrar.
+// La caja de pasarela se pliega igual que las secciones de la fila: trae 5
+// opciones y empujaba todo el panel hacia abajo. (Isaac, 23 sep 2026)
+const _pasPlegada = {sel:false, pic:false};
+function _pintarPasarela(pfx){
+  const chk  = document.getElementById(pfx+'ChkPasarela');
+  const opts = document.getElementById(pfx+'PasarelaOpts');
+  const btn  = document.getElementById(pfx+'PasarelaFold');
+  if(!chk || !opts) return;
+  const prendida = !!chk.checked;
+  opts.style.display = (prendida && !_pasPlegada[pfx]) ? '' : 'none';
+  if(btn){
+    btn.style.display = prendida ? '' : 'none';   // sin pasarela no hay que plegar
+    btn.textContent = _pasPlegada[pfx] ? '▸' : '▾';
+    btn.title = _pasPlegada[pfx] ? 'Mostrar' : 'Ocultar';
+  }
+}
+function _foldPasarela(pfx){
+  _pasPlegada[pfx] = !_pasPlegada[pfx];
+  _pintarPasarela(pfx);
+}
 function _secHead(l, i, k, labelHtml, hayDetalle){
   const fl = _plegado(l, k);
   return '<div style="display:flex;align-items:center;gap:4px">'
@@ -7480,8 +7514,7 @@ function addEvents(){
   const _gPas = document.getElementById('gonPasillo');
   if(_gPas){ _gPas.addEventListener('change', build); _gPas.addEventListener('input', build); }
   document.getElementById('selChkPasarela').addEventListener('change', ()=>{
-    document.getElementById('selPasarelaOpts').style.display =
-      document.getElementById('selChkPasarela').checked ? '' : 'none';
+    _pintarPasarela('sel');
     build();
   });
   document.getElementById('selPasarelaModelo').addEventListener('change', build);
@@ -7494,8 +7527,7 @@ function addEvents(){
   });
   document.getElementById('picPasillo').addEventListener('change', build);
   document.getElementById('picChkPasarela').addEventListener('change', ()=>{
-    document.getElementById('picPasarelaOpts').style.display =
-      document.getElementById('picChkPasarela').checked ? '' : 'none';
+    _pintarPasarela('pic');
     build();
   });
   document.getElementById('picPasarelaModelo').addEventListener('change', build);
@@ -7677,6 +7709,9 @@ function aplicarEstado(st){
     const chk = document.getElementById('bodChk'); if(chk) chk.checked = bodegaOn;
     const box = document.getElementById('bodBox'); if(box) box.style.display = bodegaOn ? '' : 'none';
   }
+  // Un link que venga con pasarela prendida tiene que abrir con sus opciones a
+  // la vista: aqui solo se repuso la palomita. (Isaac, 23 sep 2026)
+  try{ _pintarPasarela('sel'); _pintarPasarela('pic'); }catch(e){}
 }
 function codificarEstado(st){
   return btoa(unescape(encodeURIComponent(JSON.stringify(st)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
