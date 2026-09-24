@@ -675,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.02';
+const CFG_VERSION = '2026.09.24.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2748,15 +2748,11 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
           tubo.position.set(xBarFrenteCen, yNivel + dy, zEsc + anchoEsc/2);
           grupo.add(tubo);
         }
-        // La lateral del lado libre llega hasta el frente y cierra esquina con él.
-        // La del lado de la escalera se queda corta, porque ahí sube el carril.
-        const zFinA = zEsc + anchoEsc/2;
-        const latA = box(0.03, 0.03, Math.abs(zFinA - zLatA), matBarandalTubo);
-        latA.position.set(xMarcoA, yNivel + dy, (zLatA + zFinA)/2);
-        grupo.add(latA);
-        const latB = box(0.03, 0.03, largoLat, matBarandalTubo);
-        latB.position.set(xMarcoB, yNivel + dy, (zLatA + zLatB)/2);
-        grupo.add(latB);
+        // SIN laterales: corrian sobre las dos lineas de marco de ese modulo,
+        // por dentro del rack. "Los marcos de ese modulo tienen barandales y no
+        // deberia" (Isaac, 24 sep 2026, F5-M2). Es la misma regla de siempre:
+        // entre marcos no va barandal, el marco mismo hace de guarda. Queda solo
+        // el del frente, que da al vacio.
       });
       // Poste de esquina donde cierran la lateral y el frente
       {
@@ -2764,14 +2760,7 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
         poste.position.set(xMarcoA, yNivel + BAR_ALTO_POSTE/2, zEsc + anchoEsc/2);
         grupo.add(poste);
       }
-      // Postes: únicamente sobre las líneas laterales
-      [xMarcoA, xMarcoB].forEach(xL => {
-        [zLatB - 0.05, (zLatA + zLatB)/2, zLatA + 0.05].forEach(zP => {
-          const poste = box(0.04, BAR_ALTO_POSTE, 0.04, matMarcoSel);
-          poste.position.set(xL, yNivel + BAR_ALTO_POSTE/2, zP);
-          grupo.add(poste);
-        });
-      });
+      // Sin postes sobre las lineas de marco: iban con las laterales que se quitaron.
     }
   }
 }
