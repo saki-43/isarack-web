@@ -676,7 +676,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.09';
+const CFG_VERSION = '2026.09.24.10';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -5159,20 +5159,10 @@ function crearTextoSprite(texto, color, contorno){
   return sprite;
 }
 
-// Etiqueta "F2-M3" al pie de cada modulo, para poder senalar sin ambiguedad de
-// que fila y que cuerpo se habla. Antes habia que contar niveles o cambiar a la
-// vista en planta para saber cual era cual. (Isaac, 23 sep 2026)
-// Van marcadas como cota: no cuentan para medir el rack contra la bodega, y la
-// vista en planta las esconde igual que las demas etiquetas.
-function etiquetaFilaModulo(parent, x, y, z, fila, modulo){
-  const sp = crearTextoSprite('F' + fila + '-M' + modulo, '#B44E23', '#ffffff');
-  sp.position.set(x, y, z);
-  sp.scale.set(0.74, 0.24, 1);
-  sp.renderOrder = 999;
-  sp.userData.cota = true;
-  sp.userData.etiquetaFM = true;
-  parent.add(sp);
-}
+// Aqui vivia etiquetaFilaModulo(), que rotulaba cada cuerpo con "F2-M3". Se puso
+// el 23 sep 2026 para poder senalar filas y modulos sin ambiguedad mientras se
+// revisaban la pasarela y el tope tarima, y se quito el 24 sep una vez cerrado
+// ese trabajo: el dibujo del cliente se ve mas limpio sin los rotulos.
 function crearLineaCota(start, end, color){
   const mat = new THREE.LineBasicMaterial({color: color, depthTest: false});
   const geo = new THREE.BufferGeometry().setFromPoints([
@@ -5664,12 +5654,6 @@ function buildSelectivo(){
     _barrasDeLinea(gLin, cfg, l);
     _mallaDeLinea(gLin, cfg, l);
     _topeDeLinea(gLin, cfg, l);
-    // Etiqueta F#-M# al pie de cada modulo, al frente de la fila.
-    { const nMod = Math.max(l.cuerposA, l.cuerposB || 0) || l.cuerpos;
-      for(let k = 0; k < nMod; k++){
-        etiquetaFilaModulo(gLin, -l.largoM/2 + (k + 0.5)*l.vigaM, 0.30,
-                           l.profM/2 + 0.12, iLn + 1, k + 1);
-      } }
     // El rack se construye centrado en 0 → desplazar para que su borde izq. quede en xInicio
     gLin.position.x = xInicio + l.largoM/2;
     gLin.position.z = zAtras + l.profM/2;
