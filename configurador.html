@@ -676,7 +676,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.10';
+const CFG_VERSION = '2026.09.24.11';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3082,7 +3082,8 @@ function lpNivMod(i, on){
 }
 function lpNivSet(i, fila, c, val){
   const l = lineasPicking[i];
-  const v = Math.max(1, Math.min(12, parseInt(val) || 1));
+  const _n = parseInt(val);
+  const v = Math.max(0, Math.min(12, Number.isFinite(_n) ? _n : 1));   // 0 recorta el modulo
   const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
   if(!Array.isArray(l[key])) l[key] = [];
   l[key][c] = v;
@@ -3542,10 +3543,17 @@ function lnMoveGon(i, delta){
 
 // ── Niveles por módulo (opcional): cada cuerpo de una fila puede tener niveles distintos ──
 // Arreglo por cuerpo de una fila (A o B), con el valor de la fila como default de cada módulo.
+// El 0 es un valor VALIDO: un modulo en 0 niveles se queda sin vigas y sirve
+// para recortar la fila. "Ocupo que llegue a cero los niveles, esa para cortar
+// filas" (Isaac, 24 sep 2026). Por eso no se puede usar el truco de
+// "parseInt(x) || default": con 0 se caia al default y el modulo reaparecia.
 function _nivArrRaw(l, fila, n){
   const src = (fila === 'B') ? (l.nivelesB || []) : (l.nivelesA || []);
   const a = [];
-  for(let c = 0; c < n; c++) a.push(parseInt(src[c]) || l.niveles || 3);
+  for(let c = 0; c < n; c++){
+    const v = parseInt(src[c]);
+    a.push(Number.isFinite(v) ? Math.max(0, v) : (l.niveles || 3));
+  }
   return a;
 }
 // Devuelve escalar (modo parejo) o arreglo por cuerpo (modo por módulo) para el build.
@@ -3872,7 +3880,7 @@ function _nivModEditor(l, i, esD, cA, cB, setFn){
     h += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
     for(let c = 0; c < n; c++){
       h += '<div style="text-align:center"><div style="font-size:8.5px;color:#999;margin-bottom:1px">M'+(c+1)+'</div>'
-        + '<input type="number" min="1" max="12" value="'+arr[c]+'" onchange="'+setFn+'('+i+',\''+f+'\','+c+',this.value)" style="width:36px;padding:3px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:5px;text-align:center;background:#fff"></div>';
+        + '<input type="number" min="0" max="12" value="'+arr[c]+'" onchange="'+setFn+'('+i+',\''+f+'\','+c+',this.value)" style="width:36px;padding:3px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:5px;text-align:center;background:#fff"></div>';
     }
     h += '</div>';
     return h;
@@ -3894,7 +3902,8 @@ function lnNivMod(i, on){
 }
 function lnNivSet(i, fila, c, val){
   const l = lineasAlmacen[i];
-  const v = Math.max(1, Math.min(12, parseInt(val) || 1));
+  const _n = parseInt(val);
+  const v = Math.max(0, Math.min(12, Number.isFinite(_n) ? _n : 1));   // 0 recorta el modulo
   const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
   if(!Array.isArray(l[key])) l[key] = [];
   l[key][c] = v;
@@ -4767,7 +4776,13 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
   for(let c=0; c<cuerpos; c++){
     const xL = x0 + c * vigaM, xR = xL + vigaM;
     const cxV = (xL + xR) / 2;
-    const nivC = _nivArr ? (parseInt(niveles[c])||parseInt(niveles[0])||1) : niveles;
+    // Ojo con el 0: es un modulo recortado a proposito y hay que respetarlo.
+    // Con "parseInt(x)||y" el 0 se caia al valor de al lado y el modulo volvia a
+    // salir con todas sus vigas. (Isaac, 24 sep 2026)
+    const _nc = _nivArr ? parseInt(niveles[c]) : NaN;
+    const nivC = _nivArr ? (Number.isFinite(_nc) ? Math.max(0, _nc)
+                                                : (parseInt(niveles[0]) || 1))
+                         : niveles;
     const _escC = alturasManSel && alturasManSel[c];
     const alturasC = (_escC && _escC.length >= nivC) ? _escC : alturasDefaultM(altoM, nivC);
     for(let n=0; n<nivC; n++){
@@ -4997,7 +5012,9 @@ function _clarosModKey(fila){ return fila === 'B' ? 'clarosModB' : 'clarosModA';
 function _nivDeModulo(l, fila, c){
   if(!l.nivMod) return parseInt(l.niveles) || 1;
   const src = (fila === 'B') ? (l.nivelesB || []) : (l.nivelesA || []);
-  return Math.max(1, parseInt(src[c]) || parseInt(l.niveles) || 3);
+  const v = parseInt(src[c]);
+  if(Number.isFinite(v)) return Math.max(0, v);      // 0 = modulo recortado
+  return Math.max(1, parseInt(l.niveles) || 3);
 }
 // Deja buenos los claros de UN modulo. Lo que falte se toma de la escalera de la
 // fila —asi al prender "niveles por modulo" no brinca ninguna viga— y si esa
