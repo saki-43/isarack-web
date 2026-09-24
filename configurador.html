@@ -701,7 +701,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.16';
+const CFG_VERSION = '2026.09.24.17';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -5984,12 +5984,12 @@ function buildSelectivo(){
     filaTxt+' · Largo <b>'+totalLen.toFixed(2)+' m</b> · Alto <b>'+cfg.maxAltoM.toFixed(2)+' m</b> · '+
     cfg.cuerposTot+' cuerpo'+(cfg.cuerposTot>1?'s':'')+
     (posTarima>0 ? ' · <b style="color:#da6635">'+posTarima+'</b> posiciones tarima' : '');
-  // Resumen: desglose por línea cuando hay varias
+  // Con varias filas ya no se lista fila por fila: era una parrafada que nadie
+  // ocupa y empujaba la lista de materiales hacia abajo (Isaac, 24 sep 2026).
+  // Con UNA sola fila si se deja, porque ahi es donde se lee la viga y la
+  // capacidad por nivel.
   const lineasHtml = lineas.length > 1
-    ? lineas.map((l,i)=>{
-        const cposTxt = l.tipo==='doble' && l.cuerposA!==l.cuerposB ? l.cuerposA+'+'+l.cuerposB : l.cuerpos;
-        return '<span style="color:#666">'+(i+1)+'·</span> '+(l.tipo==='doble'?'Doble':'Sencilla')+' · '+cposTxt+' cpos · '+l.altoIn+'"×'+l.fondoIn+'" · viga '+l.vigaIn+'" · '+l.niveles+' niv';
-      }).join('<br>')
+    ? ''
     : 'Viga <b>'+lineas[0].vigaIn+'" × '+lineas[0].vigaAltIn+'"</b> · '+lineas[0].niveles+' niveles · '+(lineas[0].tipo==='doble' && lineas[0].cuerposA!==lineas[0].cuerposB ? lineas[0].cuerposA+'+'+lineas[0].cuerposB : cfg.cuerposTot)+' cuerpo'+(cfg.cuerposTot>1?'s':'')+'<br>'+
       'Capacidad <b style="color:#da6635">'+lineas[0].capKg.toLocaleString()+' kg</b> / <b style="color:#da6635">'+lineas[0].capLb.toLocaleString()+' lb</b> por nivel';
   document.getElementById('medidasResumen').innerHTML =
