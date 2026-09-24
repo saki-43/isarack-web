@@ -675,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.01';
+const CFG_VERSION = '2026.09.24.05';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2271,9 +2271,12 @@ function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos, todas){
   if(!cfg.pasarela || !cfg.pasarela.on) return -1;
   if(!modeloPasarela(cfg).despejaModulo) return -1;
   if(cfg.pasarela.escalera === 'no') return -1;
-  // Con una sola pasarela tambien hay que salir de la escalera; el tope de
-  // "solo con pasarela doble" dejaba la salida tapada. (Isaac, 23 sep 2026)
-  if(!todas && (cfg.pasarela.niveles || 1) < 2) return -1;
+  // Solo con pasarela DOBLE. El ramal que cruza la fila se dibuja dentro de
+  // "if(nNiveles >= 2)": con un solo nivel no pasa nada por ese modulo, asi que
+  // no hay por que quitarle vigas. "Solo vas a colocar las vigas completas en ese
+  // modulo" (Isaac, 24 sep 2026). El parametro todas quedo sin uso a proposito:
+  // este tope no se brinca.
+  if((cfg.pasarela.niveles || 1) < 2) return -1;
   const dir = cfg.pasarela.escalera === 'izq' ? -1 : 1;
   const largoTot = anchoCuerpo * nCuerpos;
   const xBorde = dir === 1 ? xInicio + largoTot : xInicio;
@@ -2295,11 +2298,14 @@ function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos, todas){
 // aunque el rack pase de 8 a 11 niveles.
 // El piso que cuenta es el de ARRIBA: ahi es donde te bajas del descanso. "La
 // inferior no lleva".
-// QUE se despeja: el TRAMO que subes, no lo que queda encima del piso. "Si la
+// QUE se despeja: de 8' a 16', contado desde el PRIMER piso de pasarela. "Si la
 // escalera del 2do nivel es la que estorban las vigas deberia de ser de 8 a 16'
 // las que debes quitar, eso sin quitar las vigas especiales" (Isaac, 23 sep
-// 2026). O sea la ventana va de piso a piso: con pasarela de 8' el tramo de
-// arriba corre de 8' a 16' y son esas vigas las que le estorban a la escalera.
+// 2026). Es la altura libre de quien camina sobre el piso de 8'.
+// El arranque es el PRIMER piso, no el de arriba: con un solo nivel de pasarela
+// la ventana medida desde arriba caia debajo del piso y quitaba las vigas de
+// abajo, que no le estorban a nadie. "En F4-M3, cuando quito la escalera quita
+// las vigas de abajo, eso no debe de quitarse" (Isaac, 24 sep 2026).
 // La medida la manda la escalera (cfg.pasarela.alturaM), nunca el numero de
 // nivel. Los niveles que caen JUSTO a la altura de un piso no se tocan: ahi van
 // las vigas especiales SEL-0454 que sostienen el piso de la pasarela.
@@ -2318,8 +2324,8 @@ function nivelSalidaEscaleraPS1(cfg, l, fila, k){
   if(idModeloPasarela(cfg) !== 'PS-1') return [];
   if(cfg.pasarela.escalera === 'no') return [];
   const paso  = cfg.pasarela.alturaM || 0;
-  const yAlto = paso * (cfg.pasarela.niveles || 1);   // piso donde te bajas (16')
-  const yBajo = yAlto - paso;                          // donde arranca el tramo (8')
+  const yBajo = paso;          // PRIMER piso de pasarela (8'), lleve 1 nivel o 2
+  const yAlto = yBajo + paso;  // un tramo completo arriba (16')
   const reales = alturasDeCuerpoM(l, fila || 'A', k || 0);
   const nv = _nivDeModulo(l, fila || 'A', k || 0);
   const ys = reales || alturasDefaultM(l.altoM, nv);
@@ -2451,11 +2457,25 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
       grupo.add(piso);
       // Piso apoyado directo en las vigas de carga de los racks (naranjas), sin vigas extra
       // de 48" cruzando el pasillo. Referencia: proyecto real del cliente (imagen SketchUp).
-      // SIN barandal en los extremos del pasillo: "entre pasillos y entre esos
-      // marcos no lleva barandal" / "quita esos barandales entre marcos" (Isaac,
-      // 23-24 sep 2026). Los postes caian justo entre los marcos de dos filas y
-      // ahi no va nada; el barandal que si se cobra es el del corredor y el del
-      // frente del descanso.
+      // Barandal en el extremo del pasillo, cruzando de un rack al otro: ese es
+      // el "de rack 1 al 2" y es el que cierra la punta del andador. Va en el
+      // extremo que NO conecta con el corredor. (Se quito por error el 24 sep al
+      // confundirlo con las laterales del ramal, que son las que iban montadas
+      // sobre los marcos; "quitaste los barandales del fondo" — Isaac.)
+      const xLadoCorredor = dir === 1 ? xInicio + largoPiso : xInicio;
+      [xInicio, xInicio + largoPiso].forEach(xExtremo => {
+        if(escActiva && acc && xExtremo === xLadoCorredor) return;   // conecta con el corredor
+        [p.zCentro - cfg.pasilloM/2, p.zCentro + cfg.pasilloM/2].forEach(zP => {
+          const poste = box(0.04, BAR_ALTO_POSTE, 0.04, matMarcoSel);
+          poste.position.set(xExtremo, yPas + BAR_ALTO_POSTE/2, zP);
+          grupo.add(poste);
+        });
+        BAR_TUBOS.forEach(dy => {
+          const tubo = box(0.03, 0.03, cfg.pasilloM, matBarandalTubo);
+          tubo.position.set(xExtremo, yPas + dy, p.zCentro);
+          grupo.add(tubo);
+        });
+      });
     });
   }
 
@@ -2558,7 +2578,10 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
         pisoC.position.set(xCorCentro, yPas, (z0 + z1)/2);
         grupo.add(pisoC);
       }
-      // Barandal exterior SOLO en los claros: los marcos ya cierran su propio tramo
+      // Barandal exterior SOLO en los claros: enfrente de una fila el marco ya
+      // cierra su propio tramo. "El barandal solo va entre rack, 1 al 2, no en el
+      // rack" (Isaac, 24 sep 2026). Lo probe corrido de punta a punta y quedaba
+      // barandal metido enfrente de los modulos, que no es como se instala.
       clarosCorredor.forEach(([zA, zB]) => {
         const largoC = zB - zA;
         BAR_TUBOS.forEach(dy => {
@@ -2742,15 +2765,11 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
           tubo.position.set(xBarFrenteCen, yNivel + dy, zEsc + anchoEsc/2);
           grupo.add(tubo);
         }
-        // La lateral del lado libre llega hasta el frente y cierra esquina con él.
-        // La del lado de la escalera se queda corta, porque ahí sube el carril.
-        const zFinA = zEsc + anchoEsc/2;
-        const latA = box(0.03, 0.03, Math.abs(zFinA - zLatA), matBarandalTubo);
-        latA.position.set(xMarcoA, yNivel + dy, (zLatA + zFinA)/2);
-        grupo.add(latA);
-        const latB = box(0.03, 0.03, largoLat, matBarandalTubo);
-        latB.position.set(xMarcoB, yNivel + dy, (zLatA + zLatB)/2);
-        grupo.add(latB);
+        // SIN laterales: corrian sobre las dos lineas de marco de ese modulo,
+        // por dentro del rack. "Los marcos de ese modulo tienen barandales y no
+        // deberia" (Isaac, 24 sep 2026, F5-M2). Es la misma regla de siempre:
+        // entre marcos no va barandal, el marco mismo hace de guarda. Queda solo
+        // el del frente, que da al vacio.
       });
       // Poste de esquina donde cierran la lateral y el frente
       {
@@ -2758,14 +2777,7 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
         poste.position.set(xMarcoA, yNivel + BAR_ALTO_POSTE/2, zEsc + anchoEsc/2);
         grupo.add(poste);
       }
-      // Postes: únicamente sobre las líneas laterales
-      [xMarcoA, xMarcoB].forEach(xL => {
-        [zLatB - 0.05, (zLatA + zLatB)/2, zLatA + 0.05].forEach(zP => {
-          const poste = box(0.04, BAR_ALTO_POSTE, 0.04, matMarcoSel);
-          poste.position.set(xL, yNivel + BAR_ALTO_POSTE/2, zP);
-          grupo.add(poste);
-        });
-      });
+      // Sin postes sobre las lineas de marco: iban con las laterales que se quitaron.
     }
   }
 }
@@ -2821,8 +2833,9 @@ function bomPasarelaEntrepiso(cfg, add, lineasInfo){
 // lineal de 4 piezas". Y van 2 postes por metro.
 // Se suma UNA sola vez, con los metros medidos del 3D, para que la lista de
 // materiales no se pueda volver a separar de lo que se dibuja.
-function _addBarandalPas(add){
-  const ml = Math.ceil(_barandalMLDesde3D(typeof grupo !== 'undefined' ? grupo : null));
+function _addBarandalPas(add, cfg){
+  const alt = (cfg && cfg.pasarela && cfg.pasarela.alturaM) || 0;
+  const ml = _barandalMLDesde3D(typeof grupo !== 'undefined' ? grupo : null, alt);
   if(ml <= 0) return;
   add(PASARELA_BARANDAL, ml);
   add(PASARELA_POSTE_BAR, ml * 2);
@@ -2830,7 +2843,7 @@ function _addBarandalPas(add){
 function bomPasarela(cfg, add, lineasInfo){
   const nNiveles = cfg.pasarela.niveles || 1;
   const escActiva = cfg.pasarela.escalera !== 'no';
-  if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); _addBarandalPas(add); return; }
+  if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); _addBarandalPas(add, cfg); return; }
   // El piso del pasillo se apoya directo en las vigas de carga de los racks (naranjas).
   // No se cotiza viga extra de 48" por marco: no van en obra (referencia proyecto real).
   for(let i=0; i<lineasInfo.length-1; i++){
@@ -2868,7 +2881,7 @@ function bomPasarela(cfg, add, lineasInfo){
       }
     }
   }
-  _addBarandalPas(add);   // los metros de barandal, una sola vez
+  _addBarandalPas(add, cfg);   // los metros de barandal, una sola vez
 }
 let lineasPicking = [{tipo:'sencilla', cuerpos:1, cuerposB:null, altoIn:96, fondoIn:24, largoCm:120, niveles:4, abierta:true}];
 
@@ -5619,17 +5632,30 @@ function _hayPasarela(){
 // Cada corrida lleva 4 tubos (BAR_TUBOS), asi que el largo total de tubo entre 4
 // da los metros de barandal. El del rellano de la escalera no cuenta: la
 // escalera se compra armada con su pasamanos.
-function _barandalMLDesde3D(g){
+// Metros lineales de barandal, POR PISO y redondeando cada piso por separado:
+// asi se cuenta en obra —"el nivel superior debe de llevar 18 postes, el
+// inferior 22" (Isaac, 24 sep 2026)— y no se pierde el pedazo suelto de un piso
+// contra el del otro. Devuelve el total ya redondeado.
+function _barandalMLDesde3D(g, alturaPiso){
   if(!g || typeof THREE === 'undefined') return 0;
-  let tubo = 0;
+  const paso = (alturaPiso > 0.5) ? alturaPiso : 1e9;   // sin dato: todo a un solo piso
+  const porPiso = new Map();
   g.traverse(o => {
     if(!o.isMesh || !o.geometry || o.geometry.type !== 'BoxGeometry') return;
     if(o.userData && (o.userData.cota || o.userData.barEsc)) return;
     if(o.material !== matBarandalTubo) return;
     const p = o.geometry.parameters || {};
-    tubo += Math.max(p.width || 0, p.depth || 0);
+    o.updateWorldMatrix(true, false);
+    const c = new THREE.Vector3(); o.getWorldPosition(c);
+    // Se agrupa por NIVEL DE PASARELA, no por altura redondeada: los 4 tubos de
+    // un mismo barandal van a alturas distintas y redondeando a metros se partian
+    // en dos pisos, lo que inflaba el redondeo.
+    const nivel = Math.max(1, Math.round(c.y / paso));
+    porPiso.set(nivel, (porPiso.get(nivel) || 0) + Math.max(p.width || 0, p.depth || 0));
   });
-  return tubo / BAR_TUBOS.length;
+  let total = 0;
+  porPiso.forEach(tubo => { total += Math.ceil(tubo / BAR_TUBOS.length); });
+  return total;
 }
 function _dimsDesde3D(g){
   if(!g || typeof THREE === 'undefined') return null;
