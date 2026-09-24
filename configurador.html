@@ -675,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.07';
+const CFG_VERSION = '2026.09.24.08';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -4492,9 +4492,17 @@ function _barrasDeLinea(gLin, cfg, l){
 // Malla anticaida de una linea: un panel por claro, de la primera viga de carga
 // al tope del marco. En SENCILLA va en la cara de atras (la que se pega a la
 // pared); en DOBLE va en medio de las dos filas.
-// Tope tarima de una linea: una barra a todo lo largo de cada claro, montada
-// sobre la viga de carga —4" arriba y saliendo 6"— del mismo lado que la malla.
-// En doble va UNA sola al centro, con sus dos aletas, que sirve a las dos caras.
+// Tope tarima de una linea. Dos piezas distintas, como en obra:
+//   · TOPE: tubo de 2" x 4" a todo lo largo del claro, 4" arriba de la viga de
+//     carga y saliendo 6". Uno por claro y por nivel.
+//   · UNION: abrazadera de 12" que monta sobre la viga y sostiene el tubo. Va en
+//     cada POSTE y en cada nivel — por eso son mas uniones que topes.
+// "Los topes tarima traen las uniones, el tope tarima mide 2x4"" (Isaac, 24 sep
+// 2026). Del mismo lado que la malla: atras en sencilla, en medio en doble, y
+// ahi la union lleva su aleta de los dos lados.
+const TOPE_ALTO_IN  = 4;    // seccion del tubo
+const TOPE_ANCHO_IN = 2;
+const TOPE_UNION_IN = 12;   // largo de la abrazadera, cruzando la viga
 function _topeDeLinea(gLin, cfg, l){
   // La malla gana: si por un enlace viejo llegaran las dos banderas prendidas, el
   // dibujo tiene que decir lo mismo que la cotizacion, que ya no cobra el tope.
@@ -4510,30 +4518,48 @@ function _topeDeLinea(gLin, cfg, l){
   const dir  = (lado === 'adelante') ? 1 : (lado === 'atras' ? -1 : 0);
   const sube = TOPE_SOBRE_VIGA_IN * IN_TO_M;
   const sale = TOPE_SALIDA_IN * IN_TO_M;
+  const hTubo = TOPE_ALTO_IN * IN_TO_M, aTubo = TOPE_ANCHO_IN * IN_TO_M;
+  const largoU = TOPE_UNION_IN * IN_TO_M;
   const xIzq = -l.largoM/2;
   const nCl  = _topeClaros(l);
   const fila = (esD && lado === 'atras') ? 'B' : 'A';
+  // Alturas por claro; para las uniones se toma el claro mas alto que toca el poste.
+  const ysDe = c => alturasDeCuerpoM(l, fila, c) || alturasDefaultM(l.altoM, _topeNivelesDe(l, c)) || [];
+  const zTubo = zCara + dir * sale;
   for(let c = 0; c < nCl; c++){
-    const ys = alturasDeCuerpoM(l, fila, c) || alturasDefaultM(l.altoM, _topeNivelesDe(l, c));
-    if(!ys || !ys.length) continue;
+    const ys = ysDe(c);
     const xc = xIzq + (c + 0.5) * l.vigaM;
     const largo = Math.max(0.1, l.vigaM - postD);
     ys.forEach(yV => {
-      const y = yV + sube;
+      const y = yV + sube + hTubo/2;
       if(y > l.altoM - 0.02) return;
-      // La barra: en medio lleva aleta de los dos lados, en una cara solo de uno.
-      const prof = (dir === 0) ? sale * 2 : sale;
-      const barra = box(largo, 0.02, prof, matTopeSel);
-      barra.position.set(xc, y, zCara + dir * sale / 2);
-      barra.userData.tope = true;
-      gLin.add(barra);
-      // Las dos patas que la levantan de la viga
-      [-1, 1].forEach(sg => {
-        const pata = box(0.06, sube, 0.02, matTopeSel);
-        pata.position.set(xc + sg * largo * 0.45, yV + sube/2, zCara);
-        pata.userData.tope = true;
-        gLin.add(pata);
-      });
+      const tubo = box(largo, hTubo, aTubo, matTopeSel);
+      tubo.position.set(xc, y, zTubo);
+      tubo.userData.tope = true;
+      gLin.add(tubo);
+    });
+  }
+  // Uniones: una por poste y por nivel. La abrazadera cruza la viga y el brazo
+  // llega hasta el tubo.
+  for(let k = 0; k <= nCl; k++){
+    const izq = (k > 0)   ? ysDe(k - 1) : [];
+    const der = (k < nCl) ? ysDe(k)     : [];
+    const ys = (izq.length >= der.length) ? izq : der;
+    const xk = xIzq + k * l.vigaM;
+    ys.forEach(yV => {
+      const y = yV + sube + hTubo/2;
+      if(y > l.altoM - 0.02) return;
+      // La union es la misma pieza que ya amarra el diseno, pero en naranja y
+      // cargando el tubo. "Ya tienes uniones en el diseno; cuando sea para dobles
+      // pinta esa de verde a anaranjado y ponle el poste de 4x2" (Isaac, 24 sep
+      // 2026). En doble cruza el hueco entre las dos filas; en sencilla es la
+      // abrazadera de 12" que monta sobre la viga.
+      const largoUnion = esD ? ((cfg.unionM || 0) + 0.10) : largoU;
+      const zUnion = esD ? 0 : (zCara + dir * (largoU/2 - l.fondoM/2 + semi));
+      const union = box(0.05, 0.05, largoUnion, matTopeSel);
+      union.position.set(xk, yV + sube/2 + 0.02, esD ? zUnion : zCara + dir * sale/2);
+      union.userData.topeUnion = true;
+      gLin.add(union);
     });
   }
 }
