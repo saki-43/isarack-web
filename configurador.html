@@ -675,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.23.09';
+const CFG_VERSION = '2026.09.24.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2451,21 +2451,11 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
       grupo.add(piso);
       // Piso apoyado directo en las vigas de carga de los racks (naranjas), sin vigas extra
       // de 48" cruzando el pasillo. Referencia: proyecto real del cliente (imagen SketchUp).
-      // Barandal en los extremos del pasillo — abierto del lado del corredor (todos los niveles)
-      const xLadoCorredor = dir === 1 ? xInicio + largoPiso : xInicio;
-      [xInicio, xInicio + largoPiso].forEach(xExtremo => {
-        if(escActiva && acc && xExtremo === xLadoCorredor) return;   // conecta con el corredor
-        [p.zCentro - cfg.pasilloM/2, p.zCentro + cfg.pasilloM/2].forEach(zP => {
-          const poste = box(0.04, BAR_ALTO_POSTE, 0.04, matMarcoSel);
-          poste.position.set(xExtremo, yPas + BAR_ALTO_POSTE/2, zP);
-          grupo.add(poste);
-        });
-        BAR_TUBOS.forEach(dy => {
-          const tubo = box(0.03, 0.03, cfg.pasilloM, matBarandalTubo);
-          tubo.position.set(xExtremo, yPas + dy, p.zCentro);
-          grupo.add(tubo);
-        });
-      });
+      // SIN barandal en los extremos del pasillo: "entre pasillos y entre esos
+      // marcos no lleva barandal" / "quita esos barandales entre marcos" (Isaac,
+      // 23-24 sep 2026). Los postes caian justo entre los marcos de dos filas y
+      // ahi no va nada; el barandal que si se cobra es el del corredor y el del
+      // frente del descanso.
     });
   }
 
@@ -2703,7 +2693,14 @@ function dibujarPasarelaExterior(cfg, pasillosInfo, xInicio, matVigaLocal){
       grupo.add(accPiso);
 
       // b) Ramal de conexión: cruza la línea frontal hasta la pasarela del 1er pasillo
-      const zPas0 = pasillosInfo[0].zCentro;
+      // El ramal cruza SOLO la fila de enfrente, hasta el pasillo mas cercano a la
+      // escalera. Tomaba pasillosInfo[0] —el pasillo del fondo— y con el orden de
+      // filas de v2026.09.22 el piso se metia por dentro de las filas de en
+      // medio: "en F2-M3 pusiste un nivel de piso entre ese rack, ahi no va nada"
+      // (Isaac, 24 sep 2026).
+      const pCerca = pasillosInfo.reduce((a, b) =>
+        Math.abs(b.zCentro - zFrente) < Math.abs(a.zCentro - zFrente) ? b : a);
+      const zPas0 = pCerca.zCentro;
       const zBordePas = zPas0 + cfg.pasilloM/2;      // borde de la pasarela del pasillo
       const ramal = box(LARGO_ACC, grosorPiso, Math.abs(zFrente - zBordePas), matPisoPas);
       ramal.position.set(xAccCen, yNivel, (zFrente + zBordePas)/2);
