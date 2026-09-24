@@ -701,7 +701,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.14';
+const CFG_VERSION = '2026.09.24.15';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3345,6 +3345,38 @@ const SEL_FONDOS = [[24,'24" (0.61 m)'],[36,'36" (0.91 m)'],[42,'42" (1.07 m)'],
 const SEL_VIGAS  = [['SEL-0362','96" × 3"'],['SEL-0364','96" × 4"'],['SEL-0352','108" × 5.5"'],['SEL-0355','144" × 3.5"'],['SEL-0451','144" × 4"'],['SEL-0358','144" × 6.25"']];
 // La viga que mas se vende: 96" x 4". Arranca seleccionada (Isaac, 18 sep 2026).
 let lineasAlmacen = [{tipo:'sencilla', cuerpos:1, altoIn:192, fondoIn:42, vigaSku:'SEL-0364', niveles:3, abierta:true}];
+// ── BLOQUES (islas) DEL ALMACEN ──────────────────────────────────────────────
+// Un bloque es un grupo de filas con su propia posicion dentro de la bodega.
+// Hasta hoy se armaba UNA sola isla pegada al origen; las bodegas reales casi
+// nunca son asi (Isaac, 24 sep 2026). Cada fila guarda su bloque en l.bloque,
+// con 0 por omision — por eso los enlaces viejos, que no traen el campo, abren
+// como un solo bloque en 0,0 y dibujan exactamente igual que antes.
+// El giro es 0 o 90 y nada mas: el libre complica el "Cabe / sobra" y no se usa.
+let bloquesAlmacen = [{x:0, z:0, giro:0}];
+function _bloqueDe(l){ const b = parseInt(l && l.bloque); return Number.isFinite(b) && b >= 0 ? b : 0; }
+function _bloquesNormaliza(){
+  if(!Array.isArray(bloquesAlmacen) || !bloquesAlmacen.length) bloquesAlmacen = [{x:0, z:0, giro:0}];
+  bloquesAlmacen = bloquesAlmacen.map(b => ({
+    x: Number(b && b.x) || 0, z: Number(b && b.z) || 0,
+    giro: (Number(b && b.giro) === 90) ? 90 : 0
+  }));
+  const n = bloquesAlmacen.length;
+  lineasAlmacen.forEach(l => { if(_bloqueDe(l) >= n) l.bloque = 0; });
+}
+function _filasDeBloque(lineas, iB){ return (lineas || []).filter(l => _bloqueDe(l) === iB); }
+// cfg recortado a las filas de UN bloque: las medidas totales se recalculan con
+// esas filas, asi la escalera, la pasarela y las cotas funcionan igual sin
+// enterarse de que hay mas bloques.
+function _cfgDeBloque(cfg, filas){
+  if(!filas.length) return null;
+  const pas = cfg.pasilloM;
+  return Object.assign({}, cfg, {
+    lineas: filas,
+    maxLenM: Math.max(...filas.map(l => l.largoM)),
+    maxAltoM: Math.max(...filas.map(l => l.altoM)),
+    profTotalM: filas.reduce((a, l) => a + l.profM, 0) + pas * (filas.length - 1)
+  });
+}
 
 function lineasSync(){
   // Espejo de la línea 1 en los selects ocultos (compatibilidad con código legado)
@@ -4017,6 +4049,7 @@ function _huecosManualesEsc(l){
 function renderLineasAlmacen(){
   lineasAlmacen.forEach(_nivNormaliza);
   const cont = document.getElementById('selLineasList');
+  const _htmlBloques = _bloquesHtml();
   cont.innerHTML = lineasAlmacen.map((l, i) => {
     const esD = l.tipo === 'doble';
     const bg = esD ? '#faf0ea' : '#eef4fb';
@@ -4079,6 +4112,15 @@ function renderLineasAlmacen(){
         // claros se le pone la altura exacta al paso. El codigo que LEE tunelOn/escH
         // se queda a proposito: los links de cliente ya mandados los traen dentro y
         // tienen que seguir dibujando y cotizando igual que el dia que se mandaron.
+        + (bloquesAlmacen.length > 1
+            ? '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+              + '<span style="font-size:10px;color:'+tx+';font-weight:600">📦 Bloque</span>'
+              + '<select onchange="lnFilaBloque('+i+',this.value)" style="font-size:10px;padding:2px 4px;border:1px solid '+bd+';border-radius:5px;background:#fff">'
+              + bloquesAlmacen.map(function(bb, ib){ return '<option value="'+ib+'"'+(_bloqueDe(l)===ib?' selected':'')+'>'+String.fromCharCode(65+ib)+'</option>'; }).join('')
+              + '</select>'
+              + '<span style="font-size:9px;color:#999">En qué parte de la bodega va esta fila.</span>'
+            + '</div>'
+            : '')
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<div style="font-size:10px;color:'+tx+';font-weight:600;margin-bottom:2px">🔗 Marco existente del cliente</div>'
           + '<div style="font-size:9px;color:#888;margin-bottom:3px">La fila se apoya en un marco que el cliente ya tiene. Se descuenta del cotizado.</div>'
@@ -4097,6 +4139,8 @@ function renderLineasAlmacen(){
     return _cardLinea('ln', i, l, {total: lineasAlmacen.length, extraChip: chipMarcoExist,
       chipHtml: chip, detalleHtml: detalle});
   }).join('');
+  cont.innerHTML = _htmlBloques + cont.innerHTML;
+
   lineasSync();
 }
 
@@ -4134,6 +4178,78 @@ function lnTipo(i){
 // Se descuenta del BOM (marco + 4 anclas + bota + juego de unión en dobles)
 // y en 3D ese marco se dibuja translúcido en gris para que sea visible pero se
 // distinga como material existente, no cotizado.
+// ── BLOQUES: alta, baja, mover una fila y editar su posicion ────────────────
+function lnBloqueAdd(){
+  _bloquesNormaliza();
+  if(bloquesAlmacen.length >= 6) return;             // tope sano: 6 islas
+  // La isla nueva nace despegada de la anterior para que se vea aparte y no
+  // encimada; de ahi el vendedor la mueve a donde va.
+  const ult = bloquesAlmacen[bloquesAlmacen.length - 1] || {x:0, z:0};
+  bloquesAlmacen.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0});
+  renderLineasAlmacen(); build();
+}
+function lnBloqueDel(iB){
+  _bloquesNormaliza();
+  if(bloquesAlmacen.length <= 1) return;
+  // Las filas del bloque que se va NO se borran: se pasan al primero, que es
+  // menos destructivo que perderlas y el vendedor las reacomoda.
+  lineasAlmacen.forEach(l => {
+    const b = _bloqueDe(l);
+    if(b === iB) l.bloque = 0;
+    else if(b > iB) l.bloque = b - 1;
+  });
+  bloquesAlmacen.splice(iB, 1);
+  renderLineasAlmacen(); build();
+}
+function lnBloqueSet(iB, campo, val){
+  _bloquesNormaliza();
+  const b = bloquesAlmacen[iB];
+  if(!b) return;
+  if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
+  renderLineasAlmacen(); build();
+}
+function lnFilaBloque(i, iB){
+  _bloquesNormaliza();
+  const n = bloquesAlmacen.length;
+  lineasAlmacen[i].bloque = Math.max(0, Math.min(n - 1, parseInt(iB) || 0));
+  renderLineasAlmacen(); build();
+}
+// Tarjetas de los bloques, arriba de las filas.
+function _bloquesHtml(){
+  _bloquesNormaliza();
+  if(bloquesAlmacen.length <= 1 && !lineasAlmacen.some(l => _bloqueDe(l) > 0)){
+    // Con una sola isla el panel no cambia: solo el boton para agregar otra.
+    return '<div style="margin-bottom:6px"><button class="btn-chip" onclick="lnBloqueAdd()" '
+      + 'style="border:1px dashed #da6635;background:#fff;color:#da6635;cursor:pointer;font-weight:700;padding:5px 9px;border-radius:7px;font-size:11px">'
+      + '+ Bloque aparte</button>'
+      + '<div style="font-size:9px;color:#999;margin-top:2px">Otro grupo de filas en otra parte de la bodega.</div></div>';
+  }
+  const u = _uniSufijo();
+  let h = '<div style="font-size:10px;color:#8a8579;letter-spacing:.05em;font-weight:600;margin:2px 0 4px">BLOQUES EN LA BODEGA</div>';
+  bloquesAlmacen.forEach((b, iB) => {
+    const nF = _filasDeBloque(lineasAlmacen, iB).length;
+    h += '<div style="border:1px solid #e0dbcd;border-radius:8px;margin-bottom:6px;background:#fff">'
+      + '<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;font-size:11px;font-weight:700;background:#fdf6f1;border-radius:7px 7px 0 0">'
+        + '<span>Bloque ' + String.fromCharCode(65 + iB) + '</span>'
+        + '<span style="font-weight:500;color:#8a8579">' + nF + (nF === 1 ? ' fila' : ' filas') + '</span>'
+        + '<span style="flex:1"></span>'
+        + (bloquesAlmacen.length > 1 ? '<span onclick="if(confirm(\'¿Quitar el bloque ' + String.fromCharCode(65 + iB) + '? Sus filas pasan al bloque A.\'))lnBloqueDel(' + iB + ')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px" title="Quitar bloque">🗑</span>' : '')
+      + '</div>'
+      + '<div style="display:flex;gap:5px;padding:6px 7px">'
+        + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Desde pared X (' + u + ')</div>'
+          + '<input type="number" step="0.1" value="' + _uniDeM(b.x) + '" onchange="lnBloqueSet(' + iB + ',\'x\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
+        + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Desde pared Y (' + u + ')</div>'
+          + '<input type="number" step="0.1" value="' + _uniDeM(b.z) + '" onchange="lnBloqueSet(' + iB + ',\'z\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
+        + '<div style="width:64px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
+          + '<select onchange="lnBloqueSet(' + iB + ',\'giro\',this.value)" style="width:100%;font-size:11px;padding:3px 2px;border:1px solid #ddd7c8;border-radius:5px">'
+          + '<option value="0"' + (b.giro === 90 ? '' : ' selected') + '>0°</option>'
+          + '<option value="90"' + (b.giro === 90 ? ' selected' : '') + '>90°</option></select></div>'
+      + '</div></div>';
+  });
+  h += '<div style="margin-bottom:6px"><button class="btn-chip" onclick="lnBloqueAdd()" style="border:1px dashed #da6635;background:#fff;color:#da6635;cursor:pointer;font-weight:700;padding:5px 9px;border-radius:7px;font-size:11px">+ Bloque aparte</button></div>';
+  return h;
+}
 function lnMarcoExistente(i, lado, on){
   const l = lineasAlmacen[i];
   if(lado === 'izq') l.marcoIzqExistente = !!on;
@@ -4189,6 +4305,7 @@ function getConfigSel(){
       escHOn: !!l.escHOn,
       escH: (l.escHOn ? (l.escH || []) : []),
       escHNivs: (l.escHOn ? (l.escHNivs || []) : []),
+      bloque: _bloqueDe(l),
       marcoIzqExistente: !!l.marcoIzqExistente,
       marcoDerExistente: !!l.marcoDerExistente,
       mallaOn: !!l.mallaOn,
@@ -5677,6 +5794,12 @@ function buildSelectivo(){
   const cfg = getConfigSel();
   // ── Renderizar cada línea del almacén con sus propias medidas, separadas por el pasillo ──
   // Todas las líneas inician alineadas al mismo lado (izquierda), no centradas
+  // ── ARMADO DE UN BLOQUE ────────────────────────────────────────────────────
+  // Todo lo de abajo arma UNA isla. Recibe su propio cfg, recortado a sus filas,
+  // y escribe en lo que tenga `grupo`, que el llamador cambia por el sub-grupo
+  // del bloque. Asi la escalera, la pasarela y las cotas siguen viendo "un
+  // diseno completo" y no hubo que tocarlas.
+  function armarBloque(cfg){
   const lineas = cfg.lineas;
   const profTotal = cfg.profTotalM;
   const maxLen = cfg.maxLenM;
@@ -5779,6 +5902,34 @@ function buildSelectivo(){
     };
   }
   if(cfg.pasarela.on) dibujarPasarela(cfg, pasillosInfoSel, xInicio, matVigaSel);
+  // Cotas de PASILLOS y de altura de pasarela: van DENTRO del bloque, porque
+  // cada isla tiene sus propios pasillos y su propia pasarela.
+  if(cfg.pasilloM && pasillosInfoSel.length){
+    const xPas = -maxLen/2 - 1.6;
+    pasillosInfoSel.forEach(function(p){ cotaPasillo(grupo, p.zCentro, cfg.pasilloM, xPas, 'z'); });
+  }
+  if(cfg.pasarela.on) agregarCotasPasarela(grupo, cfg.pasarela.alturaM, cfg.pasarela.niveles, -maxLen/2 - 2.3, profTotal/2 + 0.10);
+  }
+  // ── LAS ISLAS ──────────────────────────────────────────────────────────────
+  // Un solo bloque en 0,0 arma exactamente lo mismo que antes: su sub-grupo
+  // queda sin mover ni girar. Por eso los disenos y enlaces viejos no cambian.
+  // La camara y el resumen miran el diseno COMPLETO, no un bloque.
+  const lineas = cfg.lineas;
+  const profTotal = cfg.profTotalM;
+  const maxLen = cfg.maxLenM;
+  _bloquesNormaliza();
+  const _grupoRaiz = grupo;
+  bloquesAlmacen.forEach((b, iB) => {
+    const cfgB = _cfgDeBloque(cfg, _filasDeBloque(cfg.lineas, iB));
+    if(!cfgB) return;
+    const gB = new THREE.Group();
+    grupo = gB;                       // el armado escribe aqui
+    try{ armarBloque(cfgB); }
+    finally{ grupo = _grupoRaiz; }    // pase lo que pase se devuelve el grupo bueno
+    gB.rotation.y = (b.giro === 90) ? Math.PI/2 : 0;
+    gB.position.set(b.x || 0, 0, b.z || 0);
+    grupo.add(gB);
+  });
   const altoVista = Math.max(cfg.maxAltoM, cfg.pasarela.on ? cfg.pasarela.alturaM*(cfg.pasarela.niveles||1) + 1.1 : 0);
   targetY = altoVista * 0.46;
   const totalLen = maxLen;
@@ -5822,14 +5973,6 @@ function buildSelectivo(){
       : '');
   const capSel = lineas[0].capKg;
   agregarCotas(grupo, totalLen, profTotal, cfg.maxAltoM, capSel, lineas[0].vigaM);
-  // Cotas de PASILLOS (ancho entre líneas), al mismo costado que las demás cotas
-  // (frente-derecha, mundo -X), afuera para que no se enciman ni floten.
-  if(cfg.pasilloM && pasillosInfoSel.length){
-    const xPas = -totalLen/2 - 1.6;
-    pasillosInfoSel.forEach(function(p){ cotaPasillo(grupo, p.zCentro, cfg.pasilloM, xPas, 'z'); });
-  }
-  // Cota(s) de la altura de la pasarela, más afuera que las de pasillo
-  if(cfg.pasarela.on) agregarCotasPasarela(grupo, cfg.pasarela.alturaM, cfg.pasarela.niveles, -totalLen/2 - 2.3, profTotal/2 + 0.10);
   _rackDims = {x: totalLen, z: profTotal, y: cfg.maxAltoM};   // para el cálculo de la bodega
   // Cotas de niveles (claros) SIEMPRE visibles en la esquina frontal del primer marco
   if(lineas[0]){
@@ -8046,7 +8189,7 @@ function estadoConfigurador(){
     if(!propio && el.id !== 'auto') return;
     st.c[el.id] = (el.type === 'checkbox') ? (el.checked ? 1 : 0) : el.value;
   });
-  if(sistemaActual === 'selectivo')       st.l.alm = lineasAlmacen;
+  if(sistemaActual === 'selectivo'){ st.l.alm = lineasAlmacen; st.l.bloq = bloquesAlmacen; }
   else if(sistemaActual === 'picking')    st.l.pic = lineasPicking;
   else if(sistemaActual === 'mecano')     st.l.mec = lineasMecano;
   else if(sistemaActual === 'cantilever') st.l.can = lineasCantilever;
@@ -8065,6 +8208,10 @@ function aplicarEstado(st){
   if(!st) return;
   if(st.l){
     if(st.l.alm) lineasAlmacen    = st.l.alm;
+    // Enlace viejo: no trae bloques, asi que abre como una sola isla en 0,0 y
+    // dibuja igual que el dia que se mando.
+    bloquesAlmacen = Array.isArray(st.l.bloq) && st.l.bloq.length ? st.l.bloq : [{x:0, z:0, giro:0}];
+    try{ _bloquesNormaliza(); }catch(e){}
     if(st.l.pic) lineasPicking    = st.l.pic;
     if(st.l.mec) lineasMecano     = st.l.mec;
     if(st.l.can) lineasCantilever = st.l.can;
