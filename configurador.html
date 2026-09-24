@@ -701,7 +701,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.15';
+const CFG_VERSION = '2026.09.24.16';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -4060,8 +4060,12 @@ function renderLineasAlmacen(){
     const btnDel = lineasAlmacen.length > 1
       ? '<span onclick="if(confirm(\'¿Borrar la fila '+(i+1)+'?\'))lnDel('+i+')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1;flex-shrink:0;margin-left:2px" title="Borrar esta fila">🗑</span>'
       : '';
+    // Con varios bloques, la letra va en la pastilla: asi se ve de que isla es
+    // cada fila sin tener que abrirla una por una.
+    const letraB = bloquesAlmacen.length > 1
+      ? '<b style="background:#fff;border:1px solid '+bd+';border-radius:4px;padding:0 4px;margin-right:4px">📦 '+String.fromCharCode(65+_bloqueDe(l))+'</b>' : '';
     const chip = !l.abierta
-      ? '<div onclick="lnToggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.altoIn+'" × '+l.fondoIn+'" · viga '+(info.largoIn||'')+'" · '+l.niveles+' niv</div>'
+      ? '<div onclick="lnToggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+letraB+l.altoIn+'" × '+l.fondoIn+'" · viga '+(info.largoIn||'')+'" · '+l.niveles+' niv</div>'
       : '';
     const nivOpts = [2,3,4,5,6,7,8,9,10,11,12].map(n=>[n,String(n)]);
     const cA = l.cuerpos, cB = (l.cuerposB==null ? l.cuerpos : l.cuerposB);
@@ -4144,13 +4148,34 @@ function renderLineasAlmacen(){
   lineasSync();
 }
 
-function lnAdd(tipo){
+// iB: a que bloque va la fila nueva. Sin bloque se queda en el que este activo,
+// que es como se agregaba siempre. Cada tarjeta de bloque trae sus propios
+// botones: un bloque vacio no tenia forma de llenarse y quedaba muerto
+// (Isaac, 24 sep 2026: "como trabajo sobre el bloque 2").
+function lnAdd(tipo, iB){
   if(lineasAlmacen.length >= 8) return;
-  const ult = lineasAlmacen[lineasAlmacen.length-1];
+  _bloquesNormaliza();
+  const destino = Number.isFinite(parseInt(iB)) ? Math.max(0, Math.min(bloquesAlmacen.length - 1, parseInt(iB)))
+                                                : _bloqueActivo();
+  // La fila nueva copia a la ULTIMA de su mismo bloque, para no arrastrar las
+  // medidas de otra isla; si ese bloque esta vacio, copia a la ultima de todas.
+  const delBloque = _filasDeBloque(lineasAlmacen, destino);
+  const ult = delBloque[delBloque.length - 1] || lineasAlmacen[lineasAlmacen.length - 1];
   lineasAlmacen.forEach(l => l.abierta = false);
-  lineasAlmacen.push({tipo, cuerpos: ult.cuerpos, altoIn: ult.altoIn, fondoIn: ult.fondoIn, vigaSku: ult.vigaSku, niveles: ult.niveles, abierta:false});
+  lineasAlmacen.push({tipo, cuerpos: ult.cuerpos, altoIn: ult.altoIn, fondoIn: ult.fondoIn,
+                      vigaSku: ult.vigaSku, niveles: ult.niveles, abierta:false, bloque: destino});
+  _bloqueActivoSet(destino);
   renderLineasAlmacen(); build();
 }
+// Bloque "activo": el que se esta trabajando. Solo sirve para saber donde caen
+// las filas nuevas y para resaltar su tarjeta.
+let _bloqueAct = 0;
+function _bloqueActivo(){
+  _bloquesNormaliza();
+  return Math.max(0, Math.min(bloquesAlmacen.length - 1, _bloqueAct || 0));
+}
+function _bloqueActivoSet(iB){ _bloqueAct = parseInt(iB) || 0; }
+function lnBloqueActivo(iB){ _bloqueActivoSet(iB); renderLineasAlmacen(); }
 function lnDel(i){
   if(lineasAlmacen.length <= 1) return;
   lineasAlmacen.splice(i,1);
@@ -4229,8 +4254,9 @@ function _bloquesHtml(){
   let h = '<div style="font-size:10px;color:#8a8579;letter-spacing:.05em;font-weight:600;margin:2px 0 4px">BLOQUES EN LA BODEGA</div>';
   bloquesAlmacen.forEach((b, iB) => {
     const nF = _filasDeBloque(lineasAlmacen, iB).length;
-    h += '<div style="border:1px solid #e0dbcd;border-radius:8px;margin-bottom:6px;background:#fff">'
-      + '<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;font-size:11px;font-weight:700;background:#fdf6f1;border-radius:7px 7px 0 0">'
+    const act = (iB === _bloqueActivo());
+    h += '<div onclick="lnBloqueActivo(' + iB + ')" style="border:1px solid ' + (act ? '#da6635' : '#e0dbcd') + ';border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer' + (act ? ';box-shadow:0 0 0 2px rgba(218,102,53,.13)' : '') + '">'
+      + '<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;font-size:11px;font-weight:700;background:' + (act ? '#fceee6' : '#fdf6f1') + ';border-radius:7px 7px 0 0">'
         + '<span>Bloque ' + String.fromCharCode(65 + iB) + '</span>'
         + '<span style="font-weight:500;color:#8a8579">' + nF + (nF === 1 ? ' fila' : ' filas') + '</span>'
         + '<span style="flex:1"></span>'
@@ -4245,7 +4271,13 @@ function _bloquesHtml(){
           + '<select onchange="lnBloqueSet(' + iB + ',\'giro\',this.value)" style="width:100%;font-size:11px;padding:3px 2px;border:1px solid #ddd7c8;border-radius:5px">'
           + '<option value="0"' + (b.giro === 90 ? '' : ' selected') + '>0°</option>'
           + '<option value="90"' + (b.giro === 90 ? ' selected' : '') + '>90°</option></select></div>'
-      + '</div></div>';
+      + '</div>'
+      + '<div style="display:flex;gap:5px;padding:0 7px 7px">'
+        + '<button type="button" onclick="lnAdd(\'sencilla\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>'
+        + '<button type="button" onclick="lnAdd(\'doble\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila doble</button>'
+      + '</div>'
+      + (nF === 0 ? '<div style="font-size:9px;color:#b07d00;background:#fffbe9;border-top:1px solid #f0e4bf;padding:5px 7px;line-height:1.45">Este bloque está vacío. Agrégale una fila con los botones de arriba, o cambia una fila al bloque ' + String.fromCharCode(65 + iB) + ' desde su 📦 Bloque.</div>' : '')
+      + '</div>';
   });
   h += '<div style="margin-bottom:6px"><button class="btn-chip" onclick="lnBloqueAdd()" style="border:1px dashed #da6635;background:#fff;color:#da6635;cursor:pointer;font-weight:700;padding:5px 9px;border-radius:7px;font-size:11px">+ Bloque aparte</button></div>';
   return h;
