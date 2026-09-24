@@ -658,9 +658,34 @@ gtag('config', 'G-XXXXXXXXXX');
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<!-- Las tres librerias viven DENTRO del sitio. Antes se pedian a cdnjs y, si la
+     red del cliente lo bloqueaba —cosa comun dentro de una maquiladora— el
+     configurador se quedaba en blanco: sin THREE no se dibuja nada y no avisaba.
+     El CDN queda solo de respaldo, por si el archivo local llegara a faltar.
+     three.js DEBE ser r128: el codigo usa API que cambio despues. -->
+<script src="vendor/three.min.js"></script>
+<script>if(typeof THREE==='undefined')document.write('<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/scr'+'ipt>');</script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script>if(typeof window.jspdf==='undefined')document.write('<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/scr'+'ipt>');</script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script>
+// Si ni el archivo local ni el CDN cargaron, se avisa en pantalla en vez de
+// dejar el area del dibujo en blanco sin explicacion.
+window.addEventListener('DOMContentLoaded', function(){
+  if(typeof THREE !== 'undefined') return;
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#fff;display:flex;'
+    + 'align-items:center;justify-content:center;padding:24px;text-align:center;'
+    + 'font:15px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#333';
+  d.innerHTML = '<div style="max-width:420px">'
+    + '<div style="font-size:34px;margin-bottom:10px">&#9888;</div>'
+    + '<div style="font-weight:700;margin-bottom:6px">No se pudo cargar el visor 3D</div>'
+    + '<div style="color:#666;line-height:1.5">Vuelve a cargar la p&aacute;gina. Si sigue igual, '
+    + 'la red donde est&aacute;s puede estar bloqueando el sitio: prueba con los datos del '
+    + 'celular o desde otra red.</div></div>';
+  document.body.appendChild(d);
+});
+</script>
 <script>
 // ───────── Config ─────────
 const SB_URL = 'https://zjvuugslnfrivlyvzlei.supabase.co';
@@ -676,7 +701,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.13';
+const CFG_VERSION = '2026.09.24.14';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
