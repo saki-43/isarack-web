@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="ISARACK">
 <meta name="theme-color" content="#1a1d22">
 <title>ISARACK · Configurador 3D (Góndola + Picking + Selectivo)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 115'%3E%3Cpolygon points='50,5 95,30 95,85 50,110 5,85 5,30' fill='%23f97316'/%3E%3C/svg%3E">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#eef0f2;overflow:hidden;color:#2a2d31}
@@ -675,7 +676,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.08';
+const CFG_VERSION = '2026.09.24.09';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
