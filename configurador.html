@@ -676,7 +676,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.11';
+const CFG_VERSION = '2026.09.24.12';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1686,17 +1686,21 @@ function init(){
   });
 }
 
-function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tieneRejilla, tienePanel, tieneMadera, tienePie, skipCuerpo, bandasLibres){
+function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tieneRejilla, tienePanel, tieneMadera, tienePie, skipCuerpo, bandasLibres, marcosGhost){
   const postW = 0.05, postD = 0.05, placaH = 0.012;
   const nMarcos = cuerpos + 1;
   const totalLen = largoM * cuerpos;
   const x0 = -totalLen / 2;
-  function marco(x){
+  // Marcos que el cliente ya tiene: se dibujan translucidos y no se cotizan,
+  // igual que en Selectivo. (Isaac, 24 sep 2026)
+  const _ghostsP = new Set(marcosGhost || []);
+  function marco(x, kMarco){
+    const _matM = _ghostsP.has(kMarco) ? matMarcoGhost : matMarcoPic;
     const zFront = fondoM/2 - postD/2;
     const zBack  = -fondoM/2 + postD/2;
-    const p1 = box(postW, altoM, postD, matMarcoPic);
+    const p1 = box(postW, altoM, postD, _matM);
     p1.position.set(x, altoM/2, zFront); parent.add(p1);
-    const p2 = box(postW, altoM, postD, matMarcoPic);
+    const p2 = box(postW, altoM, postD, _matM);
     p2.position.set(x, altoM/2, zBack); parent.add(p2);
     if(tienePie){
       const pieW = 0.16, pieD = 0.16;
@@ -1716,10 +1720,10 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
     const pasoSeg = (yFin - yIni) / nSeg;
     // Solo 2 travesaños horizontales: uno arriba, otro abajo
     const travLenP = fondoM - postD;
-    const travAbP = box(0.020, 0.020, travLenP, matMarcoPic);
+    const travAbP = box(0.020, 0.020, travLenP, _matM);
     travAbP.position.set(x, yIni, 0);
     parent.add(travAbP);
-    const travArP = box(0.020, 0.020, travLenP, matMarcoPic);
+    const travArP = box(0.020, 0.020, travLenP, _matM);
     travArP.position.set(x, yFin, 0);
     parent.add(travArP);
     // Diagonales en zigzag continuo
@@ -1731,13 +1735,13 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
       const dy = yB - yA, dz = zB - zA;
       const len = Math.sqrt(dy*dy + dz*dz);
       const g = new THREE.BoxGeometry(0.016, len, 0.016);
-      const m = new THREE.Mesh(g, matMarcoPic);
+      const m = new THREE.Mesh(g, _matM);
       m.position.set(x, (yA+yB)/2, (zA+zB)/2);
       m.rotation.x = Math.atan2(dz, dy);
       parent.add(m);
     }
   }
-  for(let k=0; k<nMarcos; k++) marco(x0 + k * largoM);
+  for(let k=0; k<nMarcos; k++) marco(x0 + k * largoM, k);
   // Posición Y de cada nivel: manual (si está activo) o uniforme.
   // `niveles` puede ser número (parejo) o arreglo por cuerpo (niveles por módulo).
   const _nivArrPic = Array.isArray(niveles);
@@ -1745,7 +1749,13 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
   const bandasPic = bandasLibres || [];
   for(let c=0; c<cuerpos; c++){
     const cx = x0 + c * largoM + largoM/2;
-    const nivC = _nivArrPic ? (parseInt(niveles[c])||parseInt(niveles[0])||1) : niveles;
+    // El 0 es un modulo recortado a proposito: con "parseInt(x)||y" se caia al
+    // valor de al lado y el modulo volvia a salir entero. Mismo arreglo que en
+    // buildRackSelectivo. (Isaac, 24 sep 2026)
+    const _ncP = _nivArrPic ? parseInt(niveles[c]) : NaN;
+    const nivC = _nivArrPic ? (Number.isFinite(_ncP) ? Math.max(0, _ncP)
+                                                     : (parseInt(niveles[0]) || 1))
+                            : niveles;
     const alturasC = alturasManPic || alturasDefaultM(altoM, nivC);
     for(let n=0; n<nivC; n++){
       const y = Math.min(alturasC[n], altoM - 0.10);
@@ -1824,6 +1834,7 @@ function getConfigPic(){
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB,
       altoIn: l.altoIn, fondoIn: l.fondoIn, largoCm: l.largoCm, niveles: l.niveles,
       nivMod: !!l.nivMod, nivelesA: l.nivelesA || null, nivelesB: l.nivelesB || null,
+      marcoIzqExistente: !!l.marcoIzqExistente, marcoDerExistente: !!l.marcoDerExistente,
       escHOn: !!l.escHOn,
       escH: (l.escHOn ? (l.escH || []) : []),
       escHNivs: (l.escHOn ? (l.escHNivs || []) : []),
@@ -3012,6 +3023,14 @@ function renderLineasPicking(){
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lpNivMod('+i+',this.checked)"> Niveles por módulo</label>'
           + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB, 'lpNivSet') : '')
         + '</div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + '<div style="font-size:10px;color:'+tx+';font-weight:600;margin-bottom:2px">🔗 Marco existente del cliente</div>'
+          + '<div style="font-size:9px;color:#888;margin-bottom:3px">La fila se apoya en un marco que el cliente ya tiene. Se descuenta del cotizado.</div>'
+          + '<div style="display:flex;gap:10px;font-size:10px">'
+            + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" '+(l.marcoIzqExistente?'checked':'')+' onchange="lpMarcoExistente('+i+',\'izq\',this.checked)"> ← Izquierdo</label>'
+            + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" '+(l.marcoDerExistente?'checked':'')+' onchange="lpMarcoExistente('+i+',\'der\',this.checked)"> Derecho →</label>'
+          + '</div>'
+        + '</div>'
         // La palomita de Hueco escalera se quito el 22 sep 2026: ver la nota en el
         // recuadro de Selectivo. El lector de escH se queda para los links viejos.
         +'</div>'
@@ -3054,6 +3073,12 @@ function lpCuerposFila(i, fila, d){
 }
 function lpTipo(i){
   lineasPicking[i].tipo = lineasPicking[i].tipo === 'doble' ? 'sencilla' : 'doble';
+  renderLineasPicking(); build();
+}
+function lpMarcoExistente(i, lado, on){
+  const l = lineasPicking[i];
+  if(lado === 'izq') l.marcoIzqExistente = !!on;
+  else if(lado === 'der') l.marcoDerExistente = !!on;
   renderLineasPicking(); build();
 }
 function lpToggle(i){
@@ -5444,19 +5469,27 @@ function buildPicking(){
   };
   lineas.forEach((l, iLn) => {
     const gLin = new THREE.Group();
+    // Marcos "ghost" (los que el cliente ya tiene): k=0 es el izquierdo, k=cuerpos
+    // el derecho. Se dibujan translucidos y no se cotizan.
+    const ghostPA = [];
+    if(l.marcoIzqExistente) ghostPA.push(0);
+    if(l.marcoDerExistente) ghostPA.push(l.cuerposA);
+    const ghostPB = [];
+    if(l.marcoIzqExistente) ghostPB.push(0);
+    if(l.marcoDerExistente) ghostPB.push(l.cuerposB);
     if(l.tipo === 'doble'){
       const lenA = l.largoM * l.cuerposA, lenB = l.largoM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildPickingScene(filaA, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg));
+      buildPickingScene(filaA, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA);
       filaA.position.set(-l.largoTotM/2 + lenA/2, 0, l.fondoM/2);
       gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildPickingScene(filaB, l.altoM, l.fondoM, l.largoM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposB,true,iLn), bandasPasarela(cfg));
+      buildPickingScene(filaB, l.altoM, l.fondoM, l.largoM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposB,true,iLn), bandasPasarela(cfg), ghostPB);
       filaB.rotation.y = Math.PI;   // espalda con espalda: la fila B mira al otro lado
       filaB.position.set(-l.largoTotM/2 + lenB/2, 0, -l.fondoM/2);
       gLin.add(filaB);
     } else {
-      buildPickingScene(gLin, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg));
+      buildPickingScene(gLin, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA);
     }
     gLin.position.x = xInicio + l.largoTotM/2;
     gLin.position.z = zAtras + l.profM/2;
@@ -6099,10 +6132,13 @@ function calcularBomPicking(){
     const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.largoM, cA) : -1;
     const nivQuitadosRamal = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'picking') * (esD ? 2 : 1) : 0;
     const nivCargaFinal = nivCarga - nivQuitadosRamal;
-    const nMarcos = esD ? (cA + 1) + (cB + 1) : (cA + 1);
+    // Marcos que el cliente ya tiene: 1 por lado marcado; en doble el mismo lado
+    // descuenta 2, uno por cada sub-fila. Igual que en Selectivo.
+    const nMarcosExisPorLadoP = (l.marcoIzqExistente ? 1 : 0) + (l.marcoDerExistente ? 1 : 0);
+    const nMarcos = (esD ? (cA + 1) + (cB + 1) : (cA + 1)) - nMarcosExisPorLadoP * (esD ? 2 : 1);
     // 1) Marcos picking (alto × fondo)
     const marcoSku = MARCOS_PIC[l.altoIn] && MARCOS_PIC[l.altoIn][l.fondoIn];
-    if(marcoSku) add(marcoSku, nMarcos);
+    if(marcoSku && nMarcos > 0) add(marcoSku, nMarcos);
     // 2) Pies de poste: van INCLUIDOS en el marco picking — no se cotizan aparte
     // 3) Vigas/travesaños: 2 por nivel por cuerpo (frente + atrás)
     add(VIGAS_PIC[l.largoCm], 2 * nivCargaFinal);
