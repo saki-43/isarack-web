@@ -676,7 +676,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.12';
+const CFG_VERSION = '2026.09.24.13';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1686,7 +1686,7 @@ function init(){
   });
 }
 
-function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tieneRejilla, tienePanel, tieneMadera, tienePie, skipCuerpo, bandasLibres, marcosGhost){
+function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tieneRejilla, tienePanel, tieneMadera, tienePie, skipCuerpo, bandasLibres, marcosGhost, alturasNivelM){
   const postW = 0.05, postD = 0.05, placaH = 0.012;
   const nMarcos = cuerpos + 1;
   const totalLen = largoM * cuerpos;
@@ -1756,7 +1756,11 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
     const nivC = _nivArrPic ? (Number.isFinite(_ncP) ? Math.max(0, _ncP)
                                                      : (parseInt(niveles[0]) || 1))
                             : niveles;
-    const alturasC = alturasManPic || alturasDefaultM(altoM, nivC);
+    // Claros a la medida: alturasNivelM trae un arreglo por cuerpo. Si ese cuerpo
+    // no alcanza para sus niveles se cae al reparto parejo, nunca se brinca una viga.
+    const _escPic = Array.isArray(alturasNivelM) ? alturasNivelM[c] : null;
+    const alturasC = (_escPic && _escPic.length >= nivC) ? _escPic
+                   : (alturasManPic || alturasDefaultM(altoM, nivC));
     for(let n=0; n<nivC; n++){
       const y = Math.min(alturasC[n], altoM - 0.10);
       // skipCuerpo puede ser:
@@ -1835,6 +1839,8 @@ function getConfigPic(){
       altoIn: l.altoIn, fondoIn: l.fondoIn, largoCm: l.largoCm, niveles: l.niveles,
       nivMod: !!l.nivMod, nivelesA: l.nivelesA || null, nivelesB: l.nivelesB || null,
       marcoIzqExistente: !!l.marcoIzqExistente, marcoDerExistente: !!l.marcoDerExistente,
+      clarosOn: !!l.clarosOn, claros: l.claros || null,
+      clarosModA: l.clarosModA || null, clarosModB: l.clarosModB || null,
       escHOn: !!l.escHOn,
       escH: (l.escHOn ? (l.escH || []) : []),
       escHNivs: (l.escHOn ? (l.escHNivs || []) : []),
@@ -3031,6 +3037,10 @@ function renderLineasPicking(){
             + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" '+(l.marcoDerExistente?'checked':'')+' onchange="lpMarcoExistente('+i+',\'der\',this.checked)"> Derecho →</label>'
           + '</div>'
         + '</div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + _secHead(l, i, 'claros', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.clarosOn?'checked':'')+' onchange="lpClarosOn('+i+',this.checked)"> 📏 Claros de viga a la medida</label>', !!l.clarosOn)
+          + ((l.clarosOn && !_plegado(l,'claros')) ? _clarosEditor(l, i, 'lp') : '')
+        + '</div>'
         // La palomita de Hueco escalera se quito el 22 sep 2026: ver la nota en el
         // recuadro de Selectivo. El lector de escH se queda para los links viejos.
         +'</div>'
@@ -3744,38 +3754,42 @@ function lnTope(i, on){
 }
 // Un input por nivel con el claro en pulgadas, y debajo la altura acumulada
 // desde el piso en cm — que es el numero que el instalador busca en la obra.
-function _clarosEditor(l, i){
-  return l.nivMod ? _clarosEditorMod(l, i) : _clarosEditorSimple(l, i);
+function _clarosEditor(l, i, pfx){
+  pfx = pfx || 'ln';
+  return l.nivMod ? _clarosEditorMod(l, i, pfx) : _clarosEditorSimple(l, i, pfx);
 }
 // Una sola escalera para toda la fila.
-function _clarosEditorSimple(l, i){
+function _clarosEditorSimple(l, i, pfx){
+  pfx = pfx || 'ln';
   const cl = _clarosNormaliza(l);
   const nMax = _nivMaxLinea(l);
   return '<div style="font-size:9px;color:#888;margin:3px 0 2px">Separación desde la viga de abajo (el nivel 1, desde el piso). Va de 2 en 2 pulgadas, como los barrenos del marco.</div>'
-    + _clarosInputs(cl, nMax, l.altoIn, function(n){ return 'lnClaro('+i+','+n+',this.value)'; });
+    + _clarosInputs(cl, nMax, l.altoIn, function(n){ return pfx+'Claro('+i+','+n+',this.value)'; });
 }
 // Pestaña por módulo: cada uno con sus propias alturas.
-function _clarosEditorMod(l, i){
+function _clarosEditorMod(l, i, pfx){
+  pfx = pfx || 'ln';
   const esD = l.tipo === 'doble';
   const cA = l.cuerpos, cB = (l.cuerposB == null ? l.cuerpos : l.cuerposB);
   const t = _clarosTabSel(l);
   const cl = _clarosModNormaliza(l, t.f, t.m);
   const nv = _nivDeModulo(l, t.f, t.m);
   let h = '<div style="font-size:9px;color:#888;margin:3px 0 2px">Cada módulo lleva sus propias alturas. Escoge el módulo y captura sus claros.</div>'
-        + _clarosTabs(l, i, 'A', cA, esD ? 'Fila A' : '');
-  if(esD) h += _clarosTabs(l, i, 'B', cB, 'Fila B');
-  h += _clarosInputs(cl, nv, l.altoIn, function(n){ return 'lnClaroMod('+i+',\''+t.f+'\','+t.m+','+n+',this.value)'; });
-  h += '<button class="btn-chip" onclick="lnClarosCopiar('+i+')" style="margin-top:5px;border:1px solid #d9d4c5;background:#fff;cursor:pointer;color:#666;font-weight:500">Copiar a todos los módulos</button>';
+        + _clarosTabs(l, i, 'A', cA, esD ? 'Fila A' : '', pfx);
+  if(esD) h += _clarosTabs(l, i, 'B', cB, 'Fila B', pfx);
+  h += _clarosInputs(cl, nv, l.altoIn, function(n){ return pfx+'ClaroMod('+i+',\''+t.f+'\','+t.m+','+n+',this.value)'; });
+  h += '<button class="btn-chip" onclick="'+pfx+'ClarosCopiar('+i+')" style="margin-top:5px;border:1px solid #d9d4c5;background:#fff;cursor:pointer;color:#666;font-weight:500">Copiar a todos los módulos</button>';
   return h;
 }
 // Botones de módulo de una fila.
-function _clarosTabs(l, i, fila, cuerpos, etiqueta){
+function _clarosTabs(l, i, fila, cuerpos, etiqueta, pfx){
+  pfx = pfx || 'ln';
   const t = _clarosTabSel(l);
   let h = etiqueta ? '<div style="font-size:8.5px;color:#999;margin:3px 0 1px">'+etiqueta+'</div>' : '';
   h += '<div style="display:flex;gap:3px;flex-wrap:wrap;margin:2px 0">';
   for(let c=0; c<cuerpos; c++){
     const on = (t.f === fila && t.m === c);
-    h += '<button class="btn-chip" onclick="lnClarosTab('+i+',\''+fila+'\','+c+')" style="border:1px solid '+(on?'#da6635':'#ccc')+';background:'+(on?'#da6635':'#fff')+';color:'+(on?'#fff':'#333')+';cursor:pointer;font-weight:600">M'+(c+1)+'</button>';
+    h += '<button class="btn-chip" onclick="'+pfx+'ClarosTab('+i+',\''+fila+'\','+c+')" style="border:1px solid '+(on?'#da6635':'#ccc')+';background:'+(on?'#da6635':'#fff')+';color:'+(on?'#fff':'#333')+';cursor:pointer;font-weight:600">M'+(c+1)+'</button>';
   }
   return h + '</div>';
 }
@@ -3848,20 +3862,27 @@ function _secHead(l, i, k, labelHtml, hayDetalle){
         : '')
     + '</div>';
 }
-function lnClarosTab(i, fila, m){
-  lineasAlmacen[i].clarosTab = {f: fila, m: m};
-  renderLineasAlmacen();
+// Los setters de claros son iguales para Almacen y Picking: solo cambian el
+// arreglo y el render. Se comparten para que Selectivo pase por exactamente el
+// mismo camino que antes. (Isaac, 24 sep 2026: portar las funciones a Picking)
+function _clarosTabEn(arr, render, i, fila, m){
+  arr[i].clarosTab = {f: fila, m: m};
+  render();
 }
-function lnClaroMod(i, fila, c, n, val){
-  const l = lineasAlmacen[i];
+function lnClarosTab(i, fila, m){ _clarosTabEn(lineasAlmacen, renderLineasAlmacen, i, fila, m); }
+function lpClarosTab(i, fila, m){ _clarosTabEn(lineasPicking, renderLineasPicking, i, fila, m); }
+function _claroModEn(arr, render, i, fila, c, n, val){
+  const l = arr[i];
   _clarosModNormaliza(l, fila, c);
   l[_clarosModKey(fila)][c][n] = Math.max(2, Math.round((parseFloat(val) || 0) / 2) * 2);
-  renderLineasAlmacen(); build();
+  render(); build();
 }
+function lnClaroMod(i, fila, c, n, val){ _claroModEn(lineasAlmacen, renderLineasAlmacen, i, fila, c, n, val); }
+function lpClaroMod(i, fila, c, n, val){ _claroModEn(lineasPicking, renderLineasPicking, i, fila, c, n, val); }
 // Copia la escalera del módulo abierto a todos los demás. Si alguno tiene más
 // niveles, los de más se rellenan repitiendo el último claro.
-function lnClarosCopiar(i){
-  const l = lineasAlmacen[i];
+function _clarosCopiarEn(arr, render, i){
+  const l = arr[i];
   const t = _clarosTabSel(l);
   const src = _clarosModNormaliza(l, t.f, t.m).slice();
   const cA = l.cuerpos, cB = (l.cuerposB == null ? l.cuerpos : l.cuerposB);
@@ -3877,27 +3898,33 @@ function lnClarosCopiar(i){
   }
   aplica('A', cA);
   if(l.tipo === 'doble') aplica('B', cB);
-  renderLineasAlmacen(); build();
+  render(); build();
 }
+function lnClarosCopiar(i){ _clarosCopiarEn(lineasAlmacen, renderLineasAlmacen, i); }
+function lpClarosCopiar(i){ _clarosCopiarEn(lineasPicking, renderLineasPicking, i); }
 
 // Al prender la casilla se copian los claros que la fila YA tenia, para que no
 // brinque ninguna viga: _clarosNormaliza rellena con el reparto uniforme.
-function lnClarosOn(i, on){
-  const l = lineasAlmacen[i];
+function _clarosOnEn(arr, render, i, on){
+  const l = arr[i];
   l.clarosOn = !!on;
   if(on){
     _clarosNormaliza(l);
     if(l.nivMod) _clarosSiembraModulos(l);
   }
-  renderLineasAlmacen(); build();
+  render(); build();
 }
-function lnClaro(i, n, val){
-  const l = lineasAlmacen[i];
+function lnClarosOn(i, on){ _clarosOnEn(lineasAlmacen, renderLineasAlmacen, i, on); }
+function lpClarosOn(i, on){ _clarosOnEn(lineasPicking, renderLineasPicking, i, on); }
+function _claroEn(arr, render, i, n, val){
+  const l = arr[i];
   _clarosNormaliza(l);
   // Las vigas entran en barrenos cada 2\" — se redondea al par mas cercano.
   l.claros[n] = Math.max(2, Math.round((parseFloat(val) || 0) / 2) * 2);
-  renderLineasAlmacen(); build();
+  render(); build();
 }
+function lnClaro(i, n, val){ _claroEn(lineasAlmacen, renderLineasAlmacen, i, n, val); }
+function lpClaro(i, n, val){ _claroEn(lineasPicking, renderLineasPicking, i, n, val); }
 function _nivModEditor(l, i, esD, cA, cB, setFn){
   setFn = setFn || 'lnNivSet';
   const fila = (f, arr, n) => {
@@ -5480,16 +5507,16 @@ function buildPicking(){
     if(l.tipo === 'doble'){
       const lenA = l.largoM * l.cuerposA, lenB = l.largoM * l.cuerposB;
       const filaA = new THREE.Group();
-      buildPickingScene(filaA, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA);
+      buildPickingScene(filaA, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA, alturasPorCuerpoM(l, 'A', l.cuerposA));
       filaA.position.set(-l.largoTotM/2 + lenA/2, 0, l.fondoM/2);
       gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildPickingScene(filaB, l.altoM, l.fondoM, l.largoM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposB,true,iLn), bandasPasarela(cfg), ghostPB);
+      buildPickingScene(filaB, l.altoM, l.fondoM, l.largoM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposB,true,iLn), bandasPasarela(cfg), ghostPB, alturasPorCuerpoM(l, 'B', l.cuerposB));
       filaB.rotation.y = Math.PI;   // espalda con espalda: la fila B mira al otro lado
       filaB.position.set(-l.largoTotM/2 + lenB/2, 0, -l.fondoM/2);
       gLin.add(filaB);
     } else {
-      buildPickingScene(gLin, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA);
+      buildPickingScene(gLin, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA, alturasPorCuerpoM(l, 'A', l.cuerposA));
     }
     gLin.position.x = xInicio + l.largoTotM/2;
     gLin.position.z = zAtras + l.profM/2;
