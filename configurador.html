@@ -675,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.01';
+const CFG_VERSION = '2026.09.24.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2271,9 +2271,12 @@ function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos, todas){
   if(!cfg.pasarela || !cfg.pasarela.on) return -1;
   if(!modeloPasarela(cfg).despejaModulo) return -1;
   if(cfg.pasarela.escalera === 'no') return -1;
-  // Con una sola pasarela tambien hay que salir de la escalera; el tope de
-  // "solo con pasarela doble" dejaba la salida tapada. (Isaac, 23 sep 2026)
-  if(!todas && (cfg.pasarela.niveles || 1) < 2) return -1;
+  // Solo con pasarela DOBLE. El ramal que cruza la fila se dibuja dentro de
+  // "if(nNiveles >= 2)": con un solo nivel no pasa nada por ese modulo, asi que
+  // no hay por que quitarle vigas. "Solo vas a colocar las vigas completas en ese
+  // modulo" (Isaac, 24 sep 2026). El parametro todas quedo sin uso a proposito:
+  // este tope no se brinca.
+  if((cfg.pasarela.niveles || 1) < 2) return -1;
   const dir = cfg.pasarela.escalera === 'izq' ? -1 : 1;
   const largoTot = anchoCuerpo * nCuerpos;
   const xBorde = dir === 1 ? xInicio + largoTot : xInicio;
@@ -2295,11 +2298,14 @@ function cuerpoRamalPasarela(cfg, xInicio, anchoCuerpo, nCuerpos, todas){
 // aunque el rack pase de 8 a 11 niveles.
 // El piso que cuenta es el de ARRIBA: ahi es donde te bajas del descanso. "La
 // inferior no lleva".
-// QUE se despeja: el TRAMO que subes, no lo que queda encima del piso. "Si la
+// QUE se despeja: de 8' a 16', contado desde el PRIMER piso de pasarela. "Si la
 // escalera del 2do nivel es la que estorban las vigas deberia de ser de 8 a 16'
 // las que debes quitar, eso sin quitar las vigas especiales" (Isaac, 23 sep
-// 2026). O sea la ventana va de piso a piso: con pasarela de 8' el tramo de
-// arriba corre de 8' a 16' y son esas vigas las que le estorban a la escalera.
+// 2026). Es la altura libre de quien camina sobre el piso de 8'.
+// El arranque es el PRIMER piso, no el de arriba: con un solo nivel de pasarela
+// la ventana medida desde arriba caia debajo del piso y quitaba las vigas de
+// abajo, que no le estorban a nadie. "En F4-M3, cuando quito la escalera quita
+// las vigas de abajo, eso no debe de quitarse" (Isaac, 24 sep 2026).
 // La medida la manda la escalera (cfg.pasarela.alturaM), nunca el numero de
 // nivel. Los niveles que caen JUSTO a la altura de un piso no se tocan: ahi van
 // las vigas especiales SEL-0454 que sostienen el piso de la pasarela.
@@ -2318,8 +2324,8 @@ function nivelSalidaEscaleraPS1(cfg, l, fila, k){
   if(idModeloPasarela(cfg) !== 'PS-1') return [];
   if(cfg.pasarela.escalera === 'no') return [];
   const paso  = cfg.pasarela.alturaM || 0;
-  const yAlto = paso * (cfg.pasarela.niveles || 1);   // piso donde te bajas (16')
-  const yBajo = yAlto - paso;                          // donde arranca el tramo (8')
+  const yBajo = paso;          // PRIMER piso de pasarela (8'), lleve 1 nivel o 2
+  const yAlto = yBajo + paso;  // un tramo completo arriba (16')
   const reales = alturasDeCuerpoM(l, fila || 'A', k || 0);
   const nv = _nivDeModulo(l, fila || 'A', k || 0);
   const ys = reales || alturasDefaultM(l.altoM, nv);
