@@ -675,7 +675,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.06';
+const CFG_VERSION = '2026.09.24.07';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -936,6 +936,49 @@ function _mallaClaros(l){
   if(lado === 'adelante') return cA;   // fila A va al frente (+Z)
   if(lado === 'atras')    return cB;   // fila B va atras   (-Z)
   return Math.min(cA, cB);
+}
+// ── TOPE TARIMA ──────────────────────────────────────────────────────────────
+// Va montado ENCIMA de la viga de carga, 4" arriba y saliendo 6", a todo lo
+// largo del claro. El largo del tope sigue al de la viga. (Isaac, 24 sep 2026)
+// Va del MISMO lado que la malla anticaida —atras en sencilla, en medio en
+// doble— y por eso reusa _mallaLado(); malla y tope son EXCLUYENTES: "se instala
+// la malla anticaida o el tope, no se pueden juntos".
+const TOPE_TARIMA = {96:'SEL-0335', 108:'SEL-0332', 144:'SEL-0334'};
+const TOPE_UNION  = 'SEL-0444';          // UNION TOPE TARIMA 12"
+const TOPE_SOBRE_VIGA_IN = 4;            // cuanto sube sobre la viga de carga
+const TOPE_SALIDA_IN     = 6;            // cuanto sale hacia afuera
+function _topeSku(vigaIn){ return TOPE_TARIMA[vigaIn] || null; }
+// Claros que llevan tope: los mismos que llevarian malla. En doble va UNO al
+// centro que sirve a las dos caras, no uno por cara.
+function _topeClaros(l){ return _mallaClaros(l); }
+// Niveles de cada claro (respeta "niveles por modulo"). En doble se toma la cara
+// A como referencia: el tope del centro es uno solo.
+function _topeNivelesDe(l, c){
+  const esD = l.tipo === 'doble';
+  const lado = esD ? _mallaLado(l) : 'atras';
+  const fila = (esD && lado === 'atras') ? 'B' : 'A';
+  return _nivDeModulo(l, fila, c);
+}
+// Topes: uno por claro y por nivel de viga.
+function _topeCuenta(l){
+  let n = 0;
+  const nCl = _topeClaros(l);
+  for(let c = 0; c < nCl; c++) n += _topeNivelesDe(l, c);
+  return n;
+}
+// Uniones: una por POSTE y por nivel — "11 uniones por cada poste del rack, que
+// serian 5 postes" en una bahia de 4 modulos x 11 niveles (Isaac, 24 sep 2026).
+// Cada poste toma los niveles del claro mas alto que toca.
+function _topeUniones(l){
+  const nCl = _topeClaros(l);
+  if(nCl <= 0) return 0;
+  let n = 0;
+  for(let k = 0; k <= nCl; k++){
+    const izq = (k > 0)   ? _topeNivelesDe(l, k - 1) : 0;
+    const der = (k < nCl) ? _topeNivelesDe(l, k)     : 0;
+    n += Math.max(izq, der);
+  }
+  return n;
 }
 // De las medidas que hay en almacen, la mas cercana a lo que pide la orilla.
 function _barraProtSku(lIn){
@@ -1222,6 +1265,9 @@ const matMarcoSel = new THREE.MeshStandardMaterial({color:0x2d7a3e,metalness:0.4
 const matMarcoGhost = new THREE.MeshStandardMaterial({color:0x9aa0a6,metalness:0.2,roughness:0.7,transparent:true,opacity:0.35});
 const matPieGhost   = new THREE.MeshStandardMaterial({color:0x7d8286,metalness:0.2,roughness:0.7,transparent:true,opacity:0.35});
 const matVigaSel  = new THREE.MeshStandardMaterial({color:0xda6635,metalness:0.3,roughness:0.55});
+// Material propio del tope tarima: se ve igual que la viga pero es otro objeto,
+// asi las cuentas que miden vigas no lo confunden con una.
+const matTopeSel  = new THREE.MeshStandardMaterial({color:0xda6635,metalness:0.3,roughness:0.55});
 const matPieSel   = new THREE.MeshStandardMaterial({color:0x1f3a26,metalness:0.4,roughness:0.6});
 const matPerno    = new THREE.MeshStandardMaterial({color:0x18181a,metalness:0.5,roughness:0.4});
 const matBota     = new THREE.MeshStandardMaterial({color:0xf2b71d,metalness:0.2,roughness:0.7});
@@ -3646,6 +3692,17 @@ function lnMallaLado(i, lado){
 }
 function lnMalla(i, on){
   lineasAlmacen[i].mallaOn = !!on;
+  // Malla y tope tarima son EXCLUYENTES (Isaac, 24 sep 2026): los dos ocupan la
+  // misma cara y el mismo lugar sobre la viga.
+  if(on) lineasAlmacen[i].topeOn = false;
+  if(on && !lineasAlmacen[i].mallaLado) lineasAlmacen[i].mallaLado = _mallaLadoDefault(i);
+  renderLineasAlmacen();
+  try{ _syncProtecciones(); }catch(e){}
+  build();
+}
+function lnTope(i, on){
+  lineasAlmacen[i].topeOn = !!on;
+  if(on) lineasAlmacen[i].mallaOn = false;
   if(on && !lineasAlmacen[i].mallaLado) lineasAlmacen[i].mallaLado = _mallaLadoDefault(i);
   renderLineasAlmacen();
   try{ _syncProtecciones(); }catch(e){}
@@ -3926,6 +3983,8 @@ function renderLineasAlmacen(){
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + _secHead(l, i, 'malla', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#b07d00;cursor:pointer;font-weight:600"><input type="checkbox" '+(l.mallaOn?'checked':'')+' onchange="lnMalla('+i+',this.checked)"> 🕸 Malla anticaída</label>', !!l.mallaOn)
           + ((l.mallaOn && !_plegado(l,'malla')) ? _mallaInfo(l, i, esD, info) : '')
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#b07d00;cursor:pointer;font-weight:600;margin-top:3px"><input type="checkbox" '+(l.topeOn?'checked':'')+' onchange="lnTope('+i+',this.checked)"> 🛑 Tope tarima</label>'
+          + (l.topeOn ? '<div style="font-size:9px;color:#888;margin:2px 0 0 22px">Sobre la viga, '+TOPE_SOBRE_VIGA_IN+'\" arriba y saliendo '+TOPE_SALIDA_IN+'\", del mismo lado que la malla.<br>'+_topeCuenta(l)+' topes · '+_topeUniones(l)+' uniones</div>' : '')
         + '</div>'
         // Aqui vivian las palomitas de Tunel y Hueco escalera. Se quitaron el 22 sep
         // 2026 (Isaac): "Niveles por modulo" + "Claros de viga a la medida" ya hacen
@@ -4046,6 +4105,7 @@ function getConfigSel(){
       marcoIzqExistente: !!l.marcoIzqExistente,
       marcoDerExistente: !!l.marcoDerExistente,
       mallaOn: !!l.mallaOn,
+      topeOn:  !!l.topeOn,
       mallaLado: _mallaLado(l),
       clarosOn: !!l.clarosOn,
       claros: (l.clarosOn ? _clarosNormaliza(l).slice() : []),
@@ -4432,6 +4492,51 @@ function _barrasDeLinea(gLin, cfg, l){
 // Malla anticaida de una linea: un panel por claro, de la primera viga de carga
 // al tope del marco. En SENCILLA va en la cara de atras (la que se pega a la
 // pared); en DOBLE va en medio de las dos filas.
+// Tope tarima de una linea: una barra a todo lo largo de cada claro, montada
+// sobre la viga de carga —4" arriba y saliendo 6"— del mismo lado que la malla.
+// En doble va UNA sola al centro, con sus dos aletas, que sirve a las dos caras.
+function _topeDeLinea(gLin, cfg, l){
+  // La malla gana: si por un enlace viejo llegaran las dos banderas prendidas, el
+  // dibujo tiene que decir lo mismo que la cotizacion, que ya no cobra el tope.
+  if(!l.topeOn || l.mallaOn) return;
+  const postD = 0.076;
+  const esD  = l.tipo === 'doble';
+  const lado = esD ? _mallaLado(l) : 'atras';
+  const cf   = esD ? (l.fondoM/2 + (cfg.unionM || 0)/2) : 0;
+  const semi = l.fondoM/2 - postD/2;
+  const zCara = (lado === 'medio')    ? 0
+              : (lado === 'adelante') ?  (cf + semi)
+              :                         -(cf + semi);
+  const dir  = (lado === 'adelante') ? 1 : (lado === 'atras' ? -1 : 0);
+  const sube = TOPE_SOBRE_VIGA_IN * IN_TO_M;
+  const sale = TOPE_SALIDA_IN * IN_TO_M;
+  const xIzq = -l.largoM/2;
+  const nCl  = _topeClaros(l);
+  const fila = (esD && lado === 'atras') ? 'B' : 'A';
+  for(let c = 0; c < nCl; c++){
+    const ys = alturasDeCuerpoM(l, fila, c) || alturasDefaultM(l.altoM, _topeNivelesDe(l, c));
+    if(!ys || !ys.length) continue;
+    const xc = xIzq + (c + 0.5) * l.vigaM;
+    const largo = Math.max(0.1, l.vigaM - postD);
+    ys.forEach(yV => {
+      const y = yV + sube;
+      if(y > l.altoM - 0.02) return;
+      // La barra: en medio lleva aleta de los dos lados, en una cara solo de uno.
+      const prof = (dir === 0) ? sale * 2 : sale;
+      const barra = box(largo, 0.02, prof, matTopeSel);
+      barra.position.set(xc, y, zCara + dir * sale / 2);
+      barra.userData.tope = true;
+      gLin.add(barra);
+      // Las dos patas que la levantan de la viga
+      [-1, 1].forEach(sg => {
+        const pata = box(0.06, sube, 0.02, matTopeSel);
+        pata.position.set(xc + sg * largo * 0.45, yV + sube/2, zCara);
+        pata.userData.tope = true;
+        gLin.add(pata);
+      });
+    });
+  }
+}
 function _mallaDeLinea(gLin, cfg, l){
   if(!l.mallaOn) return;
   const postD = 0.076;
@@ -5531,6 +5636,7 @@ function buildSelectivo(){
     }
     _barrasDeLinea(gLin, cfg, l);
     _mallaDeLinea(gLin, cfg, l);
+    _topeDeLinea(gLin, cfg, l);
     // Etiqueta F#-M# al pie de cada modulo, al frente de la fila.
     { const nMod = Math.max(l.cuerposA, l.cuerposB || 0) || l.cuerpos;
       for(let k = 0; k < nMod; k++){
@@ -6108,6 +6214,16 @@ function calcularBomSelectivo(){
       if(skuMalla && nPanTot > 0){
         add(skuMalla, nPanTot);
         add(cfg.sujSku || SUJECION_SEL, _mallaSujeciones(l));
+      }
+    }
+    // Tope tarima: uno por claro y por nivel de viga, del largo de la viga, mas
+    // una union por POSTE y por nivel. Excluyente con la malla anticaida.
+    if(l.topeOn && !l.mallaOn){
+      const skuTope = _topeSku(l.vigaIn);
+      const nTope = _topeCuenta(l);
+      if(skuTope && nTope > 0){
+        add(skuTope, nTope);
+        add(TOPE_UNION, _topeUniones(l));
       }
     }
     if(esD){
