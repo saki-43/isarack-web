@@ -709,7 +709,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.06';
+const CFG_VERSION = '2026.09.25.07';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -4464,6 +4464,32 @@ function lnFilaBloque(i, iB){
 // Tarjetas de los bloques, arriba de las filas.
 // pfx: 'ln' para Almacen/Selectivo, 'lp' para Picking. Asi el mismo panel de
 // bloques sirve a los dos sin duplicar 40 lineas de HTML.
+// El giro era un <select>. En un panel que se scrollea, el menu nativo se
+// cierra en cuanto la rueda del mouse se mueve, asi que había que atinarle:
+// "cuando selecciono se quita enseguida para seleccionar" (Isaac, 25 sep 2026).
+// Dos botones no abren menu: un clic y ya. De paso se ve cual esta puesto sin
+// tener que abrir nada.
+const _RENDER_SIS = {ln:'renderLineasAlmacen', lp:'renderLineasPicking', lm:'renderLineasMecano',
+                     lc:'renderLineasCantilever', gon:'renderLineasGondola'};
+function _bloqueGiro(pfx, iB, g){
+  const set = window[pfx + 'BloqueSet'];
+  if(typeof set === 'function') set(iB, 'giro', g);
+  // aqui SI se redibuja: es un boton, no hay nada que el usuario este tecleando
+  const r = window[_RENDER_SIS[pfx]];
+  if(typeof r === 'function') r();
+}
+function _giroBotones(pfx, iB, giro){
+  const esNoventa = (Number(giro) === 90);
+  return '<div style="display:flex;border:1px solid #ddd7c8;border-radius:5px;overflow:hidden">'
+    + [0, 90].map(function(g){
+        const on = (g === 90) === esNoventa;
+        return '<button type="button" onclick="_bloqueGiro(\'' + pfx + '\',' + iB + ',' + g + ')" '
+          + 'title="Girar este grupo ' + g + ' grados" '
+          + 'style="flex:1;font-size:11px;line-height:1.5;padding:3px 0;border:0;cursor:pointer;font-weight:700;font-family:inherit;'
+          + (on ? 'background:#da6635;color:#fff' : 'background:#fff;color:#8a8579') + '">' + g + '°</button>';
+      }).join('')
+    + '</div>';
+}
 function _bloquesHtml(pfx, bloques, lineas, activo){
   pfx = pfx || 'ln';
   const esSel = (pfx === 'ln');
@@ -4480,10 +4506,8 @@ function _bloquesHtml(pfx, bloques, lineas, activo){
         + '<input type="number" step="0.1" value="' + _uniDeM(b0.x) + '" onchange="' + pfx + 'BloqueSet(0,\'x\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
       + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Pared Y (' + u + ')</div>'
         + '<input type="number" step="0.1" value="' + _uniDeM(b0.z) + '" onchange="' + pfx + 'BloqueSet(0,\'z\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
-      + '<div style="width:64px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
-        + '<select onchange="' + pfx + 'BloqueSet(0,\'giro\',this.value)" style="width:100%;font-size:11px;padding:3px 2px;border:1px solid #ddd7c8;border-radius:5px">'
-        + '<option value="0"' + (b0.giro === 90 ? '' : ' selected') + '>0°</option>'
-        + '<option value="90"' + (b0.giro === 90 ? ' selected' : '') + '>90°</option></select></div>'
+      + '<div style="width:74px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
+        + _giroBotones(pfx, 0, b0.giro) + '</div>'
       + '</div>'
       + '<div style="font-size:9px;color:#999;margin:-2px 0 6px">Dónde va este grupo dentro de la bodega, medido desde la esquina.</div>'
       + '<div style="margin-bottom:6px"><button class="btn-chip" onclick="' + pfx + 'BloqueAdd()" '
@@ -4507,10 +4531,8 @@ function _bloquesHtml(pfx, bloques, lineas, activo){
           + '<input type="number" step="0.1" value="' + _uniDeM(b.x) + '" onchange="' + pfx + 'BloqueSet(' + iB + ',\'x\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
         + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Pared Y (' + u + ')</div>'
           + '<input type="number" step="0.1" value="' + _uniDeM(b.z) + '" onchange="' + pfx + 'BloqueSet(' + iB + ',\'z\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
-        + '<div style="width:64px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
-          + '<select onchange="' + pfx + 'BloqueSet(' + iB + ',\'giro\',this.value)" style="width:100%;font-size:11px;padding:3px 2px;border:1px solid #ddd7c8;border-radius:5px">'
-          + '<option value="0"' + (b.giro === 90 ? '' : ' selected') + '>0°</option>'
-          + '<option value="90"' + (b.giro === 90 ? ' selected' : '') + '>90°</option></select></div>'
+        + '<div style="width:74px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
+          + _giroBotones(pfx, iB, b.giro) + '</div>'
       + '</div>'
       + '<div style="display:flex;gap:5px;padding:0 7px 7px">'
         + '<button type="button" onclick="' + pfx + 'Add(\'sencilla\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>'
@@ -8648,6 +8670,17 @@ function addEvents(){
   // El bloque de la bodega nace con display:none en el HTML y solo se encendia
   // al picar una pestana de sistema. Al cargar la pagina quedaba escondido.
   document.getElementById('bodegaShared').style.display = (sistemaActual==='piezas') ? 'none' : '';
+  // La rueda del mouse sobre un campo numerico ENFOCADO le sube o le baja un
+  // paso. Con step="0.1" eso significa que al bajar el panel se te movian las
+  // medidas sin que lo notaras: Isaac tecleo 6 y 0 en Pared X/Y y le quedaron
+  // en 6.1 y 0.1. Se le quita el foco al campo y la pagina sigue bajando
+  // normal, pero el numero ya no se mueve. (25 sep 2026)
+  document.addEventListener('wheel', function(e){
+    const el = e.target;
+    if(el && el.tagName === 'INPUT' && el.type === 'number' && document.activeElement === el){
+      try{ el.blur(); }catch(err){}
+    }
+  }, {passive: true});
   try{ renderPlanoCombinado(); }catch(e){}
   if(typeof renderLineasGondola === 'function') renderLineasGondola();
   actualizarSelUnion();
