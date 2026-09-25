@@ -709,7 +709,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.07';
+const CFG_VERSION = '2026.09.25.08';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -5918,8 +5918,16 @@ function agregarBodega(parent){
   const yC = -0.45;
   // Lo INSTALADO sobre cada eje: con pasarela incluye el corredor de afuera y
   // las escaleras, no nada mas el racking.
-  const rx0 = xIz + sx, rx1 = rx0 + _rackDims.x;
-  const rz0 = zAt + sz, rz1 = rz0 + _rackDims.z;
+  // Donde esta el rack DE VERDAD. Antes se suponia "pegado a la pared mas la
+  // separacion"; desde que cada bloque tiene su Pared X / Pared Y eso dejo de
+  // ser cierto, y ademas `sx`/`sz` ya no existen (se fueron con "Separar de
+  // pared"): la linea vieja tronaba y el try/catch de build() se comia el
+  // error, asi que la franja de "Cabe · sobra" se quedaba en blanco o con el
+  // texto de la vez pasada (Isaac, 25 sep 2026).
+  const cenX = (_rackCen && isFinite(_rackCen.x)) ? _rackCen.x : 0;
+  const cenZ = (_rackCen && isFinite(_rackCen.z)) ? _rackCen.z : 0;
+  const rx0 = cenX - _rackDims.x/2, rx1 = rx0 + _rackDims.x;
+  const rz0 = cenZ - _rackDims.z/2, rz1 = rz0 + _rackDims.z;
   const tramo = (a, b, p, eje) => {
     const d = b - a;
     if(d < 0.15) return;   // un tramo mas chico que esto no alcanza a leerse
@@ -5936,8 +5944,9 @@ function agregarBodega(parent){
   // Indicador de ajuste (rack: x=largo, z=fondo, y=alto)
   if(st){
     const rd = _rackDims;
-    // La separacion de pared ocupa espacio igual que el rack: entra en la cuenta.
-    const ocX = rd.x + sx, ocZ = rd.z + sz;
+    // Lo ocupado va de la pared a la orilla lejana del rack: si corriste el
+    // bloque, ese hueco tambien se gasta de la bodega.
+    const ocX = rx1 - xIz, ocZ = rz1 - zAt;
     const cabe = (A >= ocX - 0.01) && (L >= ocZ - 0.01) && (H >= rd.y - 0.01);
     if(cabe){
       st.innerHTML = '✓ Cabe · sobra '+fmtCota(A-ocX)+' de ancho, '+fmtCota(L-ocZ)+' de largo y '+fmtCota(H-rd.y)+' de alto';
@@ -6575,7 +6584,10 @@ function build(){
     try{ const m = _dimsDesde3D(grupo); if(m) _rackDims = _soloXZY(m); }catch(e){ console.warn('medir con pasarela', e); }
   }
   try{ const _m = _dimsDesde3D(grupo); _rackCen = _m ? {x:_m.cx, z:_m.cz} : null; }catch(e){ _rackCen = null; }
-  try{ agregarBodega(grupo); }catch(e){}
+  // Sin el console.warn, un error aqui no se ve por ningun lado: la bodega se
+  // dibuja a medias y la franja de "Cabe" se queda con el texto viejo. Asi se
+  // nos fue una linea rota hasta produccion.
+  try{ agregarBodega(grupo); }catch(e){ console.warn('agregarBodega:', e); }
   // Muñeco Isaac al lado izquierdo del rack (referencia de escala 1.75 m)
   // Con pasarela + escalera, se coloca junto a la base de la escalera
   let extremoIzq = 0.6;
