@@ -6457,6 +6457,31 @@ function renderPlanoCombinado(){
     }
   }
 }
+// Selectivo y Picking PUBLICAN sus medidas calculadas del cfg (fila india, sin
+// girar). Eso deja de ser cierto en cuanto un bloque se mueve o se gira: con
+// giro 90 seguia diciendo 1.20 x 0.61 cuando de verdad medía 0.72 x 1.36, asi
+// que el "Cabe · sobra" contaba el eje equivocado y la bodega se dibujaba con
+// el tamaño equivocado (Isaac, 25 sep 2026). Cuando los bloques no estan en su
+// sitio de siempre, las medidas se sacan del 3D ya armado.
+function _bloquesMovidos(){
+  const dib = _sistemasDibujados();
+  if(dib.length > 1) return true;
+  const lista = dib.length ? dib : [sistemaActual];
+  const de = {gondola: () => bloquesGondola, picking: () => bloquesPicking,
+              selectivo: () => bloquesAlmacen, mecano: () => bloquesMecano,
+              cantilever: () => bloquesCantilever};
+  for(let i = 0; i < lista.length; i++){
+    const f = de[lista[i]];
+    if(!f) continue;
+    let bs = null;
+    try{ bs = f(); }catch(e){ continue; }
+    if(!Array.isArray(bs) || !bs.length) continue;
+    if(bs.length > 1) return true;
+    const b = bs[0];
+    if(b && (Number(b.x) || Number(b.z) || Number(b.giro))) return true;
+  }
+  return false;
+}
 function _buildSistema(s){
   if(s === 'selectivo') buildSelectivo();
   else if(s === 'picking') buildPicking();
@@ -6509,7 +6534,10 @@ function build(){
   // midiendo solo la geometría del rack (las cotas van marcadas y no cuentan).
   // Así "Mostrar bodega" sirve en los cinco sistemas, y en el que venga después.
   try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
-  if(!_rackDims){ try{ _rackDims = _soloXZY(_dimsDesde3D(grupo)); }catch(e){ console.warn('medir rack', e); } }
+  if(!_rackDims || _bloquesMovidos()){
+    try{ const _d = _soloXZY(_dimsDesde3D(grupo)); if(_d) _rackDims = _d; }
+    catch(e){ console.warn('medir rack', e); }
+  }
   // Con PASARELA el conjunto se sale del racking: corredor peatonal por fuera en
   // los dos extremos del largo y, en PS-1, la escalera al frente. La formula de
   // cada sistema solo mide el rack, asi que el "Cabe" decia que si y en obra no
