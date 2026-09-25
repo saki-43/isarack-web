@@ -701,7 +701,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.02';
+const CFG_VERSION = '2026.09.25.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -4444,14 +4444,29 @@ function _bloquesHtml(pfx, bloques, lineas, activo){
   pfx = pfx || 'ln';
   const esSel = (pfx === 'ln');
   if(esSel){ _bloquesNormaliza(); bloques = bloquesAlmacen; lineas = lineasAlmacen; activo = _bloqueActivo(); }
+  const u = _uniSufijo();
   if(bloques.length <= 1 && !lineas.some(l => _bloqueDe(l) > 0)){
-    // Con una sola isla el panel no cambia: solo el boton para agregar otra.
-    return '<div style="margin-bottom:6px"><button class="btn-chip" onclick="' + pfx + 'BloqueAdd()" '
+    // Con una sola isla no hace falta la tarjeta completa, pero SI su posicion:
+    // es lo unico que mueve el rack dentro de la bodega ("Separar de pared"
+    // mueve el cuarto, no el rack). Sin esto no hay forma de decir donde va
+    // cada sistema (Isaac, 25 sep 2026).
+    const b0 = bloques[0] || {x:0, z:0, giro:0};
+    return '<div style="display:flex;gap:5px;margin-bottom:5px">'
+      + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Pared X (' + u + ')</div>'
+        + '<input type="number" step="0.1" value="' + _uniDeM(b0.x) + '" onchange="' + pfx + 'BloqueSet(0,\'x\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
+      + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Pared Y (' + u + ')</div>'
+        + '<input type="number" step="0.1" value="' + _uniDeM(b0.z) + '" onchange="' + pfx + 'BloqueSet(0,\'z\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
+      + '<div style="width:64px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
+        + '<select onchange="' + pfx + 'BloqueSet(0,\'giro\',this.value)" style="width:100%;font-size:11px;padding:3px 2px;border:1px solid #ddd7c8;border-radius:5px">'
+        + '<option value="0"' + (b0.giro === 90 ? '' : ' selected') + '>0°</option>'
+        + '<option value="90"' + (b0.giro === 90 ? ' selected' : '') + '>90°</option></select></div>'
+      + '</div>'
+      + '<div style="font-size:9px;color:#999;margin:-2px 0 6px">Dónde va este grupo dentro de la bodega, medido desde la esquina.</div>'
+      + '<div style="margin-bottom:6px"><button class="btn-chip" onclick="' + pfx + 'BloqueAdd()" '
       + 'style="border:1px dashed #da6635;background:#fff;color:#da6635;cursor:pointer;font-weight:700;padding:5px 9px;border-radius:7px;font-size:11px">'
       + '+ Bloque aparte</button>'
       + '<div style="font-size:9px;color:#999;margin-top:2px">Otro grupo de filas en otra parte de la bodega.</div></div>';
   }
-  const u = _uniSufijo();
   let h = '<div style="font-size:10px;color:#8a8579;letter-spacing:.05em;font-weight:600;margin:2px 0 4px">BLOQUES EN LA BODEGA</div>';
   bloques.forEach((b, iB) => {
     const nF = _filasDeBloque(lineas, iB).length;
@@ -4464,9 +4479,9 @@ function _bloquesHtml(pfx, bloques, lineas, activo){
         + (bloques.length > 1 ? '<span onclick="if(confirm(\'¿Quitar el bloque ' + String.fromCharCode(65 + iB) + '? Sus filas pasan al bloque A.\'))' + pfx + 'BloqueDel(' + iB + ')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px" title="Quitar bloque">🗑</span>' : '')
       + '</div>'
       + '<div style="display:flex;gap:5px;padding:6px 7px">'
-        + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Desde pared X (' + u + ')</div>'
+        + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Pared X (' + u + ')</div>'
           + '<input type="number" step="0.1" value="' + _uniDeM(b.x) + '" onchange="' + pfx + 'BloqueSet(' + iB + ',\'x\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
-        + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Desde pared Y (' + u + ')</div>'
+        + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Pared Y (' + u + ')</div>'
           + '<input type="number" step="0.1" value="' + _uniDeM(b.z) + '" onchange="' + pfx + 'BloqueSet(' + iB + ',\'z\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
         + '<div style="width:64px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
           + '<select onchange="' + pfx + 'BloqueSet(' + iB + ',\'giro\',this.value)" style="width:100%;font-size:11px;padding:3px 2px;border:1px solid #ddd7c8;border-radius:5px">'
