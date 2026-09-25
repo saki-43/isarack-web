@@ -709,7 +709,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.08';
+const CFG_VERSION = '2026.09.25.09';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -8013,6 +8013,27 @@ function abrirFormCliente(){
   };
 }
 
+// El pie del PDF tenia "INCLUYE INSTALACION: NO" escrito a mano, aunque la
+// misma cotizacion cobrara SERVICIO DE INSTALACION — y como la instalacion va
+// prendida por omision, era el caso normal. Un cliente lo noto (Isaac, 25 sep
+// 2026). Lo mismo podia pasar con la entrega: decia "SI · <direccion>" aunque
+// el flete estuviera apagado, o sea prometer un envio que no se cobro.
+// Va en su propia funcion para poder probar que el pie NUNCA contradiga lo que
+// se esta cobrando.
+function _condicionesPDF(datos){
+  datos = datos || {};
+  return [
+    ['PRECIOS EN '+monedaSel, ''],
+    ['TIPO DE CAMBIO:', ' DEL DIARIO OFICIAL AL DIA DEL PAGO EN MXN'],
+    ['TIEMPO DE ENTREGA:', ' 5 A 6 DIAS HABILES'],
+    ['INCLUYE INSTALACION:', requiereInstalacion ? ' SI' : ' NO'],
+    ['ENTREGA A DOMICILIO:', !requiereEnvio ? ' NO' : (datos.dir ? ' SI · '+datos.dir : ' CONSULTAR')],
+    ['MANIOBRA DE DESCARGA:', ' SI'],
+    ['CONDICIONES DE PAGO:', ' INMEDIATO'],
+    ['COTIZACION VALIDA POR:', ' 15 DIAS'],
+    ['GARANTIA SOBRE MATERIAL NUEVO:', ' 12 MESES']
+  ];
+}
 function captura3D(){
   try{
     let xExt, zExt, alto;
@@ -8412,17 +8433,7 @@ async function generarPDF(datos, opts){
 
   // ── CONDICIONES (PIE) ──
   if(fy > H - 140){ doc.addPage(); fy = M; }
-  const condiciones = [
-    ['PRECIOS EN '+monedaSel, ''],
-    ['TIPO DE CAMBIO:', ' DEL DIARIO OFICIAL AL DIA DEL PAGO EN MXN'],
-    ['TIEMPO DE ENTREGA:', ' 5 A 6 DIAS HABILES'],
-    ['INCLUYE INSTALACION:', ' NO'],
-    ['ENTREGA A DOMICILIO:', datos.dir ? ' SI · '+datos.dir : ' CONSULTAR'],
-    ['MANIOBRA DE DESCARGA:', ' SI'],
-    ['CONDICIONES DE PAGO:', ' INMEDIATO'],
-    ['COTIZACION VALIDA POR:', ' 15 DIAS'],
-    ['GARANTIA SOBRE MATERIAL NUEVO:', ' 12 MESES']
-  ];
+  const condiciones = _condicionesPDF(datos);
   doc.setFontSize(9);
   doc.setTextColor(...DARK);
   for(const [k,v] of condiciones){
