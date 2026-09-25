@@ -709,7 +709,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.09';
+const CFG_VERSION = '2026.09.25.11';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -7558,7 +7558,23 @@ async function sbInsertVenta(body){
     });
     return r2.ok;
   }
-  console.error('sbInsertVenta', r.status, await r.text());
+  // Antes, cualquier error aqui tiraba la venta sin mas: la cotizacion salia
+  // por PDF pero nunca aparecia en ISA-OS. Si el rechazo es por un campo que la
+  // tabla no conoce, se reintenta con lo minimo de siempre antes de rendirse.
+  const _txt = await r.text();
+  console.error('sbInsertVenta', r.status, _txt);
+  if(r.status === 400){
+    const _basico = Object.assign({}, body);
+    ['instalacion','domicilio','maniobra','tiempoEntrega','plazo'].forEach(k => { delete _basico[k]; });
+    try{
+      const r3 = await fetch(SB_URL+'/rest/v1/ventas', {
+        method:'POST',
+        headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
+        body: JSON.stringify(_basico)
+      });
+      if(r3.ok){ console.warn('sbInsertVenta: se guardo sin las condiciones'); return true; }
+    }catch(e){ console.error('sbInsertVenta reintento:', e); }
+  }
   return false;
 }
 
@@ -8523,7 +8539,17 @@ async function generarPDF(datos, opts){
         moneda: monedaSel,
         plantilla: sistemaLabel + ' · ' + configResumen().txt,
         lineas: lineasVenta,
-        total: parseFloat((totalUSD * tc).toFixed(2))
+        total: parseFloat((totalUSD * tc).toFixed(2)),
+        // ISA-OS NO guarda el PDF: vuelve a armar el presupuesto con estos
+        // campos de la venta. Como el configurador nunca los mandaba, todo lo
+        // que salia de la web se reimprimia con los valores por omision —
+        // "INCLUYE INSTALACION: NO" aunque se hubiera cobrado. Arreglar el PDF
+        // (#95) no bastaba: hay que guardar el dato. (Isaac, 25 sep 2026)
+        instalacion: requiereInstalacion ? 'SI' : 'NO',
+        domicilio: !requiereEnvio ? 'NO' : (datos.dir ? 'SI' : 'CONSULTAR'),
+        maniobra: 'SI',
+        tiempoEntrega: '5 A 6 DIAS HABILES',
+        plazo: 'INMEDIATO'
       });
     }catch(e){ console.error('sbInsertVenta:', e); }
 
