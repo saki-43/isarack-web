@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.15';
+const CFG_VERSION = '2026.09.25.16';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -5762,9 +5762,20 @@ function crearTextoSprite(texto, color, contorno){
   const c = document.createElement('canvas');
   c.width = 512; c.height = 160;   // doble resolución → texto nítido, no borroso
   const g = c.getContext('2d');
-  g.font = 'bold 92px Arial, sans-serif';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
+  // El canvas mide 512 px de ancho y NO se ajusta al texto: hasta el 25 sep 2026
+  // cualquier etiqueta larga se recortaba a media palabra ("18.53 M CON PASA...").
+  // Aqui se mide y se le baja el tamano a la letra hasta que quepa. Las cotas de
+  // siempre ("17.07 M") miden ~350 px, asi que se quedan en 92 px sin cambio.
+  let _px = 92;
+  g.font = 'bold ' + _px + 'px Arial, sans-serif';
+  const _ancho = 512 - 16;
+  let _w = g.measureText(texto).width;
+  if(_w > _ancho){
+    _px = Math.max(34, Math.floor(_px * _ancho / _w));
+    g.font = 'bold ' + _px + 'px Arial, sans-serif';
+  }
   // Contorno opcional (ej. negro para el peso naranja); las cotas van sin contorno
   if(contorno){
     g.lineJoin = 'round';
@@ -6603,6 +6614,43 @@ function renderPlanoCombinado(){
 // que el "Cabe · sobra" contaba el eje equivocado y la bodega se dibujaba con
 // el tamaño equivocado (Isaac, 25 sep 2026). Cuando los bloques no estan en su
 // sitio de siempre, las medidas se sacan del 3D ya armado.
+// Con pasarela el conjunto se sale del racking: el corredor peatonal va por
+// fuera y la escalera al frente. La cota del LARGO la dibuja cada sistema con
+// la medida del cfg —solo el rack—, así que marcaba 17.07 m cuando en obra se
+// ocupan 18.53: "si no lo sumas a las cotas tendremos fallas ahí" (Isaac, 25
+// sep 2026). El "Cabe · sobra" ya contaba bien desde el 23 de septiembre; lo
+// que faltaba era decirlo en el dibujo.
+// Se agrega una SEGUNDA cota, por fuera de la del rack, con lo que de verdad se
+// instala. La del rack se queda: esa es la medida del material.
+function _cotaInstalado(){
+  if(!_hayPasarela()) return;
+  grupo.updateMatrixWorld(true);
+  const c = new THREE.Box3(); let hay = false;
+  grupo.traverse(function(o){
+    if(!o.isMesh) return;
+    if(o.geometry && (o.geometry.type === 'PlaneGeometry' || o.geometry.type === 'ConeGeometry')) return;
+    for(let pa = o; pa && pa !== grupo; pa = pa.parent){
+      if(pa.userData && (pa.userData.cota || pa.userData.fijo)) return;
+    }
+    const bb = new THREE.Box3().setFromObject(o);
+    if(bb.isEmpty() || !isFinite(bb.min.x)) return;
+    c.union(bb); hay = true;
+  });
+  if(!hay) return;
+  const largo = c.max.x - c.min.x, fondo = c.max.z - c.min.z;
+  // Van JUSTO DEBAJO de sus equivalentes del rack, como el segundo renglon de
+  // una misma medida, que es como se lee un plano. La del fondo ademas se corre
+  // sobre su propio eje (el 2.20 del labelOffset): en la vista en planta la
+  // altura no separa nada y la etiqueta caia encima de la del fondo del rack.
+  const yAbajo = -0.95;
+  const gris = 0x6b6257;
+  // LARGO instalado, un renglon abajo de la cota del largo del rack
+  cotaDim(grupo, [c.min.x, yAbajo, c.max.z + 0.95], [c.max.x, yAbajo, c.max.z + 0.95],
+          fmtCota(largo) + ' CON PASARELA', {labelOffset:[0, -0.30, 0], escala:[0.72, 0.16], color:gris});
+  // FONDO instalado, del mismo lado que el fondo del rack (mundo -X)
+  cotaDim(grupo, [c.min.x - 1.45, yAbajo, c.min.z], [c.min.x - 1.45, yAbajo, c.max.z],
+          fmtCota(fondo) + ' CON PASARELA', {labelOffset:[-0.60, -0.55, 2.20], escala:[0.85, 0.185], color:gris});
+}
 function _bloquesMovidos(){
   const dib = _sistemasDibujados();
   if(dib.length > 1) return true;
@@ -6689,6 +6737,14 @@ function build(){
   // bodega se agregan despues, no entran en la medida.
   if(_rackDims && _hayPasarela()){
     try{ const m = _dimsDesde3D(grupo); if(m) _rackDims = _soloXZY(m); }catch(e){ console.warn('medir con pasarela', e); }
+    // El resumen de arriba lo arma cada sistema con su formula, o sea SOLO el
+    // rack: decia "Largo 17.07" cuando con la pasarela se ocupan 18.53. Aqui ya
+    // esta la medida buena, asi que se le agrega el renglon.
+    try{
+      const _res = document.getElementById('medidasResumen');
+      if(_res && _rackDims) _res.innerHTML += '<br><span style="color:#5B6B77">Con pasarela ocupa <b>'
+        + _rackDims.x.toFixed(2) + ' m</b> × <b>' + _rackDims.z.toFixed(2) + ' m</b> de piso</span>';
+    }catch(e){ console.warn('resumen con pasarela', e); }
   }
   try{ const _m = _dimsDesde3D(grupo); _rackCen = _m ? {x:_m.cx, z:_m.cz} : null; }catch(e){ _rackCen = null; }
   // Las cotas generales (el alto, el largo, la escalerita de niveles) se dibujan
@@ -6705,6 +6761,16 @@ function build(){
   // Sin el console.warn, un error aqui no se ve por ningun lado: la bodega se
   // dibuja a medias y la franja de "Cabe" se queda con el texto viejo. Asi se
   // nos fue una linea rota hasta produccion.
+  // Va aqui, despues del corrimiento de las cotas de arriba: esta se calcula
+  // con coordenadas del mundo ya buenas y no hay que moverla.
+  // Va tambien en la vista en planta: ese es el dibujo que se lleva el instalador,
+  // y ahi es donde la medida de menos se convierte en un rack que no entra.
+  try{ _cotaInstalado(); }catch(e){ console.warn('_cotaInstalado:', e); }
+  // Se marcan de inmediato: el barrido de _COTA_PEND de arriba ya paso y el de
+  // abajo solo corre en vista en planta, asi que en 3D estas dos cotas se
+  // quedaban SIN la marca userData.cota y _dimsDesde3D las habria medido como
+  // si fueran rack.
+  try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
   try{ agregarBodega(grupo); }catch(e){ console.warn('agregarBodega:', e); }
   // Muñeco Isaac al lado izquierdo del rack (referencia de escala 1.75 m)
   // Con pasarela + escalera, se coloca junto a la base de la escalera
