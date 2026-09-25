@@ -41,7 +41,16 @@
   #reset{background:transparent;color:#9aa0a6;margin-top:1px;font-weight:400;font-size:10.5px;padding:4px}
 
   /* COTIZACIÓN — derecha */
-  #cotz{top:14px;right:14px;width:330px;max-height:calc(100vh - 28px);display:flex;flex-direction:column}
+  #cotz{top:14px;right:14px;width:330px;max-height:calc(100vh - 28px);display:flex;flex-direction:column;
+    transition:transform .22s ease}
+  /* Plegado: se corre su propio ancho mas el margen, asi que solo queda la pestaña */
+  #cotz.plegado{transform:translateX(calc(100% + 14px))}
+  #cotzTab{position:absolute;left:-24px;top:50%;transform:translateY(-50%);
+    width:24px;height:70px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.96);border-radius:12px 0 0 12px;
+    box-shadow:-3px 0 12px rgba(0,0,0,.10);color:#D85A30;font-size:15px;font-weight:700;
+    user-select:none;-webkit-user-select:none}
+  #cotzTab:hover{background:#fff;color:#bd4a24}
   #cotz .head{padding:14px 16px 12px;border-bottom:1px solid #ebedef}
   #pdfBtn{background:#D85A30;color:#fff;font-size:14px}
   #pdfBtn:active{background:#bd4a24}
@@ -92,7 +101,9 @@
     .panel{position:relative !important;inset:auto !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;width:auto !important;max-height:none !important;margin:10px;backdrop-filter:none}
     #ctrl{padding:12px 14px}
     #ctrl h1{font-size:13px}
-    #cotz{display:block}
+    #cotz{display:block;transform:none !important}
+    #cotz.plegado{transform:none !important}
+    #cotzTab{display:none}
     #cotz .body{max-height:60vh;overflow:auto}
     #dims,#hint{display:none}
     .modal{max-height:88vh}
@@ -272,9 +283,16 @@ gtag('config', 'G-XXXXXXXXXX');
       </div>
     </div>
     <div style="margin-bottom:8px">
-      <div style="font-size:10px;color:#8a8579;letter-spacing:.05em;font-weight:600;margin-bottom:3px">PLANO COMBINADO</div>
-      <div id="planoChks" style="display:flex;flex-wrap:wrap;gap:3px"></div>
-      <div id="planoAviso" style="display:none;font-size:9.5px;color:#6b6257;line-height:1.45;margin-top:4px;background:#f7f4ef;border-left:2px solid #da6635;padding:4px 7px;border-radius:0 5px 5px 0"></div>
+      <div onclick="planoPlegar()" style="cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:3px">
+        <span style="font-size:10px;color:#8a8579;letter-spacing:.05em;font-weight:600;flex-shrink:0">PLANO COMBINADO</span>
+        <span id="planoResumen" style="font-size:9.5px;color:#a8481e;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+        <span style="flex:1"></span>
+        <span id="planoFlecha" style="font-size:9px;color:#8a8579;flex-shrink:0">▼</span>
+      </div>
+      <div id="planoCuerpo" style="display:none">
+        <div id="planoChks" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+        <div id="planoAviso" style="display:none;font-size:9.5px;color:#6b6257;line-height:1.45;margin-top:4px;background:#f7f4ef;border-left:2px solid #da6635;padding:4px 7px;border-radius:0 5px 5px 0"></div>
+      </div>
     </div>
   </div>
 
@@ -628,6 +646,12 @@ gtag('config', 'G-XXXXXXXXXX');
 
 <!-- Panel derecho: cotización en vivo -->
 <div class="panel" id="cotz">
+  <!-- Pestaña para meter y sacar el panel. Vive DENTRO del panel, pegada a su
+       orilla izquierda: al correrse el panel hacia afuera la pestaña queda justo
+       en el borde de la pantalla, que es lo que la deja siempre a la mano. -->
+  <div id="cotzTab" onclick="cotzPlegar()" title="Meter o sacar la lista de materiales">
+    <span id="cotzTabFlecha">›</span>
+  </div>
   <div class="head">
     <button id="pdfBtn">📄 Solicitar cotización (PDF)</button>
     <button id="linkBtn" style="margin-top:4px">🔗 Copiar link para el cliente</button>
@@ -709,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.14';
+const CFG_VERSION = '2026.09.25.15';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -6506,9 +6530,49 @@ function planoToggle(s, on){
   else if(!on && i >= 0) sistemasPlano.splice(i, 1);
   renderPlanoCombinado(); build();
 }
+// Los dos plegados recuerdan como los dejaste, por navegador. Si el guardado
+// falla (ventana privada, datos bloqueados) simplemente abren por omision.
+function _recordar(k, v){ try{ localStorage.setItem(k, v ? '1' : '0'); }catch(e){} }
+function _recordado(k, porOmision){
+  try{ const v = localStorage.getItem(k); if(v === '0') return false; if(v === '1') return true; }catch(e){}
+  return porOmision;
+}
+let _planoAbierto = _recordado('isa_plano_abierto', false);
+function planoPlegar(){
+  _planoAbierto = !_planoAbierto;
+  _recordar('isa_plano_abierto', _planoAbierto);
+  renderPlanoCombinado();
+}
+// El panel de la cotizacion entra y sale por la derecha. La pestaña se queda
+// siempre visible para poder regresarlo.
+let _cotzPlegado = _recordado('isa_cotz_plegado', false);
+function cotzPlegar(){
+  _cotzPlegado = !_cotzPlegado;
+  _recordar('isa_cotz_plegado', _cotzPlegado);
+  _aplicarCotzPlegado();
+}
+function _aplicarCotzPlegado(){
+  const p = document.getElementById('cotz');
+  const f = document.getElementById('cotzTab');
+  if(!p) return;
+  p.classList.toggle('plegado', !!_cotzPlegado);
+  if(f) f.textContent = _cotzPlegado ? '‹' : '›';
+  if(f) f.setAttribute('title', _cotzPlegado ? 'Sacar la lista de materiales' : 'Meter la lista de materiales');
+}
 function renderPlanoCombinado(){
   const cont = document.getElementById('planoChks');
   if(!cont) return;
+  // Cabecera: la flecha y, cerrado, que sistemas van en el plano — para no
+  // tener que abrirlo solo para saber si hay algo palomeado.
+  const _cuerpo = document.getElementById('planoCuerpo');
+  const _flecha = document.getElementById('planoFlecha');
+  const _res = document.getElementById('planoResumen');
+  if(_cuerpo) _cuerpo.style.display = _planoAbierto ? '' : 'none';
+  if(_flecha) _flecha.textContent = _planoAbierto ? '▲' : '▼';
+  if(_res){
+    const _act = SIS_PLANO.filter(_enPlano).map(function(x){ return SIS_NOMBRE[x]; });
+    _res.textContent = (!_planoAbierto && _act.length) ? '· ' + _act.join(' + ') : '';
+  }
   cont.innerHTML = SIS_PLANO.map(function(s){
     const on = _enPlano(s);
     const esActual = (s === sistemaActual);
@@ -8793,6 +8857,7 @@ function addEvents(){
     }
   }, {passive: true});
   try{ renderPlanoCombinado(); }catch(e){}
+  try{ _aplicarCotzPlegado(); }catch(e){}
   if(typeof renderLineasGondola === 'function') renderLineasGondola();
   actualizarSelUnion();
 
