@@ -290,7 +290,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="gonPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="gonPasillo" value="1.6" min="0.6" max="10" step="0.1" style="width:100%">
+      <input type="number" id="gonPasillo" value="1.6" min="0.6" max="50" step="0.1" style="width:100%">
     </div>
     <!-- Selects espejo (ocultos) — reflejan la fila 1 de lineasGondola. Las funciones
          existentes (buildGondola, calcularBomGondola, configResumen, captura3D) siguen
@@ -332,7 +332,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="picPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="picPasillo" value="2.0" min="0.8" max="10" step="0.1" style="width:100%">
+      <input type="number" id="picPasillo" value="2.0" min="0.8" max="50" step="0.1" style="width:100%">
     </div>
     <div id="picPasarelaBox" style="display:none">
       <div style="display:flex;align-items:center;gap:4px">
@@ -417,7 +417,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="selPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="selPasillo" value="3.5" min="1" max="10" step="0.1" style="width:100%">
+      <input type="number" id="selPasillo" value="3.5" min="1" max="50" step="0.1" style="width:100%">
     </div>
     <div id="selPasarelaBox" style="display:none">
       <div style="display:flex;align-items:center;gap:4px">
@@ -533,7 +533,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="mecPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="mecPasillo" value="1.2" min="0.8" max="10" step="0.1" style="width:100%">
+      <input type="number" id="mecPasillo" value="1.2" min="0.8" max="50" step="0.1" style="width:100%">
     </div>
     <div style="display:none">
       <select id="mecAlto">
@@ -567,7 +567,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="canPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="canPasillo" value="3.5" min="1" max="10" step="0.1" style="width:100%">
+      <input type="number" id="canPasillo" value="3.5" min="1" max="50" step="0.1" style="width:100%">
     </div>
     <div style="display:none">
       <select id="canTipo">
@@ -709,10 +709,16 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.11';
+const CFG_VERSION = '2026.09.25.13';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
+// Tope del pasillo entre lineas. Estaba en 10 m en los 5 sistemas, y con el
+// plano combinado se queda corto: en una bodega de 20 m hay separaciones
+// legitimas mas grandes ("el pasillo entre lineas solo llega a 10", Isaac,
+// 25 sep 2026). Se sube a 50, que es el mismo tope que ya tiene la posicion
+// de un bloque.
+const PASILLO_MAX_M = 50;
 const IN_TO_M = 0.0254;
 // Marco picking integral (alto × fondo): SKU directo
 const MARCOS_PIC = {
@@ -1870,7 +1876,7 @@ function getConfigPic(){
   const largoCm = parseInt(document.getElementById('picLargo').value);
   const niveles = parseInt(document.getElementById('picNiveles').value);
   const cuerpos = parseInt(document.getElementById('picCuerpos').value);
-  const pasilloM = Math.max(0.8, Math.min(10, _uniAM(document.getElementById('picPasillo').value) || 2.0));
+  const pasilloM = Math.max(0.8, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('picPasillo').value) || 2.0));
   const lineas = lineasPicking.map(l => {
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, largoM = l.largoCm/100;
     const cuerposA = l.cuerpos;
@@ -4586,7 +4592,7 @@ function getConfigSel(){
   const niveles = parseInt(document.getElementById('selNiveles').value);
   const cuerpos = parseInt(document.getElementById('selCuerpos').value);
   const filas = tipoFila==='doble' ? 2 : 1;
-  const pasilloM = Math.max(1, Math.min(10, _uniAM(document.getElementById('selPasillo').value) || 3.5));
+  const pasilloM = Math.max(1, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('selPasillo').value) || 3.5));
   const lineas = lineasAlmacen.map(l => {
     const vi = VIGAS_INFO[l.vigaSku] || VIGAS_INFO['SEL-0362'];
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, vigaM = vi.largoIn * IN_TO_M;
@@ -4656,7 +4662,7 @@ function getConfigMec(){
     bloque: _bloqueDe(l),
     profM: fondoM * (l.tipo === 'doble' ? 2 : 1)
   }));
-  const pasilloM = Math.max(0.8, Math.min(10, _uniAM(document.getElementById('mecPasillo').value) || 1.2));
+  const pasilloM = Math.max(0.8, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('mecPasillo').value) || 1.2));
   const cuerposTot = lineas.reduce((a,l)=>a + l.cuerpos * (l.tipo==='doble'?2:1), 0);
   const maxLenM = Math.max(...lineas.map(l=>l.largoTotM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -4679,7 +4685,7 @@ function getConfigCan(){
     bloque: _bloqueDe(l),
     largoZM: (l.cuerpos - 1) * separacionM
   }));
-  const pasilloM = Math.max(1, Math.min(10, _uniAM(document.getElementById('canPasillo').value) || 3.5));
+  const pasilloM = Math.max(1, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('canPasillo').value) || 3.5));
   const anchoTotalM = lineas.reduce((a,l)=>a+l.anchoBaseM,0) + pasilloM*(lineas.length-1);
   const maxLargoZM = Math.max(...lineas.map(l=>l.largoZM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -5379,7 +5385,7 @@ function buildGondola(){
 
   // Pasillo peatonal entre filas. Antes estaba fijo en 1.6 m y no habia forma
   // de cambiarlo; ahora va en el mismo campo que los otros 4 sistemas.
-  const pasilloM = Math.max(0.6, Math.min(10,
+  const pasilloM = Math.max(0.6, Math.min(PASILLO_MAX_M,
     _uniAM((document.getElementById('gonPasillo')||{}).value) || 1.6));
 
   // Info geométrica de un juego de filas. Se usa dos veces: para el diseno
