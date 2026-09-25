@@ -3502,6 +3502,43 @@ let lineasAlmacen = [{tipo:'sencilla', cuerpos:1, altoIn:192, fondoIn:42, vigaSk
 let bloquesAlmacen = [{x:0, z:0, giro:0}];
 function _bloqueDe(l){ const b = parseInt(l && l.bloque); return Number.isFinite(b) && b >= 0 ? b : 0; }
 // Normaliza la lista de bloques de CUALQUIER sistema y devuelve la buena.
+// Coloca UNA isla dentro de la bodega. Pared X / Pared Y son la distancia de
+// la pared a la ORILLA del grupo, no un corrimiento desde el centro.
+//
+// Antes se hacia `gB.position.set(b.x, b.z)` a secas. Como cada sistema se arma
+// centrado en SU PROPIO tamaño, ese numero medía desde el centro de lo dibujado
+// — y ese centro se mueve en cuanto entra otro sistema al plano. Resultado: un
+// mecano puesto en Pared Y 0 se dibujaba pegado a la pared estando solo y a
+// 6.65 m de la pared al combinarlo con picking ("se mueve el mecano, no queda
+// en donde fue colocado", Isaac, 25 sep 2026).
+//
+// Ahora la esquina de la bodega es el origen (0,0) y cada bloque se corre lo
+// necesario para que su propia orilla caiga en (ParedX, ParedY). Con un solo
+// sistema en 0,0 el dibujo sale igual que antes, porque la bodega ya se pegaba
+// a la esquina del rack.
+function _colocarBloque(gB, b){
+  gB.rotation.y = (b && b.giro === 90) ? Math.PI/2 : 0;
+  gB.position.set(0, 0, 0);
+  let mnX = 0, mnZ = 0;
+  try{
+    gB.updateMatrixWorld(true);
+    const caja = new THREE.Box3(); let hay = false;
+    gB.traverse(function(o){
+      if(!o.isMesh) return;
+      // Las puntas de flecha de las cotas salen 1.55 m por fuera del rack y no
+      // siempre quedan marcadas como cota: si se cuentan, el bloque se ancla en
+      // la flecha y no en el rack. En todo el archivo el unico ConeGeometry es
+      // esa flecha. (25 sep 2026)
+      if(o.geometry && o.geometry.type === 'ConeGeometry') return;
+      for(let pa = o; pa && pa !== gB; pa = pa.parent){ if(pa.userData && pa.userData.cota) return; }
+      const bb = new THREE.Box3().setFromObject(o);
+      if(bb.isEmpty() || !isFinite(bb.min.x)) return;
+      caja.union(bb); hay = true;
+    });
+    if(hay){ mnX = caja.min.x; mnZ = caja.min.z; }
+  }catch(e){ console.warn('medir bloque:', e); }
+  gB.position.set((Number(b && b.x) || 0) - mnX, 0, (Number(b && b.z) || 0) - mnZ);
+}
 function _bloquesNormEn(bloques, lineas){
   let bs = (Array.isArray(bloques) && bloques.length) ? bloques : [{x:0, z:0, giro:0}];
   bs = bs.map(b => ({
@@ -4862,8 +4899,7 @@ function buildCantilever(){
     grupo = gB;
     try{ armarBloque(cfgB); }
     finally{ grupo = _grupoRaiz; }
-    gB.rotation.y = (b.giro === 90) ? Math.PI/2 : 0;
-    gB.position.set(b.x || 0, 0, b.z || 0);
+    _colocarBloque(gB, b);
     grupo.add(gB);
   });
   targetY = cfg.maxAltoM * 0.46;
@@ -5458,8 +5494,7 @@ function buildGondola(){
     grupo = gB;
     try{ armarBloque(fB); }
     finally{ grupo = _grupoRaizG; }
-    gB.rotation.y = (b.giro === 90) ? Math.PI/2 : 0;
-    gB.position.set(b.x || 0, 0, b.z || 0);
+    _colocarBloque(gB, b);
     grupo.add(gB);
   });
 
@@ -5901,7 +5936,11 @@ function agregarBodega(parent){
   // cotas" (Isaac). El cuarto se queda quieto y el rack se acomoda adentro;
   // si lo mandas fuera de la bodega, se ve fuera, que es justo lo que hay que
   // ver. Quien sigue al rack es la FOTO del PDF, ahi si conviene.
-  const cx0 = (A - _rackDims.x)/2, cz0 = (L - _rackDims.z)/2;
+  // La esquina -X/-Z del cuarto va en el origen: asi Pared X / Pared Y son de
+  // verdad la distancia a la pared, para cualquier sistema y en cualquier
+  // combinacion. (Antes el cuarto se pegaba a lo dibujado, que es lo que hacia
+  // que el numero significara otra cosa al combinar.)
+  const cx0 = A/2, cz0 = L/2;
   targetX = cx0 + 0.85; targetZ = cz0 + 0.85;   // recentrado por la banda de cotas
   // Piso semitransparente
   const piso = new THREE.Mesh(new THREE.PlaneGeometry(A, L),
@@ -6073,8 +6112,7 @@ function buildPicking(){
     grupo = gB;
     try{ armarBloque(cfgB); }
     finally{ grupo = _grupoRaiz; }
-    gB.rotation.y = (b.giro === 90) ? Math.PI/2 : 0;
-    gB.position.set(b.x || 0, 0, b.z || 0);
+    _colocarBloque(gB, b);
     grupo.add(gB);
   });
   // Cotas dimensionales en el modelo 3D
@@ -6314,8 +6352,7 @@ function buildSelectivo(){
     grupo = gB;                       // el armado escribe aqui
     try{ armarBloque(cfgB); }
     finally{ grupo = _grupoRaiz; }    // pase lo que pase se devuelve el grupo bueno
-    gB.rotation.y = (b.giro === 90) ? Math.PI/2 : 0;
-    gB.position.set(b.x || 0, 0, b.z || 0);
+    _colocarBloque(gB, b);
     grupo.add(gB);
   });
   const altoVista = Math.max(cfg.maxAltoM, cfg.pasarela.on ? cfg.pasarela.alturaM*(cfg.pasarela.niveles||1) + 1.1 : 0);
@@ -6590,6 +6627,17 @@ function build(){
     try{ const m = _dimsDesde3D(grupo); if(m) _rackDims = _soloXZY(m); }catch(e){ console.warn('medir con pasarela', e); }
   }
   try{ const _m = _dimsDesde3D(grupo); _rackCen = _m ? {x:_m.cx, z:_m.cz} : null; }catch(e){ _rackCen = null; }
+  // Las cotas generales (el alto, el largo, la escalerita de niveles) se dibujan
+  // al nivel del grupo con coordenadas que suponen el rack centrado en el
+  // origen. Desde que el rack se acomoda donde diga su Pared X / Pared Y eso ya
+  // no se cumple y las cotas se quedaban flotando aparte. Se les aplica el mismo
+  // corrimiento. Las cotas de ADENTRO de un bloque no se tocan: ya viajaron con
+  // su bloque. Las de la bodega tampoco, porque se dibujan despues de esto.
+  if(_rackCen && (_rackCen.x || _rackCen.z)){
+    grupo.children.forEach(function(o){
+      if(o && o.userData && o.userData.cota){ o.position.x += _rackCen.x; o.position.z += _rackCen.z; }
+    });
+  }
   // Sin el console.warn, un error aqui no se ve por ningun lado: la bodega se
   // dibuja a medias y la franja de "Cabe" se queda con el texto viejo. Asi se
   // nos fue una linea rota hasta produccion.
@@ -6647,10 +6695,19 @@ function build(){
     // cuadro. Un plano siempre debe mostrarse completo. (Isaac, 22 sep 2026)
     _encuadrarPlanta();
   }
+  // El rack ya no nace centrado en el origen: vive donde lo pone su Pared X /
+  // Pared Y. El muñeco y la camara se calculan como si estuviera centrado, asi
+  // que se les suma el centro real. Con todo en 0,0 ese centro es el de siempre
+  // y nada se mueve.
+  const _cnX = (_rackCen && isFinite(_rackCen.x)) ? _rackCen.x : 0;
+  const _cnZ = (_rackCen && isFinite(_rackCen.z)) ? _rackCen.z : 0;
   if(!vistaPlanta){   // en un plano el muneco no va
-    if(posMuneco) buildPersonaIsaac(grupo, posMuneco.x, posMuneco.z);
-    else buildPersonaIsaac(grupo, -extremoIzq, 0.3);
+    if(posMuneco) buildPersonaIsaac(grupo, _cnX + posMuneco.x, _cnZ + posMuneco.z);
+    else buildPersonaIsaac(grupo, _cnX - extremoIzq, _cnZ + 0.3);
   }
+  // Sin bodega nadie fija a donde mira la camara, y antes bastaba con el origen
+  // porque el rack estaba ahi. Ahora hay que apuntarle a donde de verdad esta.
+  if(!bodegaOn){ targetX = _cnX; targetZ = _cnZ; }
   // Ajustar cámara para que el muñeco quepa
   camDist = Math.max(camDist, extremoIzq + 1.8);
   // Con varios sistemas cada uno escribio SU resumen; el ultimo gana y engaña.
@@ -6758,8 +6815,7 @@ function buildMecano(){
     grupo = gB;
     try{ armarBloque(cfgB); }
     finally{ grupo = _grupoRaiz; }
-    gB.rotation.y = (b.giro === 90) ? Math.PI/2 : 0;
-    gB.position.set(b.x || 0, 0, b.z || 0);
+    _colocarBloque(gB, b);
     grupo.add(gB);
   });
   targetY = cfg.maxAltoM * 0.46;
