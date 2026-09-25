@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.16';
+const CFG_VERSION = '2026.09.25.17';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -6603,7 +6603,7 @@ function renderPlanoCombinado(){
       av.innerHTML = _planoCombinado()
         ? '<b>Plano combinado:</b> ' + dib.map(function(x){ return SIS_NOMBRE[x]; }).join(' + ')
           + (fuera.length ? ' <span style="color:#b07d00">(' + fuera.map(function(x){ return SIS_NOMBRE[x]; }).join(', ') + ' se ve pero no está palomeado)</span>' : '')
-          + '<br>Cada sistema se coloca con su <b>Pared X / Pared Y</b>. La cotización todavía sale por sistema — quita los palomeos para cotizar.'
+          + '<br>Cada sistema se coloca con su <b>Pared X / Pared Y</b>. La cotización los suma en un solo folio, con subtotal por sistema.'
         : 'Palomea otro sistema para verlos juntos en la misma bodega.';
     }
   }
@@ -7499,6 +7499,78 @@ function aplicarModoPiezas(on){
 }
 // ══════════════════ /PIEZAS SUELTAS ══════════════════
 
+// El mapeo de BOM -> renglones con precio vivia duplicado, igualito, en
+// renderCotizacion y en generarPDF. Con el plano combinado hay que correrlo una
+// vez por sistema, asi que se saca aqui: una sola cuenta, imposible que las dos
+// copias se separen y que la pantalla diga un precio y el PDF otro.
+// 'acc' se va llenando con el material, las piezas y los SKU sin precio.
+function _lineasDeBom(bom, acc){
+  acc = acc || {};
+  acc.materialUSD = acc.materialUSD || 0;
+  acc.piezas = acc.piezas || 0;
+  acc.faltantes = acc.faltantes || [];
+  return (bom || []).map(function(item){
+    if(!Array.isArray(item)){
+      const impUSD = item.precioUSD * item.cantidad;
+      acc.materialUSD += impUSD; acc.piezas += item.cantidad;
+      return { sku:item.sku, producto:item.producto, cantidad:item.cantidad, precioUSD:item.precioUSD, importeUSD:impUSD };
+    }
+    const key = item[0], cant = item[1];
+    const inv = preciosCache ? preciosCache[key] : null;
+    if(!inv) acc.faltantes.push(key);
+    const puUSD = inv ? inv.precio : 0;
+    const impUSD = puUSD * cant;
+    acc.materialUSD += impUSD; acc.piezas += cant;
+    const sku = inv ? inv.sku : (key.startsWith('PIC-')||key.startsWith('GON-')||key.startsWith('ACC-')||key.startsWith('SEL-') ? key : '—');
+    const producto = inv ? (inv.producto||key) : key;
+    return { sku:sku, producto:producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD };
+  });
+}
+
+// Un bloque de cotizacion por cada sistema que esta en el plano.
+// Por que bloques y no una sola lista: el recargo del 15% del picking azul y el
+// agrupado de gondola se calculan SOBRE EL MATERIAL, y cada uno debe pegarle
+// solo al suyo. Juntando todo primero, un plano de gondola + picking azul le
+// hubiera cobrado el 15% tambien a la gondola.
+// Con un solo sistema devuelve UN bloque y la cotizacion sale identica a antes.
+// calcularBOM(), _gonLineasAgrupadas() y configResumen() leen sistemaActual y
+// los campos de su pestaña, asi que se cambia la variable y se regresa a lo que
+// estaba — el mismo truco que ya usa build() para dibujar varios sistemas.
+function _bloquesCotiza(){
+  const dib = _sistemasDibujados();
+  const lista = (dib.length > 1) ? dib : [sistemaActual];
+  const prev = sistemaActual;
+  const out = [];
+  try{
+    lista.forEach(function(sis){
+      sistemaActual = sis;
+      let bom = [];
+      try{ bom = calcularBOM() || []; }catch(e){ console.warn('BOM de '+sis+':', e); }
+      const acc = {};
+      let lineas = _lineasDeBom(bom, acc);
+      // PICKING de color azul: el 15% va SOLO sobre el material del picking.
+      if(sis === 'picking'){
+        const colorPic = (document.getElementById('colorRack') || {}).value || 'verde';
+        if(colorPic === 'azul'){
+          const recargoUSD = acc.materialUSD * 0.15;
+          acc.materialUSD += recargoUSD;
+          lineas.push({ sku:'REC-AZUL', producto:'RECARGO POR COLOR AZUL (15% sobre material)',
+                        cantidad:1, precioUSD:recargoUSD, importeUSD:recargoUSD });
+        }
+      }
+      // GONDOLA: se agrupa SOLO su material. El desglose se guarda para el PDF interno.
+      let desglose = null;
+      if(sis === 'gondola'){ desglose = lineas.slice(); lineas = _gonLineasAgrupadas(acc.materialUSD); }
+      let cfgTxt = '';
+      try{ cfgTxt = (configResumen() || {}).txt || ''; }catch(e){ console.warn('configResumen de '+sis+':', e); }
+      out.push({ sis:sis, nombre:(SIS_NOMBRE[sis] || sis), lineas:lineas,
+                 materialUSD:acc.materialUSD, piezas:acc.piezas, faltantes:acc.faltantes,
+                 desglose:desglose, cfgTxt:cfgTxt });
+    });
+  } finally { sistemaActual = prev; }
+  return out;
+}
+
 function calcularBOM(){
   if(sistemaActual === 'piezas')    return calcularBomPiezas();
   if(sistemaActual === 'selectivo') return calcularBomSelectivo();
@@ -7509,82 +7581,44 @@ function calcularBOM(){
 }
 
 function renderCotizacion(){
-  // Con dos o mas sistemas en el plano la cotizacion todavia no sabe sumarlos
-  // (el recargo del 15% del picking azul y el agrupado de gondola se calculan
-  // sobre TODO el material). Antes de arriesgar un precio malo se avisa y se
-  // apaga el PDF. Lo combinado viene en la siguiente entrega.
+  // El plano combinado ya se cotiza. Cada sistema arma SU bloque de material
+  // (con su recargo y su agrupado), y el flete, la instalacion y el IVA se
+  // calculan UNA vez sobre la suma de todos. Hasta la v2026.09.25.16 esto salia
+  // "en pausa" con el PDF apagado, porque el recargo del 15% del picking azul y
+  // el agrupado de gondola se hubieran aplicado sobre TODO el material.
   const _pdfBtn = document.getElementById('pdfBtn');
-  if(_planoCombinado()){
-    const cot = document.getElementById('lista');
-    const est = document.getElementById('stats');
-    if(est) est.innerHTML = '';
-    if(cot) cot.innerHTML = '<div style="background:#fffbe9;border:1px solid #f0e4bf;border-radius:8px;padding:11px 13px;font-size:12px;color:#7a5a00;line-height:1.5">'
-      + '<b>Cotización en pausa</b><br>El plano está combinando ' + _sistemasDibujados().map(function(x){ return SIS_NOMBRE[x]; }).join(' + ')
-      + '. Sumar los precios de dos sistemas todavía no está hecho, así que prefiero no darte un número equivocado.<br>'
-      + 'Para cotizar, quita los palomeos de <b>PLANO COMBINADO</b> y cotiza un sistema a la vez.</div>';
-    if(_pdfBtn){ _pdfBtn.disabled = true; _pdfBtn.style.opacity = '.45'; _pdfBtn.style.cursor = 'not-allowed'; }
-    return;
-  }
   if(_pdfBtn){ _pdfBtn.disabled = false; _pdfBtn.style.opacity = ''; _pdfBtn.style.cursor = ''; }
   if(!preciosCache) return;
-  const bom = calcularBOM();
+  const bloques = _bloquesCotiza();
+  const combi = bloques.length > 1;
   // Cálculo interno SIEMPRE en USD; convertir solo al formatear
   const tc = monedaSel==='MXN' ? tcCache : 1;
   const sym = monedaSel==='MXN' ? '$' : 'US$';
   const fmt = usd => sym + (usd*tc).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-  let materialUSD = 0;
-  let piezasTot = 0;
-  let lineas = bom.map(item=>{
-    if(!Array.isArray(item)){
-      const impUSD = item.precioUSD * item.cantidad;
-      materialUSD += impUSD;
-      piezasTot += item.cantidad;
-      return { sku:item.sku, producto:item.producto, cantidad:item.cantidad, precioUSD:item.precioUSD, importeUSD:impUSD };
-    }
-    const [key, cant] = item;
-    const inv = preciosCache[key];
-    const puUSD = inv ? inv.precio : 0;
-    const impUSD = puUSD * cant;
-    materialUSD += impUSD;
-    piezasTot += cant;
-    const sku = inv ? inv.sku : (key.startsWith('PIC-')||key.startsWith('GON-')||key.startsWith('ACC-')||key.startsWith('SEL-') ? key : '—');
-    const producto = inv ? (inv.producto||key) : key;
-    return { sku, producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD };
-  });
+  let materialUSD = 0, piezasTot = 0;
+  bloques.forEach(function(b){ materialUSD += b.materialUSD; piezasTot += b.piezas; });
 
-  // PICKING con color azul: recargo del 15% sobre material
-  if(sistemaActual === 'picking'){
-    const colorPic = document.getElementById('colorRack')?.value || 'verde';
-    if(colorPic === 'azul'){
-      const recargoUSD = materialUSD * 0.15;
-      materialUSD += recargoUSD;
-      lineas.push({
-        sku: 'REC-AZUL',
-        producto: 'RECARGO POR COLOR AZUL (15% sobre material)',
-        cantidad: 1,
-        precioUSD: recargoUSD,
-        importeUSD: recargoUSD
-      });
-    }
-  }
-
-  // GÓNDOLA: agrupar el material — 1 sola línea si hay 1 fila; una línea por fila si hay varias.
-  // Guardamos el desglose para el PDF
+  // El desglose de góndola que guarda el PDF interno sale de SU bloque, no de
+  // la lista revuelta.
   window._desgloseGondola = null;
-  if(sistemaActual === 'gondola'){
-    window._desgloseGondola = lineas.slice();
-    lineas = _gonLineasAgrupadas(materialUSD);
-  }
-  // Flete como línea más del listado (no en el total)
+  const _bGon = bloques.filter(function(b){ return b.sis === 'gondola'; })[0];
+  if(_bGon) window._desgloseGondola = _bGon.desglose;
+
+  // Flete e instalación: UNA sola vez, sobre el material de todo el plano.
   const fleteUSD = (requiereEnvio && materialUSD > 0) ? calcularFlete(materialUSD).flete : 0;
-  if(requiereEnvio){
-    lineas.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
-  }
   const instalacionUSD = requiereInstalacion ? calcularInstalacion(materialUSD) : 0;
-  if(requiereInstalacion){
-    lineas.push({ sku:'SRV-INST', producto:'SERVICIO DE INSTALACION', cantidad:1, precioUSD:instalacionUSD, importeUSD:instalacionUSD });
+  const servicios = [];
+  if(requiereEnvio){
+    servicios.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
   }
+  if(requiereInstalacion){
+    servicios.push({ sku:'SRV-INST', producto:'SERVICIO DE INSTALACION', cantidad:1, precioUSD:instalacionUSD, importeUSD:instalacionUSD });
+  }
+  let lineas = [];
+  bloques.forEach(function(b){ lineas = lineas.concat(b.lineas); });
+  lineas = lineas.concat(servicios);
+
   const subtotalUSD = materialUSD + fleteUSD + instalacionUSD;
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
@@ -7600,7 +7634,7 @@ function renderCotizacion(){
     const cls = disp<=0 ? 'stk-no' : (disp<need ? 'stk-par' : 'stk-ok');
     return ` <span class="stk ${cls}">${disp} disp</span>`;
   };
-  document.getElementById('lista').innerHTML = lineas.map(l=>`
+  const _liHTML = l => `
     <div class="li">
       <div>
         <div class="sku">${l.sku}</div>
@@ -7612,10 +7646,36 @@ function renderCotizacion(){
         <div class="im">${fmt(l.importeUSD)}</div>
       </div>
     </div>
-  `).join('');
+  `;
+  // Con plano combinado: un encabezado y un subtotal por sistema, para que se
+  // vea que cuesta cada parte y el cliente pueda pedir que le quiten una.
+  // Con un solo sistema el HTML sale exactamente igual que antes.
+  const _cab = (txt, sub) => '<div style="display:flex;align-items:baseline;gap:7px;margin:10px 0 3px;'
+      + 'padding-bottom:3px;border-bottom:1px solid #e6e2d8">'
+      + '<b style="font-size:12px;letter-spacing:.03em">' + txt + '</b>'
+      + (sub ? '<span style="font-size:11px;color:#8a8279">' + sub + '</span>' : '') + '</div>';
+  let _html;
+  if(combi){
+    _html = bloques.map(function(b){
+      return _cab(b.nombre.toUpperCase(), b.lineas.length + ' partida' + (b.lineas.length!==1?'s':''))
+        + b.lineas.map(_liHTML).join('')
+        + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 2px 2px">'
+        + '<span style="font-weight:600">Subtotal ' + b.nombre + '</span><span>' + fmt(b.materialUSD) + '</span></div>';
+    }).join('');
+    if(servicios.length) _html += _cab('SERVICIOS', '') + servicios.map(_liHTML).join('');
+  } else {
+    _html = lineas.map(_liHTML).join('');
+  }
+  document.getElementById('lista').innerHTML = _html;
 
   // Stats
-  if(sistemaActual === 'piezas'){
+  if(combi){
+    // Con varios sistemas, los datos de UNO solo (cuerpos, niveles) engañan.
+    document.getElementById('stats').innerHTML =
+      '<div class="s"><div class="v">' + bloques.length + '</div><div class="l">Sistemas</div></div>' +
+      '<div class="s"><div class="v">' + lineas.length + '</div><div class="l">Partidas</div></div>' +
+      '<div class="s"><div class="v">' + piezasTot + '</div><div class="l">Piezas</div></div>';
+  } else if(sistemaActual === 'piezas'){
     const nPart = lineas.filter(l => l.sku && l.sku.indexOf('SRV-')!==0 && l.sku!=='SEL-0305').length;
     document.getElementById('medidasResumen').innerHTML =
       '<b>Piezas sueltas</b> · ' + nPart + ' partida' + (nPart!==1?'s':'') + '<br>Sin rack armado · folio <b>PZ-</b>';
@@ -8373,60 +8433,37 @@ async function generarPDF(datos, opts){
   const GREY_BG = [245,246,247];
 
   // ── Cálculos ──
-  const bom = calcularBOM();
+  // Las mismas cuentas que renderCotizacion, con los mismos bloques: si esto se
+  // separa de la pantalla, el cliente ve en el PDF un precio que no le cotizaron.
+  const bloques = _bloquesCotiza();
+  const combi = bloques.length > 1;
   const tc = monedaSel==='MXN' ? tcCache : 1;
   const sym = monedaSel==='MXN' ? '$' : 'US$';
   const fmt = usd => sym + ' ' + (usd*tc).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   let materialUSD = 0, faltantes = [];
-  const lineas = bom.map(item=>{
-    if(!Array.isArray(item)){
-      const impUSD = item.precioUSD * item.cantidad;
-      materialUSD += impUSD;
-      return { sku:item.sku, producto:item.producto, cantidad:item.cantidad, precioUSD:item.precioUSD, importeUSD:impUSD };
-    }
-    const [key, cant] = item;
-    const inv = preciosCache[key];
-    if(!inv) faltantes.push(key);
-    const puUSD = inv ? inv.precio : 0;
-    const impUSD = puUSD * cant;
-    materialUSD += impUSD;
-    const sku = inv ? inv.sku : (key.startsWith('PIC-')||key.startsWith('GON-')||key.startsWith('ACC-')||key.startsWith('SEL-') ? key : '—');
-    const producto = inv ? (inv.producto||key) : key;
-    return { sku, producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD };
+  bloques.forEach(function(b){
+    materialUSD += b.materialUSD;
+    faltantes = faltantes.concat(b.faltantes || []);
   });
 
-  // PICKING con color azul: recargo del 15% sobre material (misma lógica que renderCotizacion)
-  if(sistemaActual === 'picking'){
-    const colorPic = document.getElementById('colorRack')?.value || 'verde';
-    if(colorPic === 'azul'){
-      const recargoUSD = materialUSD * 0.15;
-      materialUSD += recargoUSD;
-      lineas.push({
-        sku: 'REC-AZUL',
-        producto: 'RECARGO POR COLOR AZUL (15% sobre material)',
-        cantidad: 1,
-        precioUSD: recargoUSD,
-        importeUSD: recargoUSD
-      });
-    }
-  }
-
-  // GÓNDOLA: colapsar y guardar desglose. 1 fila = 1 línea; multi-fila = 1 línea por fila.
+  // GÓNDOLA: el desglose para el PDF interno sale de SU bloque.
   let desgloseGondola = null;
-  let lineasParaPDF = lineas;
-  if(sistemaActual === 'gondola'){
-    desgloseGondola = lineas.slice();
-    lineasParaPDF = _gonLineasAgrupadas(materialUSD);
-  }
+  const _bGon = bloques.filter(function(b){ return b.sis === 'gondola'; })[0];
+  if(_bGon) desgloseGondola = _bGon.desglose;
 
   const fleteUSD = (requiereEnvio && materialUSD > 0) ? calcularFlete(materialUSD).flete : 0;
-  if(requiereEnvio){
-    lineasParaPDF.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
-  }
   const instalacionUSD = requiereInstalacion ? calcularInstalacion(materialUSD) : 0;
-  if(requiereInstalacion){
-    lineasParaPDF.push({ sku:'SRV-INST', producto:'SERVICIO DE INSTALACION', cantidad:1, precioUSD:instalacionUSD, importeUSD:instalacionUSD });
+  const servicios = [];
+  if(requiereEnvio){
+    servicios.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
   }
+  if(requiereInstalacion){
+    servicios.push({ sku:'SRV-INST', producto:'SERVICIO DE INSTALACION', cantidad:1, precioUSD:instalacionUSD, importeUSD:instalacionUSD });
+  }
+  let lineasParaPDF = [];
+  bloques.forEach(function(b){ lineasParaPDF = lineasParaPDF.concat(b.lineas); });
+  lineasParaPDF = lineasParaPDF.concat(servicios);
+
   const subtotalUSD = materialUSD + fleteUSD + instalacionUSD;
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
@@ -8524,11 +8561,12 @@ async function generarPDF(datos, opts){
   // ── CONFIGURACIÓN (solo en PDF interno; el cliente no la ve) ──
   y = y + boxH + 10;
   if(soloInterno){
-    const cfg = configResumen();
+    // Con plano combinado se apila la configuracion de cada sistema.
+    const cfgTxt = bloques.map(function(b){ return b.cfgTxt; }).filter(Boolean).join('\n');
     doc.setFont('helvetica','normal');
     doc.setFontSize(9);
     const cfgMaxW = W - M - 110 - 8;
-    const cfgLines = doc.splitTextToSize(cfg.txt, cfgMaxW);
+    const cfgLines = doc.splitTextToSize(cfgTxt, cfgMaxW);
     const cfgRectH = cfgLines.length > 1 ? 8 + 12 * cfgLines.length : 22;
     doc.setFillColor(...GREY_BG);
     doc.rect(M, y, W - M*2, cfgRectH, 'F');
@@ -8542,16 +8580,34 @@ async function generarPDF(datos, opts){
   }
 
   // ── TABLA ──
+  // Con plano combinado se mete un renglon de encabezado y uno de subtotal por
+  // sistema. Con un solo sistema sale exactamente la misma tabla de siempre.
+  const _filaPDF = l => [
+    l.producto,
+    l.cantidad + ' Unidades',
+    fmt(l.precioUSD),
+    'IVA('+IVA_FIJO+'%)',
+    fmt(l.importeUSD)
+  ];
+  let filasTabla = [];
+  if(combi){
+    bloques.forEach(function(b){
+      filasTabla.push([{ content:b.nombre.toUpperCase(), colSpan:5,
+                         styles:{ fontStyle:'bold', textColor:ORANGE, fillColor:GREY_BG } }]);
+      b.lineas.forEach(function(l){ filasTabla.push(_filaPDF(l)); });
+      filasTabla.push([
+        { content:'Subtotal '+b.nombre, colSpan:4, styles:{ fontStyle:'bold', halign:'right' } },
+        { content:fmt(b.materialUSD), styles:{ fontStyle:'bold', halign:'right' } }
+      ]);
+    });
+    servicios.forEach(function(l){ filasTabla.push(_filaPDF(l)); });
+  } else {
+    filasTabla = lineasParaPDF.map(_filaPDF);
+  }
   doc.autoTable({
     startY: y,
     head: [['DESCRIPCIÓN','CANTIDAD','PRECIO UNITARIO','IMPUESTOS','IMPORTE']],
-    body: lineasParaPDF.map(l => [
-      l.producto,
-      l.cantidad + ' Unidades',
-      fmt(l.precioUSD),
-      'IVA('+IVA_FIJO+'%)',
-      fmt(l.importeUSD)
-    ]),
+    body: filasTabla,
     margin:{left:M, right:M},
     theme:'plain',
     styles:{ fontSize:9, cellPadding:{top:4,right:6,bottom:4,left:6}, textColor:DARK },
@@ -8686,7 +8742,12 @@ async function generarPDF(datos, opts){
   if(btnSubmit){ btnSubmit.disabled = true; btnSubmit.textContent = 'Procesando…'; }
 
   // Preparar payload de venta
-  const sistemaLabel = sistemaActual==='piezas' ? 'Piezas sueltas' : (sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking' : 'Góndola'));
+  // El folio NO cambia: sigue saliendo de la pestaña en la que estas parado
+  // (RW-/GW-/PW-), como pidio Isaac. Lo que cambia es la etiqueta, para que en
+  // ISA-OS se vea que la cotizacion trae varios sistemas.
+  const sistemaLabel = combi
+    ? ('Plano mixto · ' + bloques.map(function(b){ return b.nombre; }).join(' + '))
+    : (sistemaActual==='piezas' ? 'Piezas sueltas' : (sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking' : 'Góndola')));
   const lineasVenta = lineasParaPDF.map(l => ({
     producto: l.producto,
     cantidad: l.cantidad,
@@ -8729,7 +8790,7 @@ async function generarPDF(datos, opts){
         stage: 'Presupuesto',
         estatus: 'Web',
         moneda: monedaSel,
-        plantilla: sistemaLabel + ' · ' + configResumen().txt,
+        plantilla: sistemaLabel + ' · ' + bloques.map(function(b){ return b.cfgTxt; }).filter(Boolean).join(' | '),
         lineas: lineasVenta,
         total: parseFloat((totalUSD * tc).toFixed(2)),
         // ISA-OS NO guarda el PDF: vuelve a armar el presupuesto con estos
