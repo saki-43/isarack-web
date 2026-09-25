@@ -268,6 +268,11 @@ gtag('config', 'G-XXXXXXXXXX');
         <div id="bodEstado" style="font-size:10px;font-weight:600;margin-top:4px;line-height:1.25"></div>
       </div>
     </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:10px;color:#8a8579;letter-spacing:.05em;font-weight:600;margin-bottom:3px">PLANO COMBINADO</div>
+      <div id="planoChks" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+      <div id="planoAviso" style="display:none;font-size:9.5px;color:#6b6257;line-height:1.45;margin-top:4px;background:#f7f4ef;border-left:2px solid #da6635;padding:4px 7px;border-radius:0 5px 5px 0"></div>
+    </div>
   </div>
 
   <!-- Opciones GÓNDOLA -->
@@ -701,7 +706,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.03';
+const CFG_VERSION = '2026.09.25.04';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1190,6 +1195,14 @@ function cambiarUnidad(nueva){
 // Bodega (cuarto con medidas para ver cuánto entra) + dimensiones actuales del rack
 let bodegaOn = false;
 let _rackDims = null;   // {x: largo total, z: fondo total, y: alto} en metros
+// CENTRO real de lo dibujado, medido del 3D. Con los bloques (y con el plano
+// combinado) el conjunto ya no nace centrado en el origen, asi que la bodega no
+// se puede colocar suponiendolo: se dibujaba corrida y las filas se salian del
+// cuarto aunque el "Cabe" dijera que si (Isaac, 25 sep 2026).
+// Se guarda el CENTRO y no la esquina a proposito: con el rack centrado vale
+// 0 y la formula de la bodega queda bit por bit como estaba, asi que ningun
+// diseno de los que ya existen se mueve ni un milimetro.
+let _rackCen = null;
 function fmtCota(m){
   if(unidadCota === 'cm') return Math.round(m*100) + ' CM';
   if(unidadCota === 'in') return Math.round(m/0.0254) + '"';
@@ -5840,7 +5853,12 @@ function agregarBodega(parent){
   // mueve es la BODEGA, asi que separarlo de la pared es correr el cuarto al reves:
   // restandole la separacion a su centro, el hueco queda del lado -X / -Z.
   const sx = Math.max(0, _uniAM(gv('bodSepX'))), sz = Math.max(0, _uniAM(gv('bodSepY')));
-  const cx0 = (A - _rackDims.x)/2 - sx, cz0 = (L - _rackDims.z)/2 - sz;
+  // El cuarto sigue al rack: si el rack se corrio con las coordenadas de su
+  // bloque, el cuarto se corre lo mismo. Centrado en el origen el corrimiento
+  // es 0 y queda la formula de siempre.
+  const ceX = (_rackCen && isFinite(_rackCen.x)) ? _rackCen.x : 0;
+  const ceZ = (_rackCen && isFinite(_rackCen.z)) ? _rackCen.z : 0;
+  const cx0 = (A - _rackDims.x)/2 - sx + ceX, cz0 = (L - _rackDims.z)/2 - sz + ceZ;
   targetX = cx0 + 0.85; targetZ = cz0 + 0.85;   // recentrado por la banda de cotas
   // Piso semitransparente
   const piso = new THREE.Mesh(new THREE.PlaneGeometry(A, L),
@@ -6350,6 +6368,9 @@ function _barandalMLDesde3D(g, alturaPiso){
   porPiso.forEach(tubo => { total += Math.ceil(tubo / BAR_TUBOS.length); });
   return total;
 }
+// _rackDims solo debe traer x/z/y: hay codigo (y pruebas) que recorre sus
+// llaves, y el centro es un dato aparte.
+function _soloXZY(d){ return d ? {x:d.x, z:d.z, y:d.y} : null; }
 function _dimsDesde3D(g){
   if(!g || typeof THREE === 'undefined') return null;
   // El grupo todavia no pasa por el render, asi que sus matrices de mundo estan
@@ -6369,7 +6390,66 @@ function _dimsDesde3D(g){
     caja.union(bb); hay = true;
   });
   if(!hay) return null;
-  return { x: caja.max.x - caja.min.x, z: caja.max.z - caja.min.z, y: Math.max(caja.max.y, 0) };
+  return { x: caja.max.x - caja.min.x, z: caja.max.z - caja.min.z, y: Math.max(caja.max.y, 0),
+           // centro real, para que la bodega siga al rack cuando su bloque se corre
+           cx: (caja.min.x + caja.max.x)/2, cz: (caja.min.z + caja.max.z)/2 };
+}
+// ── PLANO COMBINADO ──────────────────────────────────────────────────────────
+// Varios sistemas dibujados en la misma bodega. Cada uno se coloca con las
+// coordenadas de SU bloque (Pared X / Pared Y / Giro de su pestaña); "Separar
+// de pared" no sirve para esto porque mueve el cuarto, no el rack.
+const SIS_PLANO = ['gondola', 'picking', 'selectivo', 'mecano', 'cantilever'];
+const SIS_NOMBRE = {gondola:'Góndola', picking:'Picking', selectivo:'Selectivo', mecano:'Mecano', cantilever:'Cantilever'};
+let sistemasPlano = [];   // vacio = todo funciona igual que siempre
+function _enPlano(s){ return sistemasPlano.indexOf(s) >= 0; }
+// Lo que se DIBUJA: los palomeados, mas la pestaña en la que estas (para no
+// editar a ciegas). Sin nadie palomeado devuelve vacio y build() hace lo de hoy.
+function _sistemasDibujados(){
+  const base = SIS_PLANO.filter(_enPlano);
+  if(!base.length) return [];
+  if(sistemaActual === 'piezas') return base;
+  return base.indexOf(sistemaActual) >= 0 ? base : base.concat([sistemaActual]);
+}
+function _planoCombinado(){ return _sistemasDibujados().length > 1; }
+function planoToggle(s, on){
+  const i = sistemasPlano.indexOf(s);
+  if(on && i < 0) sistemasPlano.push(s);
+  else if(!on && i >= 0) sistemasPlano.splice(i, 1);
+  renderPlanoCombinado(); build();
+}
+function renderPlanoCombinado(){
+  const cont = document.getElementById('planoChks');
+  if(!cont) return;
+  cont.innerHTML = SIS_PLANO.map(function(s){
+    const on = _enPlano(s);
+    const esActual = (s === sistemaActual);
+    return '<label class="chk" style="margin:0;font-size:10.5px;padding:2px 6px;border-radius:6px;white-space:nowrap;'
+      + (on ? 'background:#fceee6;font-weight:700;color:#8a3d18' : 'color:#6b6257') + '">'
+      + '<input type="checkbox" onchange="planoToggle(\'' + s + '\',this.checked)"' + (on ? ' checked' : '') + '> '
+      + SIS_NOMBRE[s] + (esActual && !on ? ' <span style="font-size:9px;color:#b07d00">(viéndose)</span>' : '')
+      + '</label>';
+  }).join('');
+  const av = document.getElementById('planoAviso');
+  if(av){
+    const dib = _sistemasDibujados();
+    if(!dib.length){ av.style.display = 'none'; }
+    else {
+      av.style.display = '';
+      const fuera = dib.filter(function(x){ return !_enPlano(x); });
+      av.innerHTML = _planoCombinado()
+        ? '<b>Plano combinado:</b> ' + dib.map(function(x){ return SIS_NOMBRE[x]; }).join(' + ')
+          + (fuera.length ? ' <span style="color:#b07d00">(' + fuera.map(function(x){ return SIS_NOMBRE[x]; }).join(', ') + ' se ve pero no está palomeado)</span>' : '')
+          + '<br>Cada sistema se coloca con su <b>Pared X / Pared Y</b>. La cotización todavía sale por sistema — quita los palomeos para cotizar.'
+        : 'Palomea otro sistema para verlos juntos en la misma bodega.';
+    }
+  }
+}
+function _buildSistema(s){
+  if(s === 'selectivo') buildSelectivo();
+  else if(s === 'picking') buildPicking();
+  else if(s === 'mecano') buildMecano();
+  else if(s === 'cantilever') buildCantilever();
+  else buildGondola();
 }
 function build(){
   if(grupo){
@@ -6389,19 +6469,34 @@ function build(){
     scene.remove(obj);
   }
   grupo = new THREE.Group();
-  _rackDims = null;
+  _rackDims = null; _rackCen = null;
   targetX = 0; targetZ = 0;   // sin bodega, la camara mira al centro del rack
   _COTA_PEND = [];
-  if(sistemaActual === 'selectivo') buildSelectivo();
-  else if(sistemaActual === 'picking') buildPicking();
-  else if(sistemaActual === 'mecano') buildMecano();
-  else if(sistemaActual === 'cantilever') buildCantilever();
-  else buildGondola();
+  const _dibujar = _sistemasDibujados();
+  if(_dibujar.length > 1){
+    // Cada sistema se arma con su propio `sistemaActual` porque varios
+    // ayudantes (el muñeco, _hayPasarela) preguntan por el. Se restaura pase
+    // lo que pase. La camara se queda con el encuadre mas grande de todos.
+    const _sisPrev = sistemaActual;
+    let _tyMax = 0, _cdMax = 0;
+    try{
+      _dibujar.forEach(function(s){
+        sistemaActual = s;
+        targetY = 0; camDist = 0;
+        _buildSistema(s);
+        _tyMax = Math.max(_tyMax, targetY); _cdMax = Math.max(_cdMax, camDist);
+      });
+    } finally { sistemaActual = _sisPrev; }
+    targetY = _tyMax; camDist = _cdMax;
+    // Cada sistema publica SUS medidas; el "Cabe" tiene que mirar el conjunto,
+    // asi que se vuelve a medir del 3D ya armado.
+    _rackDims = null;
+  } else _buildSistema(sistemaActual);
   // Góndola, Mecano y Cantilever no publican _rackDims: se saca del propio 3D,
   // midiendo solo la geometría del rack (las cotas van marcadas y no cuentan).
   // Así "Mostrar bodega" sirve en los cinco sistemas, y en el que venga después.
   try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
-  if(!_rackDims){ try{ _rackDims = _dimsDesde3D(grupo); }catch(e){ console.warn('medir rack', e); } }
+  if(!_rackDims){ try{ _rackDims = _soloXZY(_dimsDesde3D(grupo)); }catch(e){ console.warn('medir rack', e); } }
   // Con PASARELA el conjunto se sale del racking: corredor peatonal por fuera en
   // los dos extremos del largo y, en PS-1, la escalera al frente. La formula de
   // cada sistema solo mide el rack, asi que el "Cabe" decia que si y en obra no
@@ -6412,8 +6507,9 @@ function build(){
   // tener que repetir la cuenta por cada modelo de pasarela. El muñeco y la
   // bodega se agregan despues, no entran en la medida.
   if(_rackDims && _hayPasarela()){
-    try{ const m = _dimsDesde3D(grupo); if(m) _rackDims = m; }catch(e){ console.warn('medir con pasarela', e); }
+    try{ const m = _dimsDesde3D(grupo); if(m) _rackDims = _soloXZY(m); }catch(e){ console.warn('medir con pasarela', e); }
   }
+  try{ const _m = _dimsDesde3D(grupo); _rackCen = _m ? {x:_m.cx, z:_m.cz} : null; }catch(e){ _rackCen = null; }
   try{ agregarBodega(grupo); }catch(e){}
   // Muñeco Isaac al lado izquierdo del rack (referencia de escala 1.75 m)
   // Con pasarela + escalera, se coloca junto a la base de la escalera
@@ -6474,6 +6570,16 @@ function build(){
   }
   // Ajustar cámara para que el muñeco quepa
   camDist = Math.max(camDist, extremoIzq + 1.8);
+  // Con varios sistemas cada uno escribio SU resumen; el ultimo gana y engaña.
+  // Se reemplaza por el del conjunto, medido del 3D.
+  if(_dibujar.length > 1){
+    const nom = _dibujar.map(function(x){ return SIS_NOMBRE[x]; }).join(' + ');
+    const d = _rackDims;
+    const med = d ? ('Ancho <b>'+d.x.toFixed(2)+' m</b> · Largo <b>'+d.z.toFixed(2)+' m</b> · Alto <b>'+d.y.toFixed(2)+' m</b>') : '';
+    const el1 = document.getElementById('dims'), el2 = document.getElementById('medidasResumen');
+    if(el1) el1.innerHTML = 'Plano combinado · ' + nom + (med ? ' · ' + med : '');
+    if(el2) el2.innerHTML = '<b>Plano combinado · ' + nom + '</b><br>' + med;
+  }
   scene.add(grupo);
   renderCotizacion();
 }
@@ -7132,6 +7238,23 @@ function calcularBOM(){
 }
 
 function renderCotizacion(){
+  // Con dos o mas sistemas en el plano la cotizacion todavia no sabe sumarlos
+  // (el recargo del 15% del picking azul y el agrupado de gondola se calculan
+  // sobre TODO el material). Antes de arriesgar un precio malo se avisa y se
+  // apaga el PDF. Lo combinado viene en la siguiente entrega.
+  const _pdfBtn = document.getElementById('pdfBtn');
+  if(_planoCombinado()){
+    const cot = document.getElementById('lista');
+    const est = document.getElementById('stats');
+    if(est) est.innerHTML = '';
+    if(cot) cot.innerHTML = '<div style="background:#fffbe9;border:1px solid #f0e4bf;border-radius:8px;padding:11px 13px;font-size:12px;color:#7a5a00;line-height:1.5">'
+      + '<b>Cotización en pausa</b><br>El plano está combinando ' + _sistemasDibujados().map(function(x){ return SIS_NOMBRE[x]; }).join(' + ')
+      + '. Sumar los precios de dos sistemas todavía no está hecho, así que prefiero no darte un número equivocado.<br>'
+      + 'Para cotizar, quita los palomeos de <b>PLANO COMBINADO</b> y cotiza un sistema a la vez.</div>';
+    if(_pdfBtn){ _pdfBtn.disabled = true; _pdfBtn.style.opacity = '.45'; _pdfBtn.style.cursor = 'not-allowed'; }
+    return;
+  }
+  if(_pdfBtn){ _pdfBtn.disabled = false; _pdfBtn.style.opacity = ''; _pdfBtn.style.cursor = ''; }
   if(!preciosCache) return;
   const bom = calcularBOM();
   // Cálculo interno SIEMPRE en USD; convertir solo al formatear
@@ -8465,6 +8588,7 @@ function addEvents(){
   // El bloque de la bodega nace con display:none en el HTML y solo se encendia
   // al picar una pestana de sistema. Al cargar la pagina quedaba escondido.
   document.getElementById('bodegaShared').style.display = (sistemaActual==='piezas') ? 'none' : '';
+  try{ renderPlanoCombinado(); }catch(e){}
   if(typeof renderLineasGondola === 'function') renderLineasGondola();
   actualizarSelUnion();
 
@@ -8515,6 +8639,7 @@ function addEvents(){
       }
       aplicarModoPiezas(sistemaActual==='piezas');
       ajustarSelectorColor();
+      try{ renderPlanoCombinado(); }catch(e){}
       if(sistemaActual==='piezas'){ try{ renderCotizacion(); }catch(e){} }
       else build();
     });
@@ -8553,7 +8678,7 @@ function addEvents(){
 // sin paneles ni controles: el cliente solo puede girar y acercar.
 const _PREFIJO_SIS = {picking:'pic', selectivo:'sel', mecano:'mec', cantilever:'can'};
 function estadoConfigurador(){
-  const st = {s: sistemaActual, c: {}, l: {}};
+  const st = {s: sistemaActual, c: {}, l: {}, plano: sistemasPlano.slice()};
   const pre = _PREFIJO_SIS[sistemaActual] || null;
   document.querySelectorAll('#ctrl input, #ctrl select').forEach(el => {
     if(!el.id) return;
@@ -8562,6 +8687,15 @@ function estadoConfigurador(){
                        : !/^(pic|sel|mec|can)[A-Z]/.test(el.id);
     if(!propio && el.id !== 'auto') return;
     st.c[el.id] = (el.type === 'checkbox') ? (el.checked ? 1 : 0) : el.value;
+  });
+  // Con plano combinado el enlace tiene que llevar las filas de TODOS los
+  // sistemas dibujados; si no, al abrirlo el cliente ve uno solo.
+  _sistemasDibujados().forEach(function(x){
+    if(x === 'gondola'){ st.l.gon = lineasGondola; st.l.bloqGon = bloquesGondola; }
+    else if(x === 'selectivo'){ st.l.alm = lineasAlmacen; st.l.bloq = bloquesAlmacen; }
+    else if(x === 'picking'){ st.l.pic = lineasPicking; st.l.bloqPic = bloquesPicking; }
+    else if(x === 'mecano'){ st.l.mec = lineasMecano; st.l.bloqMec = bloquesMecano; }
+    else if(x === 'cantilever'){ st.l.can = lineasCantilever; st.l.bloqCan = bloquesCantilever; }
   });
   if(sistemaActual === 'gondola'){ st.l.gon = lineasGondola; st.l.bloqGon = bloquesGondola; }
   else if(sistemaActual === 'selectivo'){ st.l.alm = lineasAlmacen; st.l.bloq = bloquesAlmacen; }
@@ -8581,6 +8715,8 @@ function estadoConfigurador(){
 }
 function aplicarEstado(st){
   if(!st) return;
+  // Enlace viejo: sin `plano` abre como un solo sistema, igual que siempre.
+  sistemasPlano = Array.isArray(st.plano) ? st.plano.filter(function(x){ return SIS_PLANO.indexOf(x) >= 0; }) : [];
   if(st.l){
     if(st.l.alm) lineasAlmacen    = st.l.alm;
     // Enlace viejo: no trae bloques, asi que abre como una sola isla en 0,0 y
