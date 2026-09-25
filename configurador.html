@@ -701,7 +701,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.24.17';
+const CFG_VERSION = '2026.09.24.18';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1863,6 +1863,7 @@ function getConfigPic(){
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB,
       altoIn: l.altoIn, fondoIn: l.fondoIn, largoCm: l.largoCm, niveles: l.niveles,
       nivMod: !!l.nivMod, nivelesA: l.nivelesA || null, nivelesB: l.nivelesB || null,
+      bloque: _bloqueDe(l),
       marcoIzqExistente: !!l.marcoIzqExistente, marcoDerExistente: !!l.marcoDerExistente,
       clarosOn: !!l.clarosOn, claros: l.claros || null,
       clarosModA: l.clarosModA || null, clarosModB: l.clarosModB || null,
@@ -3010,6 +3011,7 @@ function lineasSyncPic(){
 function renderLineasPicking(){
   lineasPicking.forEach(_nivNormaliza);
   const cont = document.getElementById('picLineasList');
+  const _htmlBloquesP = _bloquesHtml('lp', bloquesPicking, lineasPicking, _bloqueActivoPic());
   cont.innerHTML = lineasPicking.map((l, i) => {
     const esD = l.tipo === 'doble';
     const bg = esD ? '#faf0ea' : '#eef4fb';
@@ -3054,6 +3056,15 @@ function renderLineasPicking(){
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lpNivMod('+i+',this.checked)"> Niveles por módulo</label>'
           + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB, 'lpNivSet') : '')
         + '</div>'
+        + (bloquesPicking.length > 1
+            ? '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+              + '<span style="font-size:10px;color:'+tx+';font-weight:600">📦 Bloque</span>'
+              + '<select onchange="lpFilaBloque('+i+',this.value)" style="font-size:10px;padding:2px 4px;border:1px solid '+bd+';border-radius:5px;background:#fff">'
+              + bloquesPicking.map(function(bb, ib){ return '<option value="'+ib+'"'+(_bloqueDe(l)===ib?' selected':'')+'>'+String.fromCharCode(65+ib)+'</option>'; }).join('')
+              + '</select>'
+              + '<span style="font-size:9px;color:#999">En qué parte de la bodega va esta fila.</span>'
+            + '</div>'
+            : '')
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<div style="font-size:10px;color:'+tx+';font-weight:600;margin-bottom:2px">🔗 Marco existente del cliente</div>'
           + '<div style="font-size:9px;color:#888;margin-bottom:3px">La fila se apoya en un marco que el cliente ya tiene. Se descuenta del cotizado.</div>'
@@ -3073,6 +3084,8 @@ function renderLineasPicking(){
     // Mismo recuadro que los otros 4 sistemas (Isaac, 21 sep 2026).
     return _cardLinea('lp', i, l, {total: lineasPicking.length, chipHtml: chip, detalleHtml: detalle});
   }).join('');
+  cont.innerHTML = _htmlBloquesP + cont.innerHTML;
+
   lineasSyncPic();
 }
 
@@ -3080,11 +3093,16 @@ function renderLineasPicking(){
 // su palomita: claros de viga a la medida ya hace lo mismo. _huecosManualesEsc()
 // se queda y sigue leyendo escH de los links viejos.
 
-function lpAdd(tipo){
+function lpAdd(tipo, iB){
   if(lineasPicking.length >= 8) return;
-  const ult = lineasPicking[lineasPicking.length-1];
+  _bloquesNormPic();
+  const destino = Number.isFinite(parseInt(iB)) ? Math.max(0, Math.min(bloquesPicking.length - 1, parseInt(iB))) : _bloqueActivoPic();
+  const delB = _filasDeBloque(lineasPicking, destino);
+  const ult = delB[delB.length - 1] || lineasPicking[lineasPicking.length - 1];
   lineasPicking.forEach(l => l.abierta = false);
-  lineasPicking.push({tipo, cuerpos: ult.cuerpos, cuerposB:null, altoIn: ult.altoIn, fondoIn: ult.fondoIn, largoCm: ult.largoCm, niveles: ult.niveles, abierta:false});
+  lineasPicking.push({tipo, cuerpos: ult.cuerpos, altoIn: ult.altoIn, fondoIn: ult.fondoIn,
+                      largoCm: ult.largoCm, niveles: ult.niveles, abierta:false, bloque: destino});
+  _bloqueActPic = destino;
   renderLineasPicking(); build();
 }
 function lpDel(i){
@@ -3108,6 +3126,45 @@ function lpCuerposFila(i, fila, d){
 }
 function lpTipo(i){
   lineasPicking[i].tipo = lineasPicking[i].tipo === 'doble' ? 'sencilla' : 'doble';
+  renderLineasPicking(); build();
+}
+// ── BLOQUES DE PICKING ──────────────────────────────────────────────────────
+// Misma idea que en Selectivo y con las mismas funciones de fondo; aqui solo
+// viven el arreglo y los envoltorios. (Isaac, 24 sep 2026: "falta aplicar lo de
+// los bloques en los demas".)
+let bloquesPicking = [{x:0, z:0, giro:0}];
+let _bloqueActPic = 0;
+function _bloquesNormPic(){ bloquesPicking = _bloquesNormEn(bloquesPicking, lineasPicking); }
+function _bloqueActivoPic(){ _bloquesNormPic(); return Math.max(0, Math.min(bloquesPicking.length - 1, _bloqueActPic || 0)); }
+function lpBloqueActivo(iB){ _bloqueActPic = parseInt(iB) || 0; renderLineasPicking(); }
+function lpBloqueAdd(){
+  _bloquesNormPic();
+  if(bloquesPicking.length >= 6) return;
+  const ult = bloquesPicking[bloquesPicking.length - 1] || {x:0, z:0};
+  bloquesPicking.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0});
+  renderLineasPicking(); build();
+}
+function lpBloqueDel(iB){
+  _bloquesNormPic();
+  if(bloquesPicking.length <= 1) return;
+  lineasPicking.forEach(l => {
+    const b = _bloqueDe(l);
+    if(b === iB) l.bloque = 0; else if(b > iB) l.bloque = b - 1;
+  });
+  bloquesPicking.splice(iB, 1);
+  renderLineasPicking(); build();
+}
+function lpBloqueSet(iB, campo, val){
+  _bloquesNormPic();
+  const b = bloquesPicking[iB];
+  if(!b) return;
+  if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
+  renderLineasPicking(); build();
+}
+function lpFilaBloque(i, iB){
+  _bloquesNormPic();
+  lineasPicking[i].bloque = Math.max(0, Math.min(bloquesPicking.length - 1, parseInt(iB) || 0));
   renderLineasPicking(); build();
 }
 function lpMarcoExistente(i, lado, on){
@@ -3354,29 +3411,36 @@ let lineasAlmacen = [{tipo:'sencilla', cuerpos:1, altoIn:192, fondoIn:42, vigaSk
 // El giro es 0 o 90 y nada mas: el libre complica el "Cabe / sobra" y no se usa.
 let bloquesAlmacen = [{x:0, z:0, giro:0}];
 function _bloqueDe(l){ const b = parseInt(l && l.bloque); return Number.isFinite(b) && b >= 0 ? b : 0; }
-function _bloquesNormaliza(){
-  if(!Array.isArray(bloquesAlmacen) || !bloquesAlmacen.length) bloquesAlmacen = [{x:0, z:0, giro:0}];
-  bloquesAlmacen = bloquesAlmacen.map(b => ({
+// Normaliza la lista de bloques de CUALQUIER sistema y devuelve la buena.
+function _bloquesNormEn(bloques, lineas){
+  let bs = (Array.isArray(bloques) && bloques.length) ? bloques : [{x:0, z:0, giro:0}];
+  bs = bs.map(b => ({
     x: Number(b && b.x) || 0, z: Number(b && b.z) || 0,
     giro: (Number(b && b.giro) === 90) ? 90 : 0
   }));
-  const n = bloquesAlmacen.length;
-  lineasAlmacen.forEach(l => { if(_bloqueDe(l) >= n) l.bloque = 0; });
+  const n = bs.length;
+  (lineas || []).forEach(l => { if(_bloqueDe(l) >= n) l.bloque = 0; });
+  return bs;
 }
+function _bloquesNormaliza(){ bloquesAlmacen = _bloquesNormEn(bloquesAlmacen, lineasAlmacen); }
 function _filasDeBloque(lineas, iB){ return (lineas || []).filter(l => _bloqueDe(l) === iB); }
 // cfg recortado a las filas de UN bloque: las medidas totales se recalculan con
 // esas filas, asi la escalera, la pasarela y las cotas funcionan igual sin
 // enterarse de que hay mas bloques.
-function _cfgDeBloque(cfg, filas){
+// campoLargo: de donde sale el largo de una fila. Selectivo usa largoM y
+// Picking largoTotM, que es lo unico que cambia entre sistemas.
+function _cfgDeBloqueGen(cfg, filas, campoLargo){
   if(!filas.length) return null;
   const pas = cfg.pasilloM;
+  const k = campoLargo || 'largoM';
   return Object.assign({}, cfg, {
     lineas: filas,
-    maxLenM: Math.max(...filas.map(l => l.largoM)),
+    maxLenM: Math.max(...filas.map(l => l[k])),
     maxAltoM: Math.max(...filas.map(l => l.altoM)),
     profTotalM: filas.reduce((a, l) => a + l.profM, 0) + pas * (filas.length - 1)
   });
 }
+function _cfgDeBloque(cfg, filas){ return _cfgDeBloqueGen(cfg, filas, 'largoM'); }
 
 function lineasSync(){
   // Espejo de la línea 1 en los selects ocultos (compatibilidad con código legado)
@@ -4241,45 +4305,49 @@ function lnFilaBloque(i, iB){
   renderLineasAlmacen(); build();
 }
 // Tarjetas de los bloques, arriba de las filas.
-function _bloquesHtml(){
-  _bloquesNormaliza();
-  if(bloquesAlmacen.length <= 1 && !lineasAlmacen.some(l => _bloqueDe(l) > 0)){
+// pfx: 'ln' para Almacen/Selectivo, 'lp' para Picking. Asi el mismo panel de
+// bloques sirve a los dos sin duplicar 40 lineas de HTML.
+function _bloquesHtml(pfx, bloques, lineas, activo){
+  pfx = pfx || 'ln';
+  const esSel = (pfx === 'ln');
+  if(esSel){ _bloquesNormaliza(); bloques = bloquesAlmacen; lineas = lineasAlmacen; activo = _bloqueActivo(); }
+  if(bloques.length <= 1 && !lineas.some(l => _bloqueDe(l) > 0)){
     // Con una sola isla el panel no cambia: solo el boton para agregar otra.
-    return '<div style="margin-bottom:6px"><button class="btn-chip" onclick="lnBloqueAdd()" '
+    return '<div style="margin-bottom:6px"><button class="btn-chip" onclick="' + pfx + 'BloqueAdd()" '
       + 'style="border:1px dashed #da6635;background:#fff;color:#da6635;cursor:pointer;font-weight:700;padding:5px 9px;border-radius:7px;font-size:11px">'
       + '+ Bloque aparte</button>'
       + '<div style="font-size:9px;color:#999;margin-top:2px">Otro grupo de filas en otra parte de la bodega.</div></div>';
   }
   const u = _uniSufijo();
   let h = '<div style="font-size:10px;color:#8a8579;letter-spacing:.05em;font-weight:600;margin:2px 0 4px">BLOQUES EN LA BODEGA</div>';
-  bloquesAlmacen.forEach((b, iB) => {
-    const nF = _filasDeBloque(lineasAlmacen, iB).length;
-    const act = (iB === _bloqueActivo());
-    h += '<div onclick="lnBloqueActivo(' + iB + ')" style="border:1px solid ' + (act ? '#da6635' : '#e0dbcd') + ';border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer' + (act ? ';box-shadow:0 0 0 2px rgba(218,102,53,.13)' : '') + '">'
+  bloques.forEach((b, iB) => {
+    const nF = _filasDeBloque(lineas, iB).length;
+    const act = (iB === activo);
+    h += '<div onclick="' + pfx + 'BloqueActivo(' + iB + ')" style="border:1px solid ' + (act ? '#da6635' : '#e0dbcd') + ';border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer' + (act ? ';box-shadow:0 0 0 2px rgba(218,102,53,.13)' : '') + '">'
       + '<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;font-size:11px;font-weight:700;background:' + (act ? '#fceee6' : '#fdf6f1') + ';border-radius:7px 7px 0 0">'
         + '<span>Bloque ' + String.fromCharCode(65 + iB) + '</span>'
         + '<span style="font-weight:500;color:#8a8579">' + nF + (nF === 1 ? ' fila' : ' filas') + '</span>'
         + '<span style="flex:1"></span>'
-        + (bloquesAlmacen.length > 1 ? '<span onclick="if(confirm(\'¿Quitar el bloque ' + String.fromCharCode(65 + iB) + '? Sus filas pasan al bloque A.\'))lnBloqueDel(' + iB + ')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px" title="Quitar bloque">🗑</span>' : '')
+        + (bloques.length > 1 ? '<span onclick="if(confirm(\'¿Quitar el bloque ' + String.fromCharCode(65 + iB) + '? Sus filas pasan al bloque A.\'))lnBloqueDel(' + iB + ')" style="cursor:pointer;color:#fff;background:#c62828;font-size:10px;font-weight:700;padding:2px 5px;border-radius:5px" title="Quitar bloque">🗑</span>' : '')
       + '</div>'
       + '<div style="display:flex;gap:5px;padding:6px 7px">'
         + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Desde pared X (' + u + ')</div>'
-          + '<input type="number" step="0.1" value="' + _uniDeM(b.x) + '" onchange="lnBloqueSet(' + iB + ',\'x\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
+          + '<input type="number" step="0.1" value="' + _uniDeM(b.x) + '" onchange="' + pfx + 'BloqueSet(' + iB + ',\'x\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
         + '<div style="flex:1"><div style="font-size:9px;color:#999;margin-bottom:1px">Desde pared Y (' + u + ')</div>'
-          + '<input type="number" step="0.1" value="' + _uniDeM(b.z) + '" onchange="lnBloqueSet(' + iB + ',\'z\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
+          + '<input type="number" step="0.1" value="' + _uniDeM(b.z) + '" onchange="' + pfx + 'BloqueSet(' + iB + ',\'z\',this.value)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>'
         + '<div style="width:64px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
-          + '<select onchange="lnBloqueSet(' + iB + ',\'giro\',this.value)" style="width:100%;font-size:11px;padding:3px 2px;border:1px solid #ddd7c8;border-radius:5px">'
+          + '<select onchange="' + pfx + 'BloqueSet(' + iB + ',\'giro\',this.value)" style="width:100%;font-size:11px;padding:3px 2px;border:1px solid #ddd7c8;border-radius:5px">'
           + '<option value="0"' + (b.giro === 90 ? '' : ' selected') + '>0°</option>'
           + '<option value="90"' + (b.giro === 90 ? ' selected' : '') + '>90°</option></select></div>'
       + '</div>'
       + '<div style="display:flex;gap:5px;padding:0 7px 7px">'
-        + '<button type="button" onclick="lnAdd(\'sencilla\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>'
-        + '<button type="button" onclick="lnAdd(\'doble\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila doble</button>'
+        + '<button type="button" onclick="' + pfx + 'Add(\'sencilla\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>'
+        + '<button type="button" onclick="' + pfx + 'Add(\'doble\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila doble</button>'
       + '</div>'
       + (nF === 0 ? '<div style="font-size:9px;color:#b07d00;background:#fffbe9;border-top:1px solid #f0e4bf;padding:5px 7px;line-height:1.45">Este bloque está vacío. Agrégale una fila con los botones de arriba, o cambia una fila al bloque ' + String.fromCharCode(65 + iB) + ' desde su 📦 Bloque.</div>' : '')
       + '</div>';
   });
-  h += '<div style="margin-bottom:6px"><button class="btn-chip" onclick="lnBloqueAdd()" style="border:1px dashed #da6635;background:#fff;color:#da6635;cursor:pointer;font-weight:700;padding:5px 9px;border-radius:7px;font-size:11px">+ Bloque aparte</button></div>';
+  h += '<div style="margin-bottom:6px"><button class="btn-chip" onclick="' + pfx + 'BloqueAdd()" style="border:1px dashed #da6635;background:#fff;color:#da6635;cursor:pointer;font-weight:700;padding:5px 9px;border-radius:7px;font-size:11px">+ Bloque aparte</button></div>';
   return h;
 }
 function lnMarcoExistente(i, lado, on){
@@ -5635,6 +5703,9 @@ function agregarBodega(parent){
 function buildPicking(){
   const cfg = getConfigPic();
   // ── Renderizar cada línea con sus propias medidas; dobles = espalda con espalda pegadas ──
+  // Mismo patron que en Selectivo: armarBloque arma UNA isla con su propio cfg,
+  // recortado a sus filas, y el llamador cambia `grupo` por el sub-grupo.
+  function armarBloque(cfg){
   const lineas = cfg.lineas;
   const profTotal = cfg.profTotalM;
   const maxLen = cfg.maxLenM;
@@ -5721,6 +5792,23 @@ function buildPicking(){
     };
   }
   if(cfg.pasarela.on) dibujarPasarela(cfg, pasillosInfo, xInicio, matVigaPic);
+  }
+  const lineas = cfg.lineas;
+  const profTotal = cfg.profTotalM;
+  const maxLen = cfg.maxLenM;
+  _bloquesNormPic();
+  const _grupoRaiz = grupo;
+  bloquesPicking.forEach((b, iBl) => {
+    const cfgB = _cfgDeBloqueGen(cfg, _filasDeBloque(cfg.lineas, iBl), 'largoTotM');
+    if(!cfgB) return;
+    const gB = new THREE.Group();
+    grupo = gB;
+    try{ armarBloque(cfgB); }
+    finally{ grupo = _grupoRaiz; }
+    gB.rotation.y = (b.giro === 90) ? Math.PI/2 : 0;
+    gB.position.set(b.x || 0, 0, b.z || 0);
+    grupo.add(gB);
+  });
   // Cotas dimensionales en el modelo 3D
   agregarCotas(grupo, maxLen, profTotal, cfg.maxAltoM, 400, lineas[0].largoM);
   // Cota(s) de la altura de la pasarela, por fuera del marco (mismo costado)
@@ -8222,7 +8310,7 @@ function estadoConfigurador(){
     st.c[el.id] = (el.type === 'checkbox') ? (el.checked ? 1 : 0) : el.value;
   });
   if(sistemaActual === 'selectivo'){ st.l.alm = lineasAlmacen; st.l.bloq = bloquesAlmacen; }
-  else if(sistemaActual === 'picking')    st.l.pic = lineasPicking;
+  else if(sistemaActual === 'picking'){ st.l.pic = lineasPicking; st.l.bloqPic = bloquesPicking; }
   else if(sistemaActual === 'mecano')     st.l.mec = lineasMecano;
   else if(sistemaActual === 'cantilever') st.l.can = lineasCantilever;
   else if(sistemaActual === 'piezas')     st.pz = piezasCarrito.map(c => [c.sku, c.cant]);
@@ -8245,6 +8333,8 @@ function aplicarEstado(st){
     bloquesAlmacen = Array.isArray(st.l.bloq) && st.l.bloq.length ? st.l.bloq : [{x:0, z:0, giro:0}];
     try{ _bloquesNormaliza(); }catch(e){}
     if(st.l.pic) lineasPicking    = st.l.pic;
+    bloquesPicking = Array.isArray(st.l.bloqPic) && st.l.bloqPic.length ? st.l.bloqPic : [{x:0, z:0, giro:0}];
+    try{ _bloquesNormPic(); }catch(e){}
     if(st.l.mec) lineasMecano     = st.l.mec;
     if(st.l.can) lineasCantilever = st.l.can;
   }
