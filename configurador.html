@@ -706,7 +706,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.04';
+const CFG_VERSION = '2026.09.25.05';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3173,7 +3173,9 @@ function lpBloqueSet(iB, campo, val){
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
-  renderLineasPicking(); build();
+  // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
+  // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
+  build();
 }
 function lpFilaBloque(i, iB){
   _bloquesNormPic();
@@ -3410,8 +3412,10 @@ function lcBloqueSet(iB, campo, val){
   _bloquesNormCan();
   const b = bloquesCantilever[iB];
   if(!b) return;
-  if(campo === 'giro') b.giro = (parseInt(val) === 90) ? 90 : 0;
-  else b[campo] = _uniAM(val) || 0;
+  if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
+  // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
+  // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
   build();
 }
 function lcFilaBloque(i, iB){
@@ -3665,8 +3669,10 @@ function gonBloqueSet(iB, campo, val){
   _bloquesNormGon();
   const b = bloquesGondola[iB];
   if(!b) return;
-  if(campo === 'giro') b.giro = (parseInt(val) === 90) ? 90 : 0;
-  else b[campo] = _uniAM(val) || 0;
+  if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
+  // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
+  // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
   build();
 }
 function gonFilaBloque(i, iB){
@@ -4442,7 +4448,9 @@ function lnBloqueSet(iB, campo, val){
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
-  renderLineasAlmacen(); build();
+  // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
+  // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
+  build();
 }
 function lnFilaBloque(i, iB){
   _bloquesNormaliza();
@@ -4505,7 +4513,11 @@ function _bloquesHtml(pfx, bloques, lineas, activo){
         + '<button type="button" onclick="' + pfx + 'Add(\'sencilla\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>'
         + '<button type="button" onclick="' + pfx + 'Add(\'doble\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila doble</button>'
       + '</div>'
-      + (nF === 0 ? '<div style="font-size:9px;color:#b07d00;background:#fffbe9;border-top:1px solid #f0e4bf;padding:5px 7px;line-height:1.45">Este bloque está vacío. Agrégale una fila con los botones de arriba, o cambia una fila al bloque ' + String.fromCharCode(65 + iB) + ' desde su 📦 Bloque.</div>' : '')
+      + (nF === 0 ? '<div style="font-size:9px;color:#b07d00;background:#fffbe9;border-top:1px solid #f0e4bf;padding:5px 7px;line-height:1.45">'
+          + 'Este bloque está vacío, por eso el dibujo no cambia. '
+          + '<b>Su posición (X ' + _uniDeM(b.x) + ', Y ' + _uniDeM(b.z) + ') y su giro de ' + (b.giro === 90 ? '90°' : '0°') + ' ya quedaron guardados</b> '
+          + 'y se van a ver en cuanto tenga una fila. Agrégasela con los botones de arriba, o cambia una fila al bloque '
+          + String.fromCharCode(65 + iB) + ' desde su 📦 Bloque.</div>' : '')
       + '</div>';
   });
   h += '<div style="margin-bottom:6px"><button class="btn-chip" onclick="' + pfx + 'BloqueAdd()" style="border:1px dashed #da6635;background:#fff;color:#da6635;cursor:pointer;font-weight:700;padding:5px 9px;border-radius:7px;font-size:11px">+ Bloque aparte</button></div>';
@@ -5853,12 +5865,13 @@ function agregarBodega(parent){
   // mueve es la BODEGA, asi que separarlo de la pared es correr el cuarto al reves:
   // restandole la separacion a su centro, el hueco queda del lado -X / -Z.
   const sx = Math.max(0, _uniAM(gv('bodSepX'))), sz = Math.max(0, _uniAM(gv('bodSepY')));
-  // El cuarto sigue al rack: si el rack se corrio con las coordenadas de su
-  // bloque, el cuarto se corre lo mismo. Centrado en el origen el corrimiento
-  // es 0 y queda la formula de siempre.
-  const ceX = (_rackCen && isFinite(_rackCen.x)) ? _rackCen.x : 0;
-  const ceZ = (_rackCen && isFinite(_rackCen.z)) ? _rackCen.z : 0;
-  const cx0 = (A - _rackDims.x)/2 - sx + ceX, cz0 = (L - _rackDims.z)/2 - sz + ceZ;
+  // El cuarto NO sigue al rack. Se intento el 25 sep y fue un error: al mover
+  // Pared X / Pared Y se movian los dos juntos y el rack nunca cambiaba de
+  // lugar dentro de la bodega — "cuando quiero reubicarlo solo se mueven las
+  // cotas" (Isaac). El cuarto se queda quieto y el rack se acomoda adentro;
+  // si lo mandas fuera de la bodega, se ve fuera, que es justo lo que hay que
+  // ver. Quien sigue al rack es la FOTO del PDF, ahi si conviene.
+  const cx0 = (A - _rackDims.x)/2 - sx, cz0 = (L - _rackDims.z)/2 - sz;
   targetX = cx0 + 0.85; targetZ = cz0 + 0.85;   // recentrado por la banda de cotas
   // Piso semitransparente
   const piso = new THREE.Mesh(new THREE.PlaneGeometry(A, L),
@@ -6444,6 +6457,31 @@ function renderPlanoCombinado(){
     }
   }
 }
+// Selectivo y Picking PUBLICAN sus medidas calculadas del cfg (fila india, sin
+// girar). Eso deja de ser cierto en cuanto un bloque se mueve o se gira: con
+// giro 90 seguia diciendo 1.20 x 0.61 cuando de verdad medía 0.72 x 1.36, asi
+// que el "Cabe · sobra" contaba el eje equivocado y la bodega se dibujaba con
+// el tamaño equivocado (Isaac, 25 sep 2026). Cuando los bloques no estan en su
+// sitio de siempre, las medidas se sacan del 3D ya armado.
+function _bloquesMovidos(){
+  const dib = _sistemasDibujados();
+  if(dib.length > 1) return true;
+  const lista = dib.length ? dib : [sistemaActual];
+  const de = {gondola: () => bloquesGondola, picking: () => bloquesPicking,
+              selectivo: () => bloquesAlmacen, mecano: () => bloquesMecano,
+              cantilever: () => bloquesCantilever};
+  for(let i = 0; i < lista.length; i++){
+    const f = de[lista[i]];
+    if(!f) continue;
+    let bs = null;
+    try{ bs = f(); }catch(e){ continue; }
+    if(!Array.isArray(bs) || !bs.length) continue;
+    if(bs.length > 1) return true;
+    const b = bs[0];
+    if(b && (Number(b.x) || Number(b.z) || Number(b.giro))) return true;
+  }
+  return false;
+}
 function _buildSistema(s){
   if(s === 'selectivo') buildSelectivo();
   else if(s === 'picking') buildPicking();
@@ -6496,7 +6534,10 @@ function build(){
   // midiendo solo la geometría del rack (las cotas van marcadas y no cuentan).
   // Así "Mostrar bodega" sirve en los cinco sistemas, y en el que venga después.
   try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
-  if(!_rackDims){ try{ _rackDims = _soloXZY(_dimsDesde3D(grupo)); }catch(e){ console.warn('medir rack', e); } }
+  if(!_rackDims || _bloquesMovidos()){
+    try{ const _d = _soloXZY(_dimsDesde3D(grupo)); if(_d) _rackDims = _d; }
+    catch(e){ console.warn('medir rack', e); }
+  }
   // Con PASARELA el conjunto se sale del racking: corredor peatonal por fuera en
   // los dos extremos del largo y, en PS-1, la escalera al frente. La formula de
   // cada sistema solo mide el rack, asi que el "Cabe" decia que si y en obra no
@@ -6613,7 +6654,9 @@ function lmBloqueSet(iB, campo, val){
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
-  renderLineasMecano(); build();
+  // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
+  // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
+  build();
 }
 function lmFilaBloque(i, iB){
   _bloquesNormMec();
