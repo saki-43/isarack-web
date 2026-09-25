@@ -701,7 +701,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.25.01';
+const CFG_VERSION = '2026.09.25.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3372,8 +3372,44 @@ function lineasSyncCan(){
   document.getElementById('canPasilloRow').style.display = lineasCantilever.length > 1 ? '' : 'none';
 }
 
+let bloquesCantilever = [{x:0, z:0, giro:0}];
+let _bloqueActCan = 0;
+function _bloquesNormCan(){ bloquesCantilever = _bloquesNormEn(bloquesCantilever, lineasCantilever); }
+function _bloqueActivoCan(){ _bloquesNormCan(); return Math.max(0, Math.min(bloquesCantilever.length - 1, _bloqueActCan || 0)); }
+function lcBloqueActivo(iB){ _bloqueActCan = parseInt(iB) || 0; renderLineasCantilever(); }
+function lcBloqueAdd(){
+  _bloquesNormCan();
+  if(bloquesCantilever.length >= 6) return;
+  const ult = bloquesCantilever[bloquesCantilever.length - 1] || {x:0, z:0};
+  bloquesCantilever.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0});
+  _bloqueActCan = bloquesCantilever.length - 1;
+  renderLineasCantilever(); build();
+}
+function lcBloqueDel(iB){
+  _bloquesNormCan();
+  if(bloquesCantilever.length <= 1) return;
+  lineasCantilever.forEach(l => { const b = _bloqueDe(l); if(b === iB) l.bloque = 0; else if(b > iB) l.bloque = b - 1; });
+  bloquesCantilever.splice(iB, 1);
+  _bloqueActCan = 0;
+  renderLineasCantilever(); build();
+}
+function lcBloqueSet(iB, campo, val){
+  _bloquesNormCan();
+  const b = bloquesCantilever[iB];
+  if(!b) return;
+  if(campo === 'giro') b.giro = (parseInt(val) === 90) ? 90 : 0;
+  else b[campo] = _uniAM(val) || 0;
+  build();
+}
+function lcFilaBloque(i, iB){
+  _bloquesNormCan();
+  lineasCantilever[i].bloque = Math.max(0, Math.min(bloquesCantilever.length - 1, parseInt(iB) || 0));
+  _bloqueActCan = lineasCantilever[i].bloque;
+  renderLineasCantilever(); build();
+}
 function renderLineasCantilever(){
   const cont = document.getElementById('canLineasList');
+  const _htmlBloquesC = _bloquesHtml('lc', bloquesCantilever, lineasCantilever, _bloqueActivoCan());
   cont.innerHTML = lineasCantilever.map((l, i) => {
     const nivOpts = [3,4,5,6,7].map(n=>[n,String(n)]);
     const detalle =
@@ -3386,16 +3422,31 @@ function renderLineasCantilever(){
     const flip = l.tipo !== 'doble'
       ? '<span onclick="event.stopPropagation();lcFlip('+i+')" style="cursor:pointer;color:'+(l.tipo==='doble'?'#993C1D':'#185FA5')+';font-size:12px;font-weight:700;padding:1px 4px;line-height:1;flex-shrink:0" title="Voltear: brazos al otro lado">'+(l.volteada?'⇐':'⇒')+'</span>'
       : '';
+    const letraB = bloquesCantilever.length > 1 ? '📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ' : '';
+    const selB = bloquesCantilever.length > 1
+      ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px;padding-top:3px"><span style="font-size:10px;color:#666;font-weight:600">📦 Bloque</span>'
+        + '<select onchange="lcFilaBloque('+i+',this.value)" style="font-size:10px;padding:2px 4px;border:1px solid #d9d4c5;border-radius:5px;background:#fff">'
+        + bloquesCantilever.map(function(bb, ib){ return '<option value="'+ib+'"'+(_bloqueDe(l)===ib?' selected':'')+'>'+String.fromCharCode(65+ib)+'</option>'; }).join('')
+        + '</select></div>'
+      : '';
     return _cardLinea('lc', i, l, {total: lineasCantilever.length, abPermitido:false, flip: flip,
-      chip: l.altoFt+"' · brazo "+l.brazoIn+'\" · '+l.niveles+' niv', detalle});
+      chip: letraB+l.altoFt+"' · brazo "+l.brazoIn+'\" · '+l.niveles+' niv', detalle: detalle + selB});
   }).join('');
+  cont.innerHTML = _htmlBloquesC + cont.innerHTML;
   lineasSyncCan();
 }
-function lcAdd(tipo){
+function lcAdd(tipo, iB){
   if(lineasCantilever.length >= 8) return;
-  const u = lineasCantilever[lineasCantilever.length-1];
+  // el panel de bloques es comun a los 5 sistemas y manda 'sencilla';
+  // aqui las filas se llaman 'sencillo'.
+  if(tipo === 'sencilla') tipo = 'sencillo';
+  _bloquesNormCan();
+  const destino = Number.isFinite(parseInt(iB)) ? Math.max(0, Math.min(bloquesCantilever.length-1, parseInt(iB))) : _bloqueActivoCan();
+  const delB = _filasDeBloque(lineasCantilever, destino);
+  const u = delB[delB.length-1] || lineasCantilever[lineasCantilever.length-1];
   lineasCantilever.forEach(l=>l.abierta=false);
-  lineasCantilever.push({tipo, cuerpos:u.cuerpos, cuerposB:null, altoFt:u.altoFt, brazoIn:u.brazoIn, niveles:u.niveles, abierta:false});
+  lineasCantilever.push({tipo, cuerpos:u.cuerpos, cuerposB:null, altoFt:u.altoFt, brazoIn:u.brazoIn, niveles:u.niveles, abierta:false, bloque:destino});
+  _bloqueActCan = destino;
   renderLineasCantilever(); build();
 }
 function lcDel(i){ if(lineasCantilever.length<=1) return; lineasCantilever.splice(i,1); renderLineasCantilever(); build(); }
@@ -3451,6 +3502,18 @@ function _cfgDeBloqueGen(cfg, filas, campoLargo){
     maxLenM: Math.max(...filas.map(l => l[k])),
     maxAltoM: Math.max(...filas.map(l => l.altoM)),
     profTotalM: filas.reduce((a, l) => a + l.profM, 0) + pas * (filas.length - 1)
+  });
+}
+// Cantilever acomoda sus filas sobre el eje X, no sobre el Z: por eso lleva su
+// propio recorte (anchoTotalM en vez de profTotalM).
+function _cfgDeBloqueCan(cfg, filas){
+  if(!filas.length) return null;
+  const pas = cfg.pasilloM;
+  return Object.assign({}, cfg, {
+    lineas: filas,
+    anchoTotalM: filas.reduce((a, l) => a + l.anchoBaseM, 0) + pas * (filas.length - 1),
+    maxLargoZM: Math.max(...filas.map(l => l.largoZM)),
+    maxAltoM: Math.max(...filas.map(l => l.altoM))
   });
 }
 function _cfgDeBloque(cfg, filas){ return _cfgDeBloqueGen(cfg, filas, 'largoM'); }
@@ -3564,12 +3627,62 @@ function _gonEspejar(){
   set('cabeceras', l.cabeceras);
 }
 
+let bloquesGondola = [{x:0, z:0, giro:0}];
+let _bloqueActGon = 0;
+function _bloquesNormGon(){ bloquesGondola = _bloquesNormEn(bloquesGondola, lineasGondola); }
+function _bloqueActivoGon(){ _bloquesNormGon(); return Math.max(0, Math.min(bloquesGondola.length - 1, _bloqueActGon || 0)); }
+function gonBloqueActivo(iB){ _bloqueActGon = parseInt(iB) || 0; renderLineasGondola(); }
+function gonBloqueAdd(){
+  _bloquesNormGon();
+  if(bloquesGondola.length >= 6) return;
+  const ult = bloquesGondola[bloquesGondola.length - 1] || {x:0, z:0};
+  bloquesGondola.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0});
+  _bloqueActGon = bloquesGondola.length - 1;
+  renderLineasGondola(); build();
+}
+function gonBloqueDel(iB){
+  _bloquesNormGon();
+  if(bloquesGondola.length <= 1) return;
+  lineasGondola.forEach(l => { const b = _bloqueDe(l); if(b === iB) l.bloque = 0; else if(b > iB) l.bloque = b - 1; });
+  bloquesGondola.splice(iB, 1);
+  _bloqueActGon = 0;
+  renderLineasGondola(); build();
+}
+function gonBloqueSet(iB, campo, val){
+  _bloquesNormGon();
+  const b = bloquesGondola[iB];
+  if(!b) return;
+  if(campo === 'giro') b.giro = (parseInt(val) === 90) ? 90 : 0;
+  else b[campo] = _uniAM(val) || 0;
+  build();
+}
+function gonFilaBloque(i, iB){
+  _bloquesNormGon();
+  lineasGondola[i].bloque = Math.max(0, Math.min(bloquesGondola.length - 1, parseInt(iB) || 0));
+  _bloqueActGon = lineasGondola[i].bloque;
+  renderLineasGondola(); build();
+}
+// El panel de bloques es comun a los 5 sistemas y llama a <pfx>Add(tipo, iB).
+function gonAdd(tipo, iB){
+  _bloquesNormGon();
+  const destino = Number.isFinite(parseInt(iB)) ? Math.max(0, Math.min(bloquesGondola.length-1, parseInt(iB))) : _bloqueActivoGon();
+  lineasGondola.forEach(l => { l.abierta = false; });
+  const nueva = _gonDefaultFila(tipo);
+  nueva.abierta = true;
+  nueva.bloque = destino;
+  lineasGondola.push(nueva);
+  _bloqueActGon = destino;
+  renderLineasGondola();
+  if(typeof build === 'function') build();
+  if(typeof renderCotizacion === 'function') renderCotizacion();
+}
 function renderLineasGondola(){
   lineasGondola.forEach(_gonNormaliza);
   _gonEspejar();
   const _rPas = document.getElementById('gonPasilloRow');
   if(_rPas) _rPas.style.display = lineasGondola.length > 1 ? '' : 'none';
   const cont = document.getElementById('gonLineasList'); if(!cont) return;
+  const _htmlBloquesG = _bloquesHtml('gon', bloquesGondola, lineasGondola, _bloqueActivoGon());
   cont.innerHTML = lineasGondola.map((l, i) => {
     const esD = l.tipo === 'doble';
     const bd = esD ? '#f0c4ae' : '#b5d4f4';
@@ -3583,7 +3696,7 @@ function renderLineasGondola(){
       ? '<span onclick="event.stopPropagation();lnFlipGon('+i+')" style="cursor:pointer;color:'+tx+';font-size:12px;font-weight:700;padding:1px 4px;line-height:1;flex-shrink:0" title="Voltear: charolas al otro lado">'+(l.volteada?'⇐':'⇒')+'</span>'
       : '';
     const chip = !l.abierta
-      ? '<div onclick="lnToggleGon('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tipoLbl+' · '+l.medida+' · '+l.niveles+' niv · '+l.modulos+' mód'+(l.cabeceras?' + '+l.cabeceras+' cab':'')+'</div>'
+      ? '<div onclick="lnToggleGon('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(bloquesGondola.length>1?'📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ':'')+tipoLbl+' · '+l.medida+' · '+l.niveles+' niv · '+l.modulos+' mód'+(l.cabeceras?' + '+l.cabeceras+' cab':'')+'</div>'
       : '';
     const detalle = l.abierta
       ? '<div style="background:#fff;border-top:1px solid '+bd+';padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:10px">'
@@ -3592,6 +3705,12 @@ function renderLineasGondola(){
         + '<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lnSetGon('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_NIVELES, l.niveles)+'</select></div>'
         + '<div><div style="color:#666;margin-bottom:1px">Módulos</div><select onchange="lnSetGon('+i+',\'modulos\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_MODULOS, l.modulos)+'</select></div>'
         + '<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Cabeceras (141×100)</div><select onchange="lnSetGon('+i+',\'cabeceras\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_CABECERAS, l.cabeceras)+'</select></div>'
+        + (bloquesGondola.length > 1
+            ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px"><span style="color:#666;font-weight:600">📦 Bloque</span>'
+              + '<select onchange="gonFilaBloque('+i+',this.value)" style="font-size:10px;padding:2px 4px;border:1px solid #d9d4c5;border-radius:5px;background:#fff">'
+              + bloquesGondola.map(function(bb, ib){ return '<option value="'+ib+'"'+(_bloqueDe(l)===ib?' selected':'')+'>'+String.fromCharCode(65+ib)+'</option>'; }).join('')
+              + '</select></div>'
+            : '')
         + '</div>'
       : '';
     // Mismo recuadro que los otros 4 sistemas (Isaac, 21 sep 2026). El contador
@@ -3599,6 +3718,7 @@ function renderLineasGondola(){
     return _cardLinea('gon', i, l, {total: nFilas, flip: btnFlip, conteo: l.modulos,
       chipHtml: chip, detalleHtml: detalle});
   }).join('');
+  cont.innerHTML = _htmlBloquesG + cont.innerHTML;
 }
 
 // Puentes para que Gondola use el recuadro compartido (_cardLinea llama a
@@ -4491,6 +4611,7 @@ function getConfigCan(){
     brazoM: l.brazoIn * IN_TO_M,
     separacionM,
     anchoBaseM: (l.brazoIn * IN_TO_M) * (l.tipo === 'doble' ? 2 : 1) + 0.30,
+    bloque: _bloqueDe(l),
     largoZM: (l.cuerpos - 1) * separacionM
   }));
   const pasilloM = Math.max(1, Math.min(10, _uniAM(document.getElementById('canPasillo').value) || 3.5));
@@ -4619,13 +4740,17 @@ function buildCantileverScene(parent, cfg, colorHex){
 
 function buildCantilever(){
   const cfg = getConfigCan();
-  const lineas = cfg.lineas;
   const colorHex = document.getElementById('colorRack').value === 'azul' ? 0x1a3f8e : 0x1e6b3a;
+  // ── ARMADO DE UN BLOQUE ──────────────────────────────────────────────────
+  // Arma UNA isla con su cfg ya recortado a sus filas, escribiendo en lo que
+  // tenga `grupo`. Aqui las filas van lado a lado sobre X, no sobre Z.
+  let alturasBrazosL0 = null;
+  function armarBloque(cfg){
+  const lineas = cfg.lineas;
   const W = cfg.anchoTotalM;
   const maxLargoZ = cfg.maxLargoZM;
   let xCursor = -W/2;
   const pasillosInfoCan = [];   // centro en X de cada pasillo, para cotearlos
-  let alturasBrazosL0 = null;
   lineas.forEach((l, i) => {
     const gLin = new THREE.Group();
     const pseudo = { tipo: l.tipo, altoFt: l.altoFt, altoM: l.altoM, brazoM: l.brazoM,
@@ -4650,6 +4775,26 @@ function buildCantilever(){
     const zPasC = maxLargoZ/2 + 1.15;
     pasillosInfoCan.forEach(xc => cotaPasillo(grupo, xc, cfg.pasilloM, zPasC, 'x'));
   }
+  }
+  // ── LAS ISLAS ────────────────────────────────────────────────────────────
+  // Con un solo bloque en 0,0 el sub-grupo queda sin mover ni girar, asi que
+  // los disenos y enlaces viejos salen identicos.
+  const lineas = cfg.lineas;
+  const W = cfg.anchoTotalM;
+  const maxLargoZ = cfg.maxLargoZM;
+  _bloquesNormCan();
+  const _grupoRaiz = grupo;
+  bloquesCantilever.forEach((b, iB) => {
+    const cfgB = _cfgDeBloqueCan(cfg, _filasDeBloque(cfg.lineas, iB));
+    if(!cfgB) return;
+    const gB = new THREE.Group();
+    grupo = gB;
+    try{ armarBloque(cfgB); }
+    finally{ grupo = _grupoRaiz; }
+    gB.rotation.y = (b.giro === 90) ? Math.PI/2 : 0;
+    gB.position.set(b.x || 0, 0, b.z || 0);
+    grupo.add(gB);
+  });
   targetY = cfg.maxAltoM * 0.46;
   camDist = Math.max(cfg.maxAltoM*1.35 + 1.2, maxLargoZ*0.85 + 1.5, W*1.1 + 1.2);
   // ── Cotas ──
@@ -5172,23 +5317,30 @@ function buildGondola(){
   const pasilloM = Math.max(0.6, Math.min(10,
     _uniAM((document.getElementById('gonPasillo')||{}).value) || 1.6));
 
-  // Info geométrica por fila
-  const filasInfo = filas.map(l => {
-    const m = MED[l.medida];
-    const central = l.tipoGon === 'central';
-    const largoTotM = m.ancho * l.modulos + (l.cabeceras ? CAB.fondo * 2 : 0);
-    // Profundidad Z ocupada por la fila (contando ambas caras si es central,
-    // y duplicando si es "doble" = dos góndolas espalda con espalda).
-    const profBase = central ? m.fondo * 2 : m.fondo;
-    const profM = l.tipo === 'doble' ? profBase * 2 : profBase;
-    return { l, m, central, largoTotM, profM };
-  });
+  // Info geométrica de un juego de filas. Se usa dos veces: para el diseno
+  // completo (camara y resumen) y para cada bloque por separado.
+  const infoDe = (fs) => {
+    const fi = fs.map(l => {
+      const m = MED[l.medida];
+      const central = l.tipoGon === 'central';
+      const largoTotM = m.ancho * l.modulos + (l.cabeceras ? CAB.fondo * 2 : 0);
+      // Profundidad Z ocupada por la fila (contando ambas caras si es central,
+      // y duplicando si es "doble" = dos góndolas espalda con espalda).
+      const profBase = central ? m.fondo * 2 : m.fondo;
+      const profM = l.tipo === 'doble' ? profBase * 2 : profBase;
+      return { l, m, central, largoTotM, profM };
+    });
+    return { filasInfo: fi,
+      profTotal: fi.reduce((a,f)=>a + f.profM, 0) + pasilloM * (fs.length - 1),
+      maxLargo:  Math.max(...fi.map(f=>f.largoTotM)),
+      maxAlto:   Math.max(...fi.map(f=>f.m.alto)) };
+  };
+  const { filasInfo, profTotal, maxLargo, maxAlto } = infoDe(filas);
 
-  const profTotal = filasInfo.reduce((s,f)=>s + f.profM, 0)
-                  + pasilloM * (filas.length - 1);
-  const maxLargo  = Math.max(...filasInfo.map(f=>f.largoTotM));
-  const maxAlto   = Math.max(...filasInfo.map(f=>f.m.alto));
-
+  // ── ARMADO DE UN BLOQUE ──────────────────────────────────────────────────
+  // Arma UNA isla con sus propias filas, escribiendo en lo que tenga `grupo`.
+  function armarBloque(filas){
+  const { filasInfo, profTotal, maxLargo } = infoDe(filas);
   let zAtras = -profTotal / 2;   // la fila 1 nace al fondo: ver nota del orden en planta
   const pasillosInfoGon = [];   // centro en Z de cada pasillo, para cotearlos
   filasInfo.forEach(({l, m, central, profM}, iF) => {
@@ -5222,12 +5374,29 @@ function buildGondola(){
     const xPas = -maxLargo/2 - 1.20;
     pasillosInfoGon.forEach(zc => cotaPasillo(grupo, zc, pasilloM, xPas, 'z'));
   }
+  }
+  // ── LAS ISLAS ────────────────────────────────────────────────────────────
+  // Con un solo bloque en 0,0 el sub-grupo no se mueve ni se gira, asi que los
+  // disenos y enlaces viejos salen identicos.
+  _bloquesNormGon();
+  const _grupoRaizG = grupo;
+  bloquesGondola.forEach((b, iB) => {
+    const fB = _filasDeBloque(filas, iB);
+    if(!fB.length) return;
+    const gB = new THREE.Group();
+    grupo = gB;
+    try{ armarBloque(fB); }
+    finally{ grupo = _grupoRaizG; }
+    gB.rotation.y = (b.giro === 90) ? Math.PI/2 : 0;
+    gB.position.set(b.x || 0, 0, b.z || 0);
+    grupo.add(gB);
+  });
 
   targetY = maxAlto * 0.46;
   const xExt = maxLargo + (filasInfo.some(f=>f.l.cabeceras>0) ? 0 : 0);
   const zExt = profTotal;
   camDist = Math.max(maxAlto*1.7 + 1.25, Math.max(xExt, zExt)*1.05 + 0.9);
-  if(pasillosInfoGon.length) camDist = Math.max(camDist, (maxLargo + 3.0)*1.05 + 0.9);
+  if(filas.length > 1) camDist = Math.max(camDist, (maxLargo + 3.0)*1.05 + 0.9);
 
   const dimsEl = document.getElementById('dims');
   const resEl  = document.getElementById('medidasResumen');
@@ -8379,10 +8548,11 @@ function estadoConfigurador(){
     if(!propio && el.id !== 'auto') return;
     st.c[el.id] = (el.type === 'checkbox') ? (el.checked ? 1 : 0) : el.value;
   });
-  if(sistemaActual === 'selectivo'){ st.l.alm = lineasAlmacen; st.l.bloq = bloquesAlmacen; }
+  if(sistemaActual === 'gondola'){ st.l.gon = lineasGondola; st.l.bloqGon = bloquesGondola; }
+  else if(sistemaActual === 'selectivo'){ st.l.alm = lineasAlmacen; st.l.bloq = bloquesAlmacen; }
   else if(sistemaActual === 'picking'){ st.l.pic = lineasPicking; st.l.bloqPic = bloquesPicking; }
   else if(sistemaActual === 'mecano'){ st.l.mec = lineasMecano; st.l.bloqMec = bloquesMecano; }
-  else if(sistemaActual === 'cantilever') st.l.can = lineasCantilever;
+  else if(sistemaActual === 'cantilever'){ st.l.can = lineasCantilever; st.l.bloqCan = bloquesCantilever; }
   else if(sistemaActual === 'piezas')     st.pz = piezasCarrito.map(c => [c.sku, c.cant]);
   try{ st.nb = {n: (typeof nivelesPorBahia !== 'undefined' ? nivelesPorBahia : null),
                 a: (typeof alturasPorBahia !== 'undefined' ? alturasPorBahia : null)}; }catch(e){}
@@ -8409,6 +8579,11 @@ function aplicarEstado(st){
     bloquesMecano = Array.isArray(st.l.bloqMec) && st.l.bloqMec.length ? st.l.bloqMec : [{x:0, z:0, giro:0}];
     try{ _bloquesNormMec(); }catch(e){}
     if(st.l.can) lineasCantilever = st.l.can;
+    bloquesCantilever = Array.isArray(st.l.bloqCan) && st.l.bloqCan.length ? st.l.bloqCan : [{x:0, z:0, giro:0}];
+    try{ _bloquesNormCan(); }catch(e){}
+    if(Array.isArray(st.l.gon) && st.l.gon.length) lineasGondola = st.l.gon;
+    bloquesGondola = Array.isArray(st.l.bloqGon) && st.l.bloqGon.length ? st.l.bloqGon : [{x:0, z:0, giro:0}];
+    try{ _bloquesNormGon(); }catch(e){}
   }
   try{
     if(st.nb && st.nb.n && typeof nivelesPorBahia !== 'undefined') nivelesPorBahia = st.nb.n;
