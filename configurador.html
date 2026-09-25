@@ -7999,6 +7999,14 @@ function captura3D(){
     const rY = Math.PI * 0.22;
     const rX = 0.22;
 
+    // Con bloques separados el conjunto es mas grande que lo que dice el cfg de
+    // una fila india: se toma lo mas grande de los dos para que no salga cortado.
+    // Sin bloques movidos lo medido y lo calculado coinciden y no cambia nada.
+    if(_rackDims){
+      xExt = Math.max(xExt, _rackDims.x);
+      zExt = Math.max(zExt, _rackDims.z);
+      alto = Math.max(alto, _rackDims.y);
+    }
     // Silueta proyectada del bounding box rotado (independiente del tamaño de góndola)
     const projX = xExt * Math.cos(rY) + zExt * Math.sin(rY);
     const projY = alto + (xExt * Math.sin(rY) + zExt * Math.cos(rY)) * Math.sin(rX);
@@ -8010,13 +8018,20 @@ function captura3D(){
     const dist = Math.max(distY, distX, 1.2);
     const tY = alto * 0.5;
 
+    // La camara apuntaba al ORIGEN, suponiendo el rack centrado ahi. Con los
+    // bloques ya no lo esta: un grupo corrido salia de lado o cortado en la
+    // foto del PDF. Se apunta al centro real de lo dibujado; centrado en el
+    // origen vale 0 y el encuadre queda igual que siempre (Isaac, 25 sep 2026).
+    const ceX = (_rackCen && isFinite(_rackCen.x)) ? _rackCen.x : 0;
+    const ceZ = (_rackCen && isFinite(_rackCen.z)) ? _rackCen.z : 0;
+
     const cx = Math.cos(rX);
     cam2.position.set(
-      Math.sin(rY)*cx*dist,
+      ceX + Math.sin(rY)*cx*dist,
       Math.sin(rX)*dist + tY,
-      Math.cos(rY)*cx*dist
+      ceZ + Math.cos(rY)*cx*dist
     );
-    cam2.lookAt(0, tY, 0);
+    cam2.lookAt(ceX, tY, ceZ);
 
     const savedBg = scene.background;
     scene.background = new THREE.Color(0xffffff);
