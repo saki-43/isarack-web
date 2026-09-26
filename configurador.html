@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.26.03';
+const CFG_VERSION = '2026.09.26.04';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -5040,6 +5040,7 @@ function buildCantilever(){
     grupo = gB;
     try{ armarBloque(cfgB); }
     finally{ grupo = _grupoRaiz; }
+    gB.userData.bloque = {sis:'cantilever', i:iB};   // para la cota de la isla
     _colocarBloque(gB, b);
     grupo.add(gB);
   });
@@ -5637,6 +5638,7 @@ function buildGondola(){
     grupo = gB;
     try{ armarBloque(fB, _pasilloDeBloque({pasilloM: pasilloM}, b)); }
     finally{ grupo = _grupoRaizG; }
+    gB.userData.bloque = {sis:'gondola', i:iB};   // para la cota de la isla
     _colocarBloque(gB, b);
     grupo.add(gB);
   });
@@ -6281,6 +6283,7 @@ function buildPicking(){
     grupo = gB;
     try{ armarBloque(cfgB); }
     finally{ grupo = _grupoRaiz; }
+    gB.userData.bloque = {sis:'picking', i:iBl};   // para la cota de la isla
     _colocarBloque(gB, b);
     grupo.add(gB);
   });
@@ -6521,6 +6524,7 @@ function buildSelectivo(){
     grupo = gB;                       // el armado escribe aqui
     try{ armarBloque(cfgB); }
     finally{ grupo = _grupoRaiz; }    // pase lo que pase se devuelve el grupo bueno
+    gB.userData.bloque = {sis:'selectivo', i:iB};   // para la cota de la isla
     _colocarBloque(gB, b);
     grupo.add(gB);
   });
@@ -6788,6 +6792,59 @@ function _cotaInstalado(){
 // Mide TODO lo que se dibujo (los dos sistemas, los bloques donde queden) y le
 // pone una cota de largo, una de fondo y una de alto. Es la que sustituye a las
 // cotas por sistema cuando esas ya no dicen la verdad.
+// Una cota de largo y una de fondo POR ISLA, pegadas a la isla, medidas de lo
+// que se dibujo. Con varias islas la cota global no sirve de mucho: al
+// instalador lo que le importa es cuanto mide CADA grupo de filas, no la caja
+// que las envuelve a todas — "deberian de tener sus cotas independientes por
+// bloques" (Isaac, 26 sep 2026).
+// Cuando hay mas de una isla la etiqueta lleva su letra (A, B, ...), que es la
+// misma que sale en las tarjetas del panel.
+function _cotaBloques(){
+  grupo.updateMatrixWorld(true);
+  const islas = grupo.children.filter(function(o){
+    return o.isGroup && !(o.userData && (o.userData.cota || o.userData.fijo));
+  });
+  if(islas.length < 2) return;   // con una sola, la cota global ya la da
+  islas.forEach(function(g, i){
+    const c = new THREE.Box3(); let hay = false;
+    g.traverse(function(o){
+      if(!o.isMesh) return;
+      if(o.geometry && (o.geometry.type === 'PlaneGeometry' || o.geometry.type === 'ConeGeometry')) return;
+      for(let pa = o; pa && pa !== g; pa = pa.parent){
+        if(pa.userData && (pa.userData.cota || pa.userData.fijo)) return;
+      }
+      const bb = new THREE.Box3().setFromObject(o);
+      if(bb.isEmpty() || !isFinite(bb.min.x)) return;
+      c.union(bb); hay = true;
+    });
+    if(!hay) return;
+    const largo = c.max.x - c.min.x, fondo = c.max.z - c.min.z;
+    if(largo < 0.2 && fondo < 0.2) return;
+    // La letra sale de SU bloque, no del orden en la escena: con dos sistemas en
+    // el plano las islas vienen intercaladas y la letra no cuadraba con la
+    // tarjeta del panel. Con varios sistemas se antepone el nombre, porque los
+    // dos tienen un bloque A.
+    const marca = g.userData && g.userData.bloque;
+    const letra = marca
+      ? ((_planoCombinado() ? (SIS_NOMBRE[marca.sis] || marca.sis) + ' ' : '')
+         + String.fromCharCode(65 + (marca.i || 0)) + ' ')
+      : '';
+    const y = -0.18;
+    // Pegadas a SU isla, no en la orilla del plano: si se van lejos ya no se
+    // sabe de cual isla hablan. El fondo va del lado +X, o sea el CONTRARIO al
+    // de las cotas del rack y las de pasillo, que todas viven en -X: probado a
+    // 1.15 y a 2.60 de ese lado y en las dos la etiqueta caia encima de la del
+    // pasillo ("A 5.78" sobre "3.50"). De este lado no hay nada con que pelear.
+    // El sprite va mas ancho (0.85) que el de una cota normal porque el texto
+    // es mas largo —lleva la letra del bloque— y crearTextoSprite le baja el
+    // tamano a la letra hasta que quepa: con el ancho de siempre se leia chiquita.
+    cotaDim(grupo, [c.min.x, y, c.max.z + 0.55], [c.max.x, y, c.max.z + 0.55],
+            letra + fmtCota(largo), {labelOffset:[0, -0.26, 0], escala:[0.85, 0.18]});
+    cotaDim(grupo, [c.max.x + 0.55, y, c.min.z], [c.max.x + 0.55, y, c.max.z],
+            letra + fmtCota(fondo), {labelOffset:[0.52, 0, 0], escala:[0.85, 0.18]});
+  });
+}
+
 function _cotaPlano(){
   grupo.updateMatrixWorld(true);
   const c = new THREE.Box3(); let hay = false;
@@ -7005,6 +7062,10 @@ function build(){
   // sistema se callaron: aqui va la unica que si mide lo dibujado. Con la
   // bodega prendida se omite, porque su cadena pared -> rack -> pared ya la da.
   if(_planoCombinado() || _bloquesMovidos()){
+    // Cada isla con su medida...
+    try{ _cotaBloques(); }catch(e){ console.warn('_cotaBloques:', e); }
+    // ...y el total del plano, salvo con la bodega prendida: ahi la cadena
+    // pared -> rack -> pared ya lo trae.
     if(!bodegaOn){ try{ _cotaPlano(); }catch(e){ console.warn('_cotaPlano:', e); } }
   } else {
     // El par "CON PASARELA" solo tiene sentido cuando existe la cota del rack
@@ -7199,6 +7260,7 @@ function buildMecano(){
     grupo = gB;
     try{ armarBloque(cfgB); }
     finally{ grupo = _grupoRaiz; }
+    gB.userData.bloque = {sis:'mecano', i:iB};   // para la cota de la isla
     _colocarBloque(gB, b);
     grupo.add(gB);
   });
