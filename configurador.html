@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.26.02';
+const CFG_VERSION = '2026.09.26.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3192,7 +3192,7 @@ function lpBloqueAdd(){
   if(bloquesPicking.length >= 6) return;
   const ult = bloquesPicking[bloquesPicking.length - 1] || {x:0, z:0};
   // pas:false — una isla nueva no hereda la pasarela de la anterior.
-  bloquesPicking.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
+  bloquesPicking.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false, pasillo: null});
   renderLineasPicking(); build();
 }
 function lpBloqueDel(iB){
@@ -3210,6 +3210,11 @@ function lpBloqueSet(iB, campo, val){
   const b = bloquesPicking[iB];
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else if(campo === 'pasillo'){
+    const n = _uniAM(val);
+    // Vacio = vuelve a usar el pasillo del sistema.
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+  }
   else if(campo === 'pas') b.pas = !!val;
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
@@ -3436,7 +3441,7 @@ function lcBloqueAdd(){
   if(bloquesCantilever.length >= 6) return;
   const ult = bloquesCantilever[bloquesCantilever.length - 1] || {x:0, z:0};
   // pas:false — una isla nueva no hereda la pasarela de la anterior.
-  bloquesCantilever.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
+  bloquesCantilever.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false, pasillo: null});
   _bloqueActCan = bloquesCantilever.length - 1;
   renderLineasCantilever(); build();
 }
@@ -3453,6 +3458,11 @@ function lcBloqueSet(iB, campo, val){
   const b = bloquesCantilever[iB];
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else if(campo === 'pasillo'){
+    const n = _uniAM(val);
+    // Vacio = vuelve a usar el pasillo del sistema.
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+  }
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
   // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
@@ -3577,7 +3587,10 @@ function _bloquesNormEn(bloques, lineas){
     giro: (Number(b && b.giro) === 90) ? 90 : 0,
     // Si viene sin el campo se deja en true: un link viejo se ve igual que
     // cuando se guardo. Los bloques NUEVOS nacen en false (ver *BloqueAdd).
-    pas: (b && b.pas === false) ? false : true
+    pas: (b && b.pas === false) ? false : true,
+    // null = usa el pasillo del sistema. Un numero = este bloque lleva el suyo.
+    pasillo: (b && isFinite(Number(b.pasillo)) && Number(b.pasillo) > 0)
+               ? Math.max(0.3, Math.min(PASILLO_MAX_M, Number(b.pasillo))) : null
   }));
   const n = bs.length;
   (lineas || []).forEach(l => { if(_bloqueDe(l) >= n) l.bloque = 0; });
@@ -3590,6 +3603,16 @@ function _bloquesNormaliza(){ bloquesAlmacen = _bloquesNormEn(bloquesAlmacen, li
 // hago una pasarela y quiero poner selectivo en otra area lo toma como
 // selectivo" (Isaac, 26 sep 2026). Medido: los dos bloques ganaban 85 mallas.
 function _bloqueLlevaPasarela(b){ return !b || b.pas !== false; }
+// El pasillo entre filas de UN bloque. Sin el suyo, usa el del sistema. Dos
+// islas en partes distintas de la bodega no tienen por que dejar el mismo
+// pasillo: una puede ser de montacargas y la otra de pasar caminando.
+// (Isaac, 26 sep 2026)
+function _pasilloDeBloque(cfg, bloque){
+  const base = Number(cfg && cfg.pasilloM) || 0;
+  const p = bloque && bloque.pasillo;
+  if(p === null || p === undefined || !isFinite(Number(p)) || Number(p) <= 0) return base;
+  return Math.max(0.3, Math.min(PASILLO_MAX_M, Number(p)));
+}
 function _filasDeBloque(lineas, iB){ return (lineas || []).filter(l => _bloqueDe(l) === iB); }
 // cfg recortado a las filas de UN bloque: las medidas totales se recalculan con
 // esas filas, asi la escalera, la pasarela y las cotas funcionan igual sin
@@ -3598,10 +3621,11 @@ function _filasDeBloque(lineas, iB){ return (lineas || []).filter(l => _bloqueDe
 // Picking largoTotM, que es lo unico que cambia entre sistemas.
 function _cfgDeBloqueGen(cfg, filas, campoLargo, bloque){
   if(!filas.length) return null;
-  const pas = cfg.pasilloM;
+  const pas = _pasilloDeBloque(cfg, bloque);
   const k = campoLargo || 'largoM';
   return Object.assign({}, cfg, {
     lineas: filas,
+    pasilloM: pas,
     maxLenM: Math.max(...filas.map(l => l[k])),
     maxAltoM: Math.max(...filas.map(l => l.altoM)),
     profTotalM: filas.reduce((a, l) => a + l.profM, 0) + pas * (filas.length - 1),
@@ -3620,9 +3644,10 @@ function _pasarelaDeBloque(cfg, bloque){
 // propio recorte (anchoTotalM en vez de profTotalM).
 function _cfgDeBloqueCan(cfg, filas, bloque){
   if(!filas.length) return null;
-  const pas = cfg.pasilloM;
+  const pas = _pasilloDeBloque(cfg, bloque);
   return Object.assign({}, cfg, {
     pasarela: _pasarelaDeBloque(cfg, bloque),
+    pasilloM: pas,
     lineas: filas,
     anchoTotalM: filas.reduce((a, l) => a + l.anchoBaseM, 0) + pas * (filas.length - 1),
     maxLargoZM: Math.max(...filas.map(l => l.largoZM)),
@@ -3750,7 +3775,7 @@ function gonBloqueAdd(){
   if(bloquesGondola.length >= 6) return;
   const ult = bloquesGondola[bloquesGondola.length - 1] || {x:0, z:0};
   // pas:false — una isla nueva no hereda la pasarela de la anterior.
-  bloquesGondola.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
+  bloquesGondola.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false, pasillo: null});
   _bloqueActGon = bloquesGondola.length - 1;
   renderLineasGondola(); build();
 }
@@ -3767,6 +3792,11 @@ function gonBloqueSet(iB, campo, val){
   const b = bloquesGondola[iB];
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else if(campo === 'pasillo'){
+    const n = _uniAM(val);
+    // Vacio = vuelve a usar el pasillo del sistema.
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+  }
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
   // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
@@ -4524,7 +4554,7 @@ function lnBloqueAdd(){
   // encimada; de ahi el vendedor la mueve a donde va.
   const ult = bloquesAlmacen[bloquesAlmacen.length - 1] || {x:0, z:0};
   // pas:false — una isla nueva no hereda la pasarela de la anterior.
-  bloquesAlmacen.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
+  bloquesAlmacen.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false, pasillo: null});
   renderLineasAlmacen(); build();
 }
 function lnBloqueDel(iB){
@@ -4545,6 +4575,11 @@ function lnBloqueSet(iB, campo, val){
   const b = bloquesAlmacen[iB];
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else if(campo === 'pasillo'){
+    const n = _uniAM(val);
+    // Vacio = vuelve a usar el pasillo del sistema.
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+  }
   else if(campo === 'pas') b.pas = !!val;
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
@@ -4598,6 +4633,23 @@ function _giroBotones(pfx, iB, giro){
 // El palomeo de pasarela de un bloque. Solo sale donde hay pasarela (selectivo
 // y picking), solo si el sistema la trae prendida, y solo si el bloque tiene 2+
 // filas: la pasarela va sobre el pasillo, y sin pasillo no hay nada que poner.
+// El pasillo de UN bloque. Vacio = el del sistema, y se ve de placeholder para
+// que no haya que adivinar cual es. Solo sale con 2+ filas: con una fila no hay
+// pasillo que medir.
+function _campoPasilloBloque(pfx, iB, b, nFilas, u){
+  if((nFilas || 0) < 2) return '';
+  const idSis = {ln:'selPasillo', lp:'picPasillo', lm:'mecPasillo', lc:'canPasillo', gon:'gonPasillo'}[pfx];
+  const el = idSis ? document.getElementById(idSis) : null;
+  const delSis = el ? el.value : '';
+  const val = (b && b.pasillo) ? _uniDeM(b.pasillo) : '';
+  return '<div style="padding:0 7px 6px">'
+    + '<div style="font-size:9px;color:#999;margin-bottom:1px">Pasillo entre filas (' + u + ')</div>'
+    + '<input type="number" step="0.1" min="0.3" max="' + PASILLO_MAX_M + '" value="' + val + '"'
+    + ' placeholder="' + delSis + ' (el del sistema)"'
+    + ' onchange="' + pfx + 'BloqueSet(' + iB + ',\'pasillo\',this.value)"'
+    + ' style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>';
+}
+
 function _chkPasBloque(pfx, iB, b, nFilas){
   if(pfx !== 'ln' && pfx !== 'lp') return '';
   const chk = document.getElementById(pfx === 'ln' ? 'selChkPasarela' : 'picChkPasarela');
@@ -4664,6 +4716,7 @@ function _bloquesHtml(pfx, bloques, lineas, activo){
         + '<div style="width:74px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
           + _giroBotones(pfx, iB, b.giro) + '</div>'
       + '</div>'
+      + _campoPasilloBloque(pfx, iB, b, nF, u)
       + _chkPasBloque(pfx, iB, b, nF)
       + '<div style="display:flex;gap:5px;padding:0 7px 7px">'
         + '<button type="button" onclick="' + pfx + 'Add(\'sencilla\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>'
@@ -5514,7 +5567,9 @@ function buildGondola(){
 
   // Info geométrica de un juego de filas. Se usa dos veces: para el diseno
   // completo (camara y resumen) y para cada bloque por separado.
-  const infoDe = (fs) => {
+  // pasB: el pasillo de ESE bloque. Sin el, el del sistema.
+  const infoDe = (fs, pasB) => {
+    const _pas = (isFinite(Number(pasB)) && Number(pasB) > 0) ? Number(pasB) : pasilloM;
     const fi = fs.map(l => {
       const m = MED[l.medida];
       const central = l.tipoGon === 'central';
@@ -5525,8 +5580,8 @@ function buildGondola(){
       const profM = l.tipo === 'doble' ? profBase * 2 : profBase;
       return { l, m, central, largoTotM, profM };
     });
-    return { filasInfo: fi,
-      profTotal: fi.reduce((a,f)=>a + f.profM, 0) + pasilloM * (fs.length - 1),
+    return { filasInfo: fi, pasilloM: _pas,
+      profTotal: fi.reduce((a,f)=>a + f.profM, 0) + _pas * (fs.length - 1),
       maxLargo:  Math.max(...fi.map(f=>f.largoTotM)),
       maxAlto:   Math.max(...fi.map(f=>f.m.alto)) };
   };
@@ -5534,8 +5589,8 @@ function buildGondola(){
 
   // ── ARMADO DE UN BLOQUE ──────────────────────────────────────────────────
   // Arma UNA isla con sus propias filas, escribiendo en lo que tenga `grupo`.
-  function armarBloque(filas){
-  const { filasInfo, profTotal, maxLargo } = infoDe(filas);
+  function armarBloque(filas, pasB){
+  const { filasInfo, profTotal, maxLargo, pasilloM } = infoDe(filas, pasB);
   let zAtras = -profTotal / 2;   // la fila 1 nace al fondo: ver nota del orden en planta
   const pasillosInfoGon = [];   // centro en Z de cada pasillo, para cotearlos
   filasInfo.forEach(({l, m, central, profM}, iF) => {
@@ -5580,7 +5635,7 @@ function buildGondola(){
     if(!fB.length) return;
     const gB = new THREE.Group();
     grupo = gB;
-    try{ armarBloque(fB); }
+    try{ armarBloque(fB, _pasilloDeBloque({pasilloM: pasilloM}, b)); }
     finally{ grupo = _grupoRaizG; }
     _colocarBloque(gB, b);
     grupo.add(gB);
@@ -7060,7 +7115,7 @@ function lmBloqueAdd(){
   if(bloquesMecano.length >= 6) return;
   const ult = bloquesMecano[bloquesMecano.length - 1] || {x:0, z:0};
   // pas:false — una isla nueva no hereda la pasarela de la anterior.
-  bloquesMecano.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
+  bloquesMecano.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false, pasillo: null});
   renderLineasMecano(); build();
 }
 function lmBloqueDel(iB){
@@ -7076,6 +7131,11 @@ function lmBloqueSet(iB, campo, val){
   const b = bloquesMecano[iB];
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else if(campo === 'pasillo'){
+    const n = _uniAM(val);
+    // Vacio = vuelve a usar el pasillo del sistema.
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+  }
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
   // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
