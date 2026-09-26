@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.26.01';
+const CFG_VERSION = '2026.09.26.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3186,12 +3186,13 @@ let bloquesPicking = [{x:0, z:0, giro:0}];
 let _bloqueActPic = 0;
 function _bloquesNormPic(){ bloquesPicking = _bloquesNormEn(bloquesPicking, lineasPicking); }
 function _bloqueActivoPic(){ _bloquesNormPic(); return Math.max(0, Math.min(bloquesPicking.length - 1, _bloqueActPic || 0)); }
-function lpBloqueActivo(iB){ _bloqueActPic = parseInt(iB) || 0; renderLineasPicking(); }
+function lpBloqueActivo(iB, ev){ _bloqueActPic = parseInt(iB) || 0; if(_clicEnCampo(ev)) return; renderLineasPicking(); }
 function lpBloqueAdd(){
   _bloquesNormPic();
   if(bloquesPicking.length >= 6) return;
   const ult = bloquesPicking[bloquesPicking.length - 1] || {x:0, z:0};
-  bloquesPicking.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0});
+  // pas:false — una isla nueva no hereda la pasarela de la anterior.
+  bloquesPicking.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
   renderLineasPicking(); build();
 }
 function lpBloqueDel(iB){
@@ -3209,6 +3210,7 @@ function lpBloqueSet(iB, campo, val){
   const b = bloquesPicking[iB];
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else if(campo === 'pas') b.pas = !!val;
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
   // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
@@ -3428,12 +3430,13 @@ let bloquesCantilever = [{x:0, z:0, giro:0}];
 let _bloqueActCan = 0;
 function _bloquesNormCan(){ bloquesCantilever = _bloquesNormEn(bloquesCantilever, lineasCantilever); }
 function _bloqueActivoCan(){ _bloquesNormCan(); return Math.max(0, Math.min(bloquesCantilever.length - 1, _bloqueActCan || 0)); }
-function lcBloqueActivo(iB){ _bloqueActCan = parseInt(iB) || 0; renderLineasCantilever(); }
+function lcBloqueActivo(iB, ev){ _bloqueActCan = parseInt(iB) || 0; if(_clicEnCampo(ev)) return; renderLineasCantilever(); }
 function lcBloqueAdd(){
   _bloquesNormCan();
   if(bloquesCantilever.length >= 6) return;
   const ult = bloquesCantilever[bloquesCantilever.length - 1] || {x:0, z:0};
-  bloquesCantilever.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0});
+  // pas:false — una isla nueva no hereda la pasarela de la anterior.
+  bloquesCantilever.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
   _bloqueActCan = bloquesCantilever.length - 1;
   renderLineasCantilever(); build();
 }
@@ -3571,20 +3574,29 @@ function _bloquesNormEn(bloques, lineas){
   let bs = (Array.isArray(bloques) && bloques.length) ? bloques : [{x:0, z:0, giro:0}];
   bs = bs.map(b => ({
     x: Number(b && b.x) || 0, z: Number(b && b.z) || 0,
-    giro: (Number(b && b.giro) === 90) ? 90 : 0
+    giro: (Number(b && b.giro) === 90) ? 90 : 0,
+    // Si viene sin el campo se deja en true: un link viejo se ve igual que
+    // cuando se guardo. Los bloques NUEVOS nacen en false (ver *BloqueAdd).
+    pas: (b && b.pas === false) ? false : true
   }));
   const n = bs.length;
   (lineas || []).forEach(l => { if(_bloqueDe(l) >= n) l.bloque = 0; });
   return bs;
 }
 function _bloquesNormaliza(){ bloquesAlmacen = _bloquesNormEn(bloquesAlmacen, lineasAlmacen); }
+// La pasarela es de UN bloque, no del sistema. Antes cfg.pasarela se copiaba tal
+// cual a cada isla, asi que al mandar unas filas a otra parte de la bodega esa
+// otra parte tambien amanecia con pasarela, con su escalera y su costo: "cuando
+// hago una pasarela y quiero poner selectivo en otra area lo toma como
+// selectivo" (Isaac, 26 sep 2026). Medido: los dos bloques ganaban 85 mallas.
+function _bloqueLlevaPasarela(b){ return !b || b.pas !== false; }
 function _filasDeBloque(lineas, iB){ return (lineas || []).filter(l => _bloqueDe(l) === iB); }
 // cfg recortado a las filas de UN bloque: las medidas totales se recalculan con
 // esas filas, asi la escalera, la pasarela y las cotas funcionan igual sin
 // enterarse de que hay mas bloques.
 // campoLargo: de donde sale el largo de una fila. Selectivo usa largoM y
 // Picking largoTotM, que es lo unico que cambia entre sistemas.
-function _cfgDeBloqueGen(cfg, filas, campoLargo){
+function _cfgDeBloqueGen(cfg, filas, campoLargo, bloque){
   if(!filas.length) return null;
   const pas = cfg.pasilloM;
   const k = campoLargo || 'largoM';
@@ -3592,22 +3604,32 @@ function _cfgDeBloqueGen(cfg, filas, campoLargo){
     lineas: filas,
     maxLenM: Math.max(...filas.map(l => l[k])),
     maxAltoM: Math.max(...filas.map(l => l.altoM)),
-    profTotalM: filas.reduce((a, l) => a + l.profM, 0) + pas * (filas.length - 1)
+    profTotalM: filas.reduce((a, l) => a + l.profM, 0) + pas * (filas.length - 1),
+    pasarela: _pasarelaDeBloque(cfg, bloque)
   });
+}
+// La pasarela del sistema, apagada si este bloque no la lleva. Se devuelve una
+// COPIA: cfg.pasarela es un objeto compartido y apagarlo en el original dejaria
+// sin pasarela a los demas bloques.
+function _pasarelaDeBloque(cfg, bloque){
+  const p = (cfg && cfg.pasarela) || {};
+  if(bloque === undefined || _bloqueLlevaPasarela(bloque)) return p;
+  return Object.assign({}, p, {on: false});
 }
 // Cantilever acomoda sus filas sobre el eje X, no sobre el Z: por eso lleva su
 // propio recorte (anchoTotalM en vez de profTotalM).
-function _cfgDeBloqueCan(cfg, filas){
+function _cfgDeBloqueCan(cfg, filas, bloque){
   if(!filas.length) return null;
   const pas = cfg.pasilloM;
   return Object.assign({}, cfg, {
+    pasarela: _pasarelaDeBloque(cfg, bloque),
     lineas: filas,
     anchoTotalM: filas.reduce((a, l) => a + l.anchoBaseM, 0) + pas * (filas.length - 1),
     maxLargoZM: Math.max(...filas.map(l => l.largoZM)),
     maxAltoM: Math.max(...filas.map(l => l.altoM))
   });
 }
-function _cfgDeBloque(cfg, filas){ return _cfgDeBloqueGen(cfg, filas, 'largoM'); }
+function _cfgDeBloque(cfg, filas, bloque){ return _cfgDeBloqueGen(cfg, filas, 'largoM', bloque); }
 
 function lineasSync(){
   // Espejo de la línea 1 en los selects ocultos (compatibilidad con código legado)
@@ -3722,12 +3744,13 @@ let bloquesGondola = [{x:0, z:0, giro:0}];
 let _bloqueActGon = 0;
 function _bloquesNormGon(){ bloquesGondola = _bloquesNormEn(bloquesGondola, lineasGondola); }
 function _bloqueActivoGon(){ _bloquesNormGon(); return Math.max(0, Math.min(bloquesGondola.length - 1, _bloqueActGon || 0)); }
-function gonBloqueActivo(iB){ _bloqueActGon = parseInt(iB) || 0; renderLineasGondola(); }
+function gonBloqueActivo(iB, ev){ _bloqueActGon = parseInt(iB) || 0; if(_clicEnCampo(ev)) return; renderLineasGondola(); }
 function gonBloqueAdd(){
   _bloquesNormGon();
   if(bloquesGondola.length >= 6) return;
   const ult = bloquesGondola[bloquesGondola.length - 1] || {x:0, z:0};
-  bloquesGondola.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0});
+  // pas:false — una isla nueva no hereda la pasarela de la anterior.
+  bloquesGondola.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
   _bloqueActGon = bloquesGondola.length - 1;
   renderLineasGondola(); build();
 }
@@ -4465,7 +4488,7 @@ function _bloqueActivo(){
   return Math.max(0, Math.min(bloquesAlmacen.length - 1, _bloqueAct || 0));
 }
 function _bloqueActivoSet(iB){ _bloqueAct = parseInt(iB) || 0; }
-function lnBloqueActivo(iB){ _bloqueActivoSet(iB); renderLineasAlmacen(); }
+function lnBloqueActivo(iB, ev){ _bloqueActivoSet(iB); if(_clicEnCampo(ev)) return; renderLineasAlmacen(); }
 function lnDel(i){
   if(lineasAlmacen.length <= 1) return;
   lineasAlmacen.splice(i,1);
@@ -4500,7 +4523,8 @@ function lnBloqueAdd(){
   // La isla nueva nace despegada de la anterior para que se vea aparte y no
   // encimada; de ahi el vendedor la mueve a donde va.
   const ult = bloquesAlmacen[bloquesAlmacen.length - 1] || {x:0, z:0};
-  bloquesAlmacen.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0});
+  // pas:false — una isla nueva no hereda la pasarela de la anterior.
+  bloquesAlmacen.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
   renderLineasAlmacen(); build();
 }
 function lnBloqueDel(iB){
@@ -4521,6 +4545,7 @@ function lnBloqueSet(iB, campo, val){
   const b = bloquesAlmacen[iB];
   if(!b) return;
   if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else if(campo === 'pas') b.pas = !!val;
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
   // acabas de usar. Estos campos no cambian nada mas de lo que se ve ahi.
@@ -4561,6 +4586,40 @@ function _giroBotones(pfx, iB, giro){
       }).join('')
     + '</div>';
 }
+// La tarjeta de cada bloque lleva un onclick que repinta el panel para marcarla
+// como activa. El problema: los campos de Pared X / Pared Y viven DENTRO de la
+// tarjeta, asi que al picarlos el clic burbujea hasta ella, el panel se repinta
+// y el <input> que acabas de picar se destruye y se vuelve a crear — se pierde
+// el foco y no se puede teclear. Solo funcionaban las flechitas, porque ahi el
+// valor ya habia cambiado antes del repintado. "No puedo poner los numeros yo,
+// solo me deja moverlo con las flechitas" (Isaac, 26 sep 2026).
+// Devuelve true cuando el clic nacio en un campo: entonces se marca el bloque
+// activo pero NO se repinta.
+// El palomeo de pasarela de un bloque. Solo sale donde hay pasarela (selectivo
+// y picking), solo si el sistema la trae prendida, y solo si el bloque tiene 2+
+// filas: la pasarela va sobre el pasillo, y sin pasillo no hay nada que poner.
+function _chkPasBloque(pfx, iB, b, nFilas){
+  if(pfx !== 'ln' && pfx !== 'lp') return '';
+  const chk = document.getElementById(pfx === 'ln' ? 'selChkPasarela' : 'picChkPasarela');
+  if(!chk || !chk.checked) return '';
+  if((nFilas || 0) < 2){
+    return '<div style="padding:0 7px 7px;font-size:9.5px;color:#999">'
+      + 'Con una sola fila no hay pasillo, asi que no lleva pasarela.</div>';
+  }
+  const on = _bloqueLlevaPasarela(b);
+  return '<label style="display:flex;align-items:center;gap:6px;padding:0 7px 7px;font-size:10.5px;cursor:pointer;color:#5B6B77;font-weight:600">'
+    + '<input type="checkbox"' + (on ? ' checked' : '')
+    + ' onchange="' + pfx + 'BloqueSet(' + iB + ',\'pas\',this.checked)"'
+    + ' style="width:14px;height:14px;accent-color:#da6635">'
+    + 'Pasarela en este bloque</label>';
+}
+
+function _clicEnCampo(ev){
+  const t = ev && ev.target;
+  if(!t || !t.tagName) return false;
+  return /^(INPUT|SELECT|TEXTAREA|BUTTON|OPTION|LABEL)$/.test(t.tagName);
+}
+
 function _bloquesHtml(pfx, bloques, lineas, activo){
   pfx = pfx || 'ln';
   const esSel = (pfx === 'ln');
@@ -4590,7 +4649,7 @@ function _bloquesHtml(pfx, bloques, lineas, activo){
   bloques.forEach((b, iB) => {
     const nF = _filasDeBloque(lineas, iB).length;
     const act = (iB === activo);
-    h += '<div onclick="' + pfx + 'BloqueActivo(' + iB + ')" style="border:1px solid ' + (act ? '#da6635' : '#e0dbcd') + ';border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer' + (act ? ';box-shadow:0 0 0 2px rgba(218,102,53,.13)' : '') + '">'
+    h += '<div onclick="' + pfx + 'BloqueActivo(' + iB + ', event)" style="border:1px solid ' + (act ? '#da6635' : '#e0dbcd') + ';border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer' + (act ? ';box-shadow:0 0 0 2px rgba(218,102,53,.13)' : '') + '">'
       + '<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;font-size:11px;font-weight:700;background:' + (act ? '#fceee6' : '#fdf6f1') + ';border-radius:7px 7px 0 0">'
         + '<span>Bloque ' + String.fromCharCode(65 + iB) + '</span>'
         + '<span style="font-weight:500;color:#8a8579">' + nF + (nF === 1 ? ' fila' : ' filas') + '</span>'
@@ -4605,6 +4664,7 @@ function _bloquesHtml(pfx, bloques, lineas, activo){
         + '<div style="width:74px"><div style="font-size:9px;color:#999;margin-bottom:1px">Giro</div>'
           + _giroBotones(pfx, iB, b.giro) + '</div>'
       + '</div>'
+      + _chkPasBloque(pfx, iB, b, nF)
       + '<div style="display:flex;gap:5px;padding:0 7px 7px">'
         + '<button type="button" onclick="' + pfx + 'Add(\'sencilla\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>'
         + '<button type="button" onclick="' + pfx + 'Add(\'doble\',' + iB + ')" style="flex:1;font-size:10px;padding:4px 3px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila doble</button>'
@@ -4921,7 +4981,7 @@ function buildCantilever(){
   _bloquesNormCan();
   const _grupoRaiz = grupo;
   bloquesCantilever.forEach((b, iB) => {
-    const cfgB = _cfgDeBloqueCan(cfg, _filasDeBloque(cfg.lineas, iB));
+    const cfgB = _cfgDeBloqueCan(cfg, _filasDeBloque(cfg.lineas, iB), b);
     if(!cfgB) return;
     const gB = new THREE.Group();
     grupo = gB;
@@ -6160,7 +6220,7 @@ function buildPicking(){
   _bloquesNormPic();
   const _grupoRaiz = grupo;
   bloquesPicking.forEach((b, iBl) => {
-    const cfgB = _cfgDeBloqueGen(cfg, _filasDeBloque(cfg.lineas, iBl), 'largoTotM');
+    const cfgB = _cfgDeBloqueGen(cfg, _filasDeBloque(cfg.lineas, iBl), 'largoTotM', b);
     if(!cfgB) return;
     const gB = new THREE.Group();
     grupo = gB;
@@ -6400,7 +6460,7 @@ function buildSelectivo(){
   _bloquesNormaliza();
   const _grupoRaiz = grupo;
   bloquesAlmacen.forEach((b, iB) => {
-    const cfgB = _cfgDeBloque(cfg, _filasDeBloque(cfg.lineas, iB));
+    const cfgB = _cfgDeBloque(cfg, _filasDeBloque(cfg.lineas, iB), b);
     if(!cfgB) return;
     const gB = new THREE.Group();
     grupo = gB;                       // el armado escribe aqui
@@ -6994,12 +7054,13 @@ let bloquesMecano = [{x:0, z:0, giro:0}];
 let _bloqueActMec = 0;
 function _bloquesNormMec(){ bloquesMecano = _bloquesNormEn(bloquesMecano, lineasMecano); }
 function _bloqueActivoMec(){ _bloquesNormMec(); return Math.max(0, Math.min(bloquesMecano.length - 1, _bloqueActMec || 0)); }
-function lmBloqueActivo(iB){ _bloqueActMec = parseInt(iB) || 0; renderLineasMecano(); }
+function lmBloqueActivo(iB, ev){ _bloqueActMec = parseInt(iB) || 0; if(_clicEnCampo(ev)) return; renderLineasMecano(); }
 function lmBloqueAdd(){
   _bloquesNormMec();
   if(bloquesMecano.length >= 6) return;
   const ult = bloquesMecano[bloquesMecano.length - 1] || {x:0, z:0};
-  bloquesMecano.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0});
+  // pas:false — una isla nueva no hereda la pasarela de la anterior.
+  bloquesMecano.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false});
   renderLineasMecano(); build();
 }
 function lmBloqueDel(iB){
@@ -7072,7 +7133,7 @@ function buildMecano(){
   _bloquesNormMec();
   const _grupoRaiz = grupo;
   bloquesMecano.forEach((b, iB) => {
-    const cfgB = _cfgDeBloqueGen(cfg, _filasDeBloque(cfg.lineas, iB), 'largoTotM');
+    const cfgB = _cfgDeBloqueGen(cfg, _filasDeBloque(cfg.lineas, iB), 'largoTotM', b);
     if(!cfgB) return;
     const gB = new THREE.Group();
     grupo = gB;
@@ -7235,8 +7296,20 @@ function calcularBomPicking(){
       if(skuTam) add(skuTam, nivCarga);
     }
   });
-  // ── Pasarela: piezas individuales (compartida) ──
-  if(cfg.pasarela && cfg.pasarela.on) bomPasarela(cfg, add, cfg.lineas);
+  // La pasarela se cuenta POR BLOQUE. Son los pasillos ENTRE filas vecinas, y
+  // dos filas de bloques distintos no comparten pasillo: llamando una sola vez
+  // con TODAS las filas, el BOM cotizaba una pasarela de 3 pasillos donde el 3D
+  // armaba dos de un pasillo. Ademas cada bloque decide si lleva pasarela.
+  if(cfg.pasarela && cfg.pasarela.on){
+    const _bls = (_bloquesNormPic(), bloquesPicking);
+    _bls.forEach(function(b, iB){
+      if(!_bloqueLlevaPasarela(b)) return;
+      const filas = _filasDeBloque(cfg.lineas, iB);
+      if(filas.length < 2) return;
+      const cfgB = _cfgDeBloqueGen(cfg, filas, 'largoTotM', b);
+      if(cfgB) bomPasarela(cfgB, add, filas);
+    });
+  }
   return orden.map(sku => [sku, items[sku]]);
 }
 
@@ -7268,10 +7341,15 @@ function calcularBomSelectivo(){
     // Vigas SEL-0454 (96"x4" especial pasarela) que reemplazan a la 3" del lado del pasillo,
     // en el nivel donde se apoya el piso. Solo aplica si hay pasarela activa y la viga es de 96".
     let vigasPasarelaEspecial = 0;
-    if(cfg.pasarela && cfg.pasarela.on && cfg.lineas.length > 1 && l.vigaIn === 96){
+    // Primera / ultima DE SU BLOQUE, no de la lista entera: la fila 1 del bloque
+    // B no tiene pasillo con la ultima del A, estan en otra parte de la bodega.
+    const _filasB = _filasDeBloque(cfg.lineas, _bloqueDe(l));
+    const _iEnB = _filasB.indexOf(l);
+    const _bPas = _bloqueLlevaPasarela((bloquesAlmacen || [])[_bloqueDe(l)]);
+    if(cfg.pasarela && cfg.pasarela.on && _bPas && _filasB.length > 1 && l.vigaIn === 96){
       const nNivP = cfg.pasarela.niveles || 1;
-      const esFilaPrim = iLn === 0;
-      const esFilaUlt = iLn === cfg.lineas.length - 1;
+      const esFilaPrim = _iEnB === 0;
+      const esFilaUlt = _iEnB === _filasB.length - 1;
       if(esD){
         // Doble: la sub-fila A da al pasillo delantero, la sub-fila B al trasero.
         if(esFilaPrim && !esFilaUlt)      vigasPasarelaEspecial = cB * nNivP;              // solo pasillo atrás
@@ -7376,8 +7454,20 @@ function calcularBomSelectivo(){
       if(skuUnion && nUnionesTot > 0) add(skuUnion, 3 * nUnionesTot);
     }
   });
-  // ── Pasarela: piezas individuales (compartida) ──
-  if(cfg.pasarela && cfg.pasarela.on) bomPasarela(cfg, add, cfg.lineas);
+  // La pasarela se cuenta POR BLOQUE. Son los pasillos ENTRE filas vecinas, y
+  // dos filas de bloques distintos no comparten pasillo: llamando una sola vez
+  // con TODAS las filas, el BOM cotizaba una pasarela de 3 pasillos donde el 3D
+  // armaba dos de un pasillo. Ademas cada bloque decide si lleva pasarela.
+  if(cfg.pasarela && cfg.pasarela.on){
+    const _bls = (_bloquesNormaliza(), bloquesAlmacen);
+    _bls.forEach(function(b, iB){
+      if(!_bloqueLlevaPasarela(b)) return;
+      const filas = _filasDeBloque(cfg.lineas, iB);
+      if(filas.length < 2) return;
+      const cfgB = _cfgDeBloqueGen(cfg, filas, 'largoM', b);
+      if(cfgB) bomPasarela(cfgB, add, filas);
+    });
+  }
   return orden.map(sku => [sku, items[sku]]);
 }
 
