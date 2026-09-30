@@ -308,7 +308,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="gonPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="gonPasillo" value="1.6" min="0.6" max="50" step="0.1" style="width:100%">
+      <input type="number" id="gonPasillo" value="1.6" min="0.1" max="50" step="0.1" style="width:100%">
     </div>
     <!-- Selects espejo (ocultos) — reflejan la fila 1 de lineasGondola. Las funciones
          existentes (buildGondola, calcularBomGondola, configResumen, captura3D) siguen
@@ -350,7 +350,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="picPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="picPasillo" value="2.0" min="0.8" max="50" step="0.1" style="width:100%">
+      <input type="number" id="picPasillo" value="2.0" min="0.1" max="50" step="0.1" style="width:100%">
     </div>
     <div id="picPasarelaBox" style="display:none">
       <div style="display:flex;align-items:center;gap:4px">
@@ -435,7 +435,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="selPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="selPasillo" value="3.5" min="1" max="50" step="0.1" style="width:100%">
+      <input type="number" id="selPasillo" value="3.5" min="0.1" max="50" step="0.1" style="width:100%">
     </div>
     <div id="selPasarelaBox" style="display:none">
       <div style="display:flex;align-items:center;gap:4px">
@@ -551,7 +551,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="mecPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="mecPasillo" value="1.2" min="0.8" max="50" step="0.1" style="width:100%">
+      <input type="number" id="mecPasillo" value="1.2" min="0.1" max="50" step="0.1" style="width:100%">
     </div>
     <div style="display:none">
       <select id="mecAlto">
@@ -585,7 +585,7 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row" id="canPasilloRow" style="display:none">
       <label class="lblPasillo">Pasillo entre líneas (m)</label>
-      <input type="number" id="canPasillo" value="3.5" min="1" max="50" step="0.1" style="width:100%">
+      <input type="number" id="canPasillo" value="3.5" min="0.1" max="50" step="0.1" style="width:100%">
     </div>
     <div style="display:none">
       <select id="canTipo">
@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.26.04';
+const CFG_VERSION = '2026.09.30.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -743,7 +743,17 @@ try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.
 // 25 sep 2026). Se sube a 50, que es el mismo tope que ya tiene la posicion
 // de un bloque.
 const PASILLO_MAX_M = 50;
+// Minimo del pasillo. Antes cada sistema tenia el suyo (Picking y Mecano 0.8,
+// Gondola 0.6, Selectivo y Cantilever 1.0, pasillo de bloque 0.3) y si se
+// escribia menos lo subia en silencio: Isaac ponia 0.4 y se dibujaba 0.8
+// (30 sep 2026). Ahora se respeta lo que se escriba desde 0.10 m.
+const PASILLO_MIN_M = 0.1;
 const IN_TO_M = 0.0254;
+// Placa de la pata de PICKING: sobresale 2" del marco hacia los COSTADOS (a lo
+// largo de la fila), no hacia el frente ni atras (medido en obra, Isaac, 30 sep
+// 2026). Por eso, pegado a una pared lateral, el primer marco queda a 2" de la
+// pared; entre filas el pasillo se sigue midiendo de marco a marco.
+const PIE_PIC_SOBRA_M = 2 * IN_TO_M;
 // Marco picking integral (alto × fondo): SKU directo
 const MARCOS_PIC = {
   73:  { 18:'PIC-0033', 24:'PIC-0034', 36:'PIC-0035' },   // 6'
@@ -1778,14 +1788,14 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
     const p2 = box(postW, altoM, postD, _matM);
     p2.position.set(x, altoM/2, zBack); parent.add(p2);
     if(tienePie){
-      const pieW = 0.16, pieD = 0.16;
+      const pieW = postW + 2 * PIE_PIC_SOBRA_M, pieD = postD;
       const f1 = box(pieW, placaH, pieD, matPiePic);
       f1.position.set(x, placaH/2, zFront); parent.add(f1);
       const f2 = box(pieW, placaH, pieD, matPiePic);
       f2.position.set(x, placaH/2, zBack); parent.add(f2);
-      // Pernos de anclaje (4 por placa)
+      // Pernos de anclaje: uno en cada ala de la placa, a los costados del poste
       const pernoGeoP = new THREE.CylinderGeometry(0.009, 0.009, 0.018, 8);
-      [[-pieW/2+0.022,-pieD/2+0.022],[pieW/2-0.022,-pieD/2+0.022],[-pieW/2+0.022,pieD/2-0.022],[pieW/2-0.022,pieD/2-0.022]].forEach(([px,pz])=>{
+      [[-pieW/2+0.018,0],[pieW/2-0.018,0]].forEach(([px,pz])=>{
         const pn1 = new THREE.Mesh(pernoGeoP, matPerno); pn1.position.set(x+px, placaH+0.009, zFront+pz); parent.add(pn1);
         const pn2 = new THREE.Mesh(pernoGeoP, matPerno); pn2.position.set(x+px, placaH+0.009, zBack+pz); parent.add(pn2);
       });
@@ -1904,7 +1914,7 @@ function getConfigPic(){
   const largoCm = parseInt(document.getElementById('picLargo').value);
   const niveles = parseInt(document.getElementById('picNiveles').value);
   const cuerpos = parseInt(document.getElementById('picCuerpos').value);
-  const pasilloM = Math.max(0.8, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('picPasillo').value) || 2.0));
+  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('picPasillo').value) || 2.0));
   const lineas = lineasPicking.map(l => {
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, largoM = l.largoCm/100;
     const cuerposA = l.cuerpos;
@@ -3213,7 +3223,7 @@ function lpBloqueSet(iB, campo, val){
   else if(campo === 'pasillo'){
     const n = _uniAM(val);
     // Vacio = vuelve a usar el pasillo del sistema.
-    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, n)) : null;
   }
   else if(campo === 'pas') b.pas = !!val;
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
@@ -3461,7 +3471,7 @@ function lcBloqueSet(iB, campo, val){
   else if(campo === 'pasillo'){
     const n = _uniAM(val);
     // Vacio = vuelve a usar el pasillo del sistema.
-    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, n)) : null;
   }
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
@@ -3590,7 +3600,7 @@ function _bloquesNormEn(bloques, lineas){
     pas: (b && b.pas === false) ? false : true,
     // null = usa el pasillo del sistema. Un numero = este bloque lleva el suyo.
     pasillo: (b && isFinite(Number(b.pasillo)) && Number(b.pasillo) > 0)
-               ? Math.max(0.3, Math.min(PASILLO_MAX_M, Number(b.pasillo))) : null
+               ? Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, Number(b.pasillo))) : null
   }));
   const n = bs.length;
   (lineas || []).forEach(l => { if(_bloqueDe(l) >= n) l.bloque = 0; });
@@ -3795,7 +3805,7 @@ function gonBloqueSet(iB, campo, val){
   else if(campo === 'pasillo'){
     const n = _uniAM(val);
     // Vacio = vuelve a usar el pasillo del sistema.
-    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, n)) : null;
   }
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
@@ -4578,7 +4588,7 @@ function lnBloqueSet(iB, campo, val){
   else if(campo === 'pasillo'){
     const n = _uniAM(val);
     // Vacio = vuelve a usar el pasillo del sistema.
-    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, n)) : null;
   }
   else if(campo === 'pas') b.pas = !!val;
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
@@ -4644,7 +4654,7 @@ function _campoPasilloBloque(pfx, iB, b, nFilas, u){
   const val = (b && b.pasillo) ? _uniDeM(b.pasillo) : '';
   return '<div style="padding:0 7px 6px">'
     + '<div style="font-size:9px;color:#999;margin-bottom:1px">Pasillo entre filas (' + u + ')</div>'
-    + '<input type="number" step="0.1" min="0.3" max="' + PASILLO_MAX_M + '" value="' + val + '"'
+    + '<input type="number" step="0.1" min="' + PASILLO_MIN_M + '" max="' + PASILLO_MAX_M + '" value="' + val + '"'
     + ' placeholder="' + delSis + ' (el del sistema)"'
     + ' onchange="' + pfx + 'BloqueSet(' + iB + ',\'pasillo\',this.value)"'
     + ' style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #ddd7c8;border-radius:5px"></div>';
@@ -4770,7 +4780,7 @@ function getConfigSel(){
   const niveles = parseInt(document.getElementById('selNiveles').value);
   const cuerpos = parseInt(document.getElementById('selCuerpos').value);
   const filas = tipoFila==='doble' ? 2 : 1;
-  const pasilloM = Math.max(1, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('selPasillo').value) || 3.5));
+  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('selPasillo').value) || 3.5));
   const lineas = lineasAlmacen.map(l => {
     const vi = VIGAS_INFO[l.vigaSku] || VIGAS_INFO['SEL-0362'];
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, vigaM = vi.largoIn * IN_TO_M;
@@ -4840,7 +4850,7 @@ function getConfigMec(){
     bloque: _bloqueDe(l),
     profM: fondoM * (l.tipo === 'doble' ? 2 : 1)
   }));
-  const pasilloM = Math.max(0.8, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('mecPasillo').value) || 1.2));
+  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('mecPasillo').value) || 1.2));
   const cuerposTot = lineas.reduce((a,l)=>a + l.cuerpos * (l.tipo==='doble'?2:1), 0);
   const maxLenM = Math.max(...lineas.map(l=>l.largoTotM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -4863,7 +4873,7 @@ function getConfigCan(){
     bloque: _bloqueDe(l),
     largoZM: (l.cuerpos - 1) * separacionM
   }));
-  const pasilloM = Math.max(1, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('canPasillo').value) || 3.5));
+  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('canPasillo').value) || 3.5));
   const anchoTotalM = lineas.reduce((a,l)=>a+l.anchoBaseM,0) + pasilloM*(lineas.length-1);
   const maxLargoZM = Math.max(...lineas.map(l=>l.largoZM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -5563,7 +5573,7 @@ function buildGondola(){
 
   // Pasillo peatonal entre filas. Antes estaba fijo en 1.6 m y no habia forma
   // de cambiarlo; ahora va en el mismo campo que los otros 4 sistemas.
-  const pasilloM = Math.max(0.6, Math.min(PASILLO_MAX_M,
+  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M,
     _uniAM((document.getElementById('gonPasillo')||{}).value) || 1.6));
 
   // Info geométrica de un juego de filas. Se usa dos veces: para el diseno
@@ -6306,8 +6316,11 @@ function buildPicking(){
   }
   const altoVista = Math.max(cfg.maxAltoM, cfg.pasarela.on ? cfg.pasarela.alturaM*(cfg.pasarela.niveles||1) + 1.1 : 0);
   targetY = altoVista * 0.46;
+  // Con pata, la placa sobresale en las dos puntas de la fila (medio poste + 2"):
+  // el "Cabe · sobra" tiene que contarla o dice que cabe y en obra no entra.
+  // El "Largo" del resumen y las cotas siguen siendo de marco a marco.
   const totalLen = maxLen;
-  _rackDims = {x: totalLen, z: profTotal, y: altoVista};   // para el cálculo de la bodega (incluye pasarela si aplica)
+  _rackDims = {x: totalLen + (cfg.pie ? 2 * (0.025 + PIE_PIC_SOBRA_M) : 0), z: profTotal, y: altoVista};   // para el cálculo de la bodega (incluye pasarela si aplica)
   camDist = Math.max(cfg.maxAltoM*1.4 + 1.0, totalLen*0.85 + 1.2, profTotal*1.5 + 1.2);
   // La pasarela agrega corredor exterior (1.22 m en X) y escalera al frente (en Z)
   if(cfg.pasarela.on && cfg.pasarela.escalera !== 'no' && lineas.length > 1){
@@ -7195,7 +7208,7 @@ function lmBloqueSet(iB, campo, val){
   else if(campo === 'pasillo'){
     const n = _uniAM(val);
     // Vacio = vuelve a usar el pasillo del sistema.
-    b.pasillo = (isFinite(n) && n > 0) ? Math.max(0.3, Math.min(PASILLO_MAX_M, n)) : null;
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, n)) : null;
   }
   else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
   // NO se re-dibuja el panel: eso destruye el <select> o el <input> que
