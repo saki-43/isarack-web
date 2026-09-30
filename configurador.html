@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.30.01';
+const CFG_VERSION = '2026.09.30.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -749,6 +749,11 @@ const PASILLO_MAX_M = 50;
 // (30 sep 2026). Ahora se respeta lo que se escriba desde 0.10 m.
 const PASILLO_MIN_M = 0.1;
 const IN_TO_M = 0.0254;
+// Placa de la pata de PICKING: sobresale 2" del marco hacia los COSTADOS (a lo
+// largo de la fila), no hacia el frente ni atras (medido en obra, Isaac, 30 sep
+// 2026). Por eso, pegado a una pared lateral, el primer marco queda a 2" de la
+// pared; entre filas el pasillo se sigue midiendo de marco a marco.
+const PIE_PIC_SOBRA_M = 2 * IN_TO_M;
 // Marco picking integral (alto × fondo): SKU directo
 const MARCOS_PIC = {
   73:  { 18:'PIC-0033', 24:'PIC-0034', 36:'PIC-0035' },   // 6'
@@ -1783,14 +1788,14 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
     const p2 = box(postW, altoM, postD, _matM);
     p2.position.set(x, altoM/2, zBack); parent.add(p2);
     if(tienePie){
-      const pieW = 0.16, pieD = 0.16;
+      const pieW = postW + 2 * PIE_PIC_SOBRA_M, pieD = postD;
       const f1 = box(pieW, placaH, pieD, matPiePic);
       f1.position.set(x, placaH/2, zFront); parent.add(f1);
       const f2 = box(pieW, placaH, pieD, matPiePic);
       f2.position.set(x, placaH/2, zBack); parent.add(f2);
-      // Pernos de anclaje (4 por placa)
+      // Pernos de anclaje: uno en cada ala de la placa, a los costados del poste
       const pernoGeoP = new THREE.CylinderGeometry(0.009, 0.009, 0.018, 8);
-      [[-pieW/2+0.022,-pieD/2+0.022],[pieW/2-0.022,-pieD/2+0.022],[-pieW/2+0.022,pieD/2-0.022],[pieW/2-0.022,pieD/2-0.022]].forEach(([px,pz])=>{
+      [[-pieW/2+0.018,0],[pieW/2-0.018,0]].forEach(([px,pz])=>{
         const pn1 = new THREE.Mesh(pernoGeoP, matPerno); pn1.position.set(x+px, placaH+0.009, zFront+pz); parent.add(pn1);
         const pn2 = new THREE.Mesh(pernoGeoP, matPerno); pn2.position.set(x+px, placaH+0.009, zBack+pz); parent.add(pn2);
       });
@@ -6311,8 +6316,11 @@ function buildPicking(){
   }
   const altoVista = Math.max(cfg.maxAltoM, cfg.pasarela.on ? cfg.pasarela.alturaM*(cfg.pasarela.niveles||1) + 1.1 : 0);
   targetY = altoVista * 0.46;
+  // Con pata, la placa sobresale en las dos puntas de la fila (medio poste + 2"):
+  // el "Cabe · sobra" tiene que contarla o dice que cabe y en obra no entra.
+  // El "Largo" del resumen y las cotas siguen siendo de marco a marco.
   const totalLen = maxLen;
-  _rackDims = {x: totalLen, z: profTotal, y: altoVista};   // para el cálculo de la bodega (incluye pasarela si aplica)
+  _rackDims = {x: totalLen + (cfg.pie ? 2 * (0.025 + PIE_PIC_SOBRA_M) : 0), z: profTotal, y: altoVista};   // para el cálculo de la bodega (incluye pasarela si aplica)
   camDist = Math.max(cfg.maxAltoM*1.4 + 1.0, totalLen*0.85 + 1.2, profTotal*1.5 + 1.2);
   // La pasarela agrega corredor exterior (1.22 m en X) y escalera al frente (en Z)
   if(cfg.pasarela.on && cfg.pasarela.escalera !== 'no' && lineas.length > 1){
