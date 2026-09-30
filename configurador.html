@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.30.05';
+const CFG_VERSION = '2026.09.30.06';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -786,7 +786,7 @@ const REJILLAS_COMBO_PIC = {
   120: {tipo:120, cantidad:1},   // 1 × R120 exacto
   200: {tipo:100, cantidad:2},   // 2 × R100 exacto
   230: {tipo:120, cantidad:2}    // 2 × R120 (cubre 240, sobra 10)
-  // 150 y 180 no tienen combinación buena con rejillas — caen a panel galvanizado
+  // 150 y 180 no tienen rejilla en inventario: se cotizan por nombre y salen "sin precio"
 };
 function tieneRejillaPicking(largoCm){ return REJILLAS_COMBO_PIC[largoCm] !== undefined; }
 
@@ -797,9 +797,15 @@ const MARCOS_SEL = {
   192: { 24:'SEL-0116', 36:'SEL-0117', 42:'SEL-0119', 48:'SEL-0122' },
   240: { 24:'SEL-0132', 36:'SEL-0133', 42:'SEL-0135', 48:'SEL-0137' },
   288: { 24:'SEL-0456', 36:'SEL-0151', 42:'SEL-0152', 48:'SEL-0158' },
-  312: { 42:'SEL-0168', 48:'SEL-0171' },
-  336: { 24:'SEL-0457', 36:null,       42:'SEL-0178', 48:'SEL-0180' },
-  360: { 42:'SEL-0183', 48:'SEL-0185' }
+  // 312/336/360: faltaban 5 combinaciones y el marco NO se cotizaba (salia la
+  // venta sin marcos). Y en 312x42 / 336x42 / 336x48 se usaban marcos
+  // especiales (GA12 doble diagonal, GAGE 12 PSA) que ISARACK no maneja
+  // (Isaac, 30 sep 2026). Esos van por NOMBRE del marco estandar: en cuanto se
+  // den de alta en el inventario de ISA-OS con ese nombre exacto, toman su
+  // precio solos; mientras, salen con el aviso de "sin precio".
+  312: { 24:'MARCO 312" X 24"', 36:'MARCO 312" X 36"', 42:'MARCO 312" X 42"', 48:'SEL-0171' },
+  336: { 24:'SEL-0457',         36:'MARCO 336" X 36"', 42:'MARCO 336" X 42"', 48:'MARCO 336" X 48"' },
+  360: { 24:'MARCO 360" X 24"', 36:'MARCO 360" X 36"', 42:'SEL-0183',         48:'SEL-0185' }
 };
 // Uniones para separar las 2 filas de un rack doble (medida = separación entre filas)
 const UNIONES_SEL = {
@@ -1055,13 +1061,15 @@ function _topeUniones(l){
   }
   return n;
 }
-// De las medidas que hay en almacen, la mas cercana a lo que pide la orilla.
-function _barraProtSku(lIn){
-  var mej = BARRA_PROT_OPC[0];
-  for(var i=1;i<BARRA_PROT_OPC.length;i++)
-    if(Math.abs(BARRA_PROT_OPC[i].lIn - lIn) < Math.abs(mej.lIn - lIn)) mej = BARRA_PROT_OPC[i];
-  return mej.sku;
+// La barra CORTA (42") es para orillas de hasta 42"; lo que pase de ahi lleva la
+// LARGA (96") (Isaac, 30 sep 2026). Antes se tomaba "la mas cercana" y una orilla
+// de 48" salia con barra de 42": 6" corta.
+function _barraProtOpc(lIn){
+  var ord = BARRA_PROT_OPC.slice().sort(function(a,b){ return a.lIn - b.lIn; });
+  for(var i=0;i<ord.length;i++) if(ord[i].lIn >= lIn) return ord[i];
+  return ord[ord.length-1];
 }
+function _barraProtSku(lIn){ return _barraProtOpc(lIn).sku; }
 
 // REGLA DE OBRA (ISARACK): la rejilla electrosoldada viene en 2 anchos, uno
 // por cada largo de viga. NO se puede poner rejilla 46" en viga 108" — quedan
@@ -2997,17 +3005,31 @@ function bomPasarelaEntrepiso(cfg, add, lineasInfo){
 // lineal de 4 piezas". Y van 2 postes por metro.
 // Se suma UNA sola vez, con los metros medidos del 3D, para que la lista de
 // materiales no se pueda volver a separar de lo que se dibuja.
-function _addBarandalPas(add, cfg){
+// Se mide SOLO la isla que se esta cotizando (bloqueRef = {sis, i}). Antes se
+// medía todo el dibujo en cada isla: con 2 islas salian 38 ML en vez de 20, y en
+// plano combinado cada sistema cobraba el barandal de los dos.
+function _grupoDeIsla(bloqueRef){
+  if(!bloqueRef || typeof grupo === 'undefined' || !grupo) return null;
+  let hallado = null;
+  grupo.traverse(function(o){
+    if(hallado) return;
+    const b = o.userData && o.userData.bloque;
+    if(b && b.sis === bloqueRef.sis && b.i === bloqueRef.i) hallado = o;
+  });
+  return hallado;
+}
+function _addBarandalPas(add, cfg, bloqueRef){
   const alt = (cfg && cfg.pasarela && cfg.pasarela.alturaM) || 0;
-  const ml = _barandalMLDesde3D(typeof grupo !== 'undefined' ? grupo : null, alt);
+  const gIsla = _grupoDeIsla(bloqueRef);
+  const ml = _barandalMLDesde3D(gIsla || (typeof grupo !== 'undefined' ? grupo : null), alt);
   if(ml <= 0) return;
   add(PASARELA_BARANDAL, ml);
   add(PASARELA_POSTE_BAR, ml * 2);
 }
-function bomPasarela(cfg, add, lineasInfo){
+function bomPasarela(cfg, add, lineasInfo, bloqueRef){
   const nNiveles = cfg.pasarela.niveles || 1;
   const escActiva = cfg.pasarela.escalera !== 'no';
-  if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); _addBarandalPas(add, cfg); return; }
+  if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); _addBarandalPas(add, cfg, bloqueRef); return; }
   // El piso del pasillo se apoya directo en las vigas de carga de los racks (naranjas).
   // No se cotiza viga extra de 48" por marco: no van en obra (referencia proyecto real).
   for(let i=0; i<lineasInfo.length-1; i++){
@@ -3045,7 +3067,7 @@ function bomPasarela(cfg, add, lineasInfo){
       }
     }
   }
-  _addBarandalPas(add, cfg);   // los metros de barandal, una sola vez
+  _addBarandalPas(add, cfg, bloqueRef);   // los metros de barandal de ESTA isla
 }
 let lineasPicking = [{tipo:'sencilla', cuerpos:1, cuerposB:null, altoIn:96, fondoIn:24, largoCm:120, niveles:4, abierta:true}];
 
@@ -4755,8 +4777,6 @@ function lnToggle(i){
 }
 function lnSet(i, campo, valor){
   lineasAlmacen[i][campo] = valor;
-  // Combinación 336×36 no existe en catálogo → forzar fondo 42
-  if(lineasAlmacen[i].altoIn === 336 && lineasAlmacen[i].fondoIn === 36) lineasAlmacen[i].fondoIn = 42;
   renderLineasAlmacen();
   try{ actualizarStockEnDropdowns(); }catch(e){}
   build();
@@ -5371,8 +5391,10 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
     const f2 = box(pieW, pieT, pieD, matPie); f2.position.set(x, pieT/2, zBack); parent.add(f2);
     // Pernos y botas solo si el marco es cotizado (no ghost)
     if(!esGhost){
+      // 4 anclas por MARCO = 2 por placa, en esquinas opuestas (Isaac, 30 sep
+      // 2026). Antes se dibujaban 4 por placa (8 por marco) y se cotizaban 4.
       const pernoGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.025, 8);
-      [[-pieW/2+0.025,-pieD/2+0.025],[pieW/2-0.025,-pieD/2+0.025],[-pieW/2+0.025,pieD/2-0.025],[pieW/2-0.025,pieD/2-0.025]].forEach(([px,pz])=>{
+      [[-pieW/2+0.025,-pieD/2+0.025],[pieW/2-0.025,pieD/2-0.025]].forEach(([px,pz])=>{
         const pn1 = new THREE.Mesh(pernoGeo, matPerno); pn1.position.set(x+px, pieT+0.012, zFront+pz); parent.add(pn1);
         const pn2 = new THREE.Mesh(pernoGeo, matPerno); pn2.position.set(x+px, pieT+0.012, zBack+pz); parent.add(pn2);
       });
@@ -7404,10 +7426,11 @@ function calcularBomPicking(){
     const sumaCuerpos = esD ? cA + cB : cA;
     // Posiciones cuerpo×nivel con carga: descuenta ramal PS-1, escalera PS-2 y túneles.
     const nivCarga = _nivCargaSel(l, cA, cB, esD, cfg, iLn, l.largoM);
-    // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera (PS-1)
-    const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.largoM, cA) : -1;
-    const nivQuitadosRamal = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'picking') * (esD ? 2 : 1) : 0;
-    const nivCargaFinal = nivCarga - nivQuitadosRamal;
+    // El cuerpo de salida de la escalera PS-1 ya viene descontado dentro de
+    // _nivCargaSel. Aqui se volvia a restar (como en Selectivo antes de su
+    // arreglo) y con pasarela de 2 niveles faltaban vigas: el 3D dibujaba 88 y
+    // se cotizaban 80.
+    const nivCargaFinal = nivCarga;
     // Marcos que el cliente ya tiene: 1 por lado marcado; en doble el mismo lado
     // descuenta 2, uno por cada sub-fila. Igual que en Selectivo.
     const nMarcosExisPorLadoP = (l.marcoIzqExistente ? 1 : 0) + (l.marcoDerExistente ? 1 : 0);
@@ -7415,21 +7438,29 @@ function calcularBomPicking(){
     // 1) Marcos picking (alto × fondo)
     const marcoSku = MARCOS_PIC[l.altoIn] && MARCOS_PIC[l.altoIn][l.fondoIn];
     if(marcoSku && nMarcos > 0) add(marcoSku, nMarcos);
-    // 2) Pies de poste: van INCLUIDOS en el marco picking — no se cotizan aparte
+    // 2) Pies de poste: van INCLUIDOS en el marco picking — no se cotizan aparte.
+    //    Anclas: 2 por marco picking, una por placa (Isaac, 30 sep 2026). Se
+    //    dibujaban pero no se cobraban.
+    if(nMarcos > 0) add(ANCLA_STD_SEL, 2 * nMarcos);
     // 3) Vigas/travesaños: 2 por nivel por cuerpo (frente + atrás)
     add(VIGAS_PIC[l.largoCm], 2 * nivCargaFinal);
     // 4) Carga del nivel (rejilla/panel/madera se ponen SOLO en los cuerpos×nivel con viga)
-    if(cfg.rejilla && tieneRejillaPicking(l.largoCm)){
+    // Se cobra SOLO lo que se eligio: rejilla lleva rejilla, panel lleva panel
+    // (Isaac, 30 sep 2026). Antes la rejilla de 150/180 cm caia callada a panel
+    // beige. Si la medida no existe en inventario, se pide por su NOMBRE y la
+    // cotizacion la marca "sin precio" en vez de desaparecerla.
+    if(cfg.rejilla){
       const combo = REJILLAS_COMBO_PIC[l.largoCm];
-      const skuRej = REJILLAS_PIC[combo.tipo] && REJILLAS_PIC[combo.tipo][l.fondoIn];
-      add(skuRej, combo.cantidad * nivCarga);
-    } else if(cfg.panel || (cfg.rejilla && !tieneRejillaPicking(l.largoCm))){
+      const skuRej = combo && REJILLAS_PIC[combo.tipo] && REJILLAS_PIC[combo.tipo][l.fondoIn];
+      if(skuRej) add(skuRej, combo.cantidad * nivCarga);
+      else add('REJILLA PICKING ' + l.largoCm + 'CMX' + l.fondoIn + '"', nivCarga);
+    } else if(cfg.panel){
       const skuPanel = PANELES_BEIGE_PIC[l.fondoIn];
       const piezasPorNivel = Math.ceil(l.largoCm / (8 * 2.54));
       add(skuPanel, piezasPorNivel * nivCarga);
     } else if(cfg.madera){
       const skuTam = TAM_PIC[l.largoCm] && TAM_PIC[l.largoCm][l.fondoIn];
-      if(skuTam) add(skuTam, nivCarga);
+      add(skuTam || ('TAM ' + l.largoCm + 'CMX' + l.fondoIn + '"'), nivCarga);
     }
   });
   // La pasarela se cuenta POR BLOQUE. Son los pasillos ENTRE filas vecinas, y
@@ -7443,7 +7474,7 @@ function calcularBomPicking(){
       const filas = _filasDeBloque(cfg.lineas, iB);
       if(filas.length < 2) return;
       const cfgB = _cfgDeBloqueGen(cfg, filas, 'largoTotM', b);
-      if(cfgB) bomPasarela(cfgB, add, filas);
+      if(cfgB) bomPasarela(cfgB, add, filas, {sis:'picking', i:iB});
     });
   }
   return orden.map(sku => [sku, items[sku]]);
@@ -7505,8 +7536,10 @@ function calcularBomSelectivo(){
       // Ver comentario "REGLA DE OBRA (ISARACK)" arriba, junto a REJILLAS_SEL.
       const anchoRej = REJILLA_ANCHO_POR_VIGA[l.vigaIn] || 46;
       const rejSku = (REJILLAS_SEL[l.fondoIn] || {})[anchoRej];
-      const rejPorViga = REJILLAS_POR_VIGA_SEL[l.vigaIn];
-      if(rejSku && rejPorViga) add(rejSku, rejPorViga * nivCarga);
+      const rejPorViga = REJILLAS_POR_VIGA_SEL[l.vigaIn] || 2;
+      // Fondo 24" no tiene rejilla en inventario: antes desaparecia callada de la
+      // cotizacion (el 3D si la dibujaba). Ahora va por nombre y sale "sin precio".
+      add(rejSku || ('REJILLA ELECTROSOLDADA ' + l.fondoIn + '"X' + anchoRej + '"'), rejPorViga * nivCarga);
     }
     if(cfg.panel){
       // Panel Beige por fondo (in): cada pieza es fondoIn × 8", cubre 8" de alto de viga
@@ -7601,7 +7634,7 @@ function calcularBomSelectivo(){
       const filas = _filasDeBloque(cfg.lineas, iB);
       if(filas.length < 2) return;
       const cfgB = _cfgDeBloqueGen(cfg, filas, 'largoM', b);
-      if(cfgB) bomPasarela(cfgB, add, filas);
+      if(cfgB) bomPasarela(cfgB, add, filas, {sis:'selectivo', i:iB});
     });
   }
   return orden.map(sku => [sku, items[sku]]);
@@ -7876,13 +7909,17 @@ function _lineasDeBom(bom, acc){
     }
     const key = item[0], cant = item[1];
     const inv = preciosCache ? preciosCache[key] : null;
-    if(!inv) acc.faltantes.push(key);
-    const puUSD = inv ? inv.precio : 0;
+    // Sin precio = la pieza no existe en inventario O esta en $0. Antes solo se
+    // avisaba si no existia, y una en $0 entraba callada a la cotizacion.
+    // (Isaac, 30 sep 2026: "si no tiene precio, manda un mensaje").
+    const puUSD = inv ? (Number(inv.precio) || 0) : 0;
+    const sinPrecio = !(puUSD > 0);
+    const producto = inv ? (inv.producto||key) : key;
+    if(sinPrecio) acc.faltantes.push(producto);
     const impUSD = puUSD * cant;
     acc.materialUSD += impUSD; acc.piezas += cant;
-    const sku = inv ? inv.sku : (key.startsWith('PIC-')||key.startsWith('GON-')||key.startsWith('ACC-')||key.startsWith('SEL-') ? key : '—');
-    const producto = inv ? (inv.producto||key) : key;
-    return { sku:sku, producto:producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD };
+    const sku = inv ? inv.sku : (/^[A-Z]{3}-\d/.test(key) ? key : '—');
+    return { sku:sku, producto:producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD, sinPrecio:sinPrecio };
   });
 }
 
@@ -7994,11 +8031,11 @@ function renderCotizacion(){
     return ` <span class="stk ${cls}">${disp} disp</span>`;
   };
   const _liHTML = l => `
-    <div class="li">
+    <div class="li"${l.sinPrecio ? ' style="background:#FFF4E5"' : ''}>
       <div>
         <div class="sku">${l.sku}</div>
         <div class="prd">${l.producto}</div>
-        <div class="pu">${fmt(l.precioUSD)} / pza ${badgeStock(l)}</div>
+        <div class="pu">${l.sinPrecio ? '<b style="color:#c0392b">⚠ SIN PRECIO</b>' : fmt(l.precioUSD) + ' / pza'} ${badgeStock(l)}</div>
       </div>
       <div>
         <div class="qy">${l.cantidad}</div>
@@ -8024,6 +8061,16 @@ function renderCotizacion(){
     if(servicios.length) _html += _cab('SERVICIOS', '') + servicios.map(_liHTML).join('');
   } else {
     _html = lineas.map(_liHTML).join('');
+  }
+  // Aviso de piezas sin precio: la cotizacion sale CORTA y hay que decirlo.
+  const _sinPrecio = [];
+  bloques.forEach(function(b){ (b.faltantes || []).forEach(function(n){ if(_sinPrecio.indexOf(n) < 0) _sinPrecio.push(n); }); });
+  if(_sinPrecio.length){
+    _html = '<div style="background:#FFF4E5;border:1px solid #E8A33D;color:#7a4a00;border-radius:8px;padding:8px 10px;margin:4px 0 8px;font-size:12px;line-height:1.35">'
+      + '<b>⚠ ' + _sinPrecio.length + ' pieza' + (_sinPrecio.length !== 1 ? 's' : '') + ' sin precio en el sistema.</b> '
+      + 'El total NO las incluye; hay que confirmar su precio con ISARACK antes de cerrar la venta.'
+      + '<div style="margin-top:4px;color:#8a5a10">' + _sinPrecio.map(function(n){ return String(n).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }).join(' · ') + '</div></div>'
+      + _html;
   }
   document.getElementById('lista').innerHTML = _html;
 
@@ -8191,7 +8238,7 @@ async function cargarPrecios(){
   const map = {};
   inventarioArr = [];
   for(const row of data){
-    const item = { sku:row.sku, producto:row.producto, precio:parseFloat(row.precio), sistema:row.sistema, cantidad:parseInt(row.cantidad)||0 };
+    const item = { sku:row.sku, producto:row.producto, precio:(parseFloat(row.precio)||0), sistema:row.sistema, cantidad:parseInt(row.cantidad)||0 };
     map[row.producto] = item;
     map[row.sku] = item;
     inventarioArr.push(item);
@@ -8442,7 +8489,7 @@ function configResumen(){
     if(cfg.rejilla) extras.push('rejilla');
     if(cfg.panel) extras.push('panel beige');
     if(cfg.botas)   extras.push('bota protectora ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt
-                      + (cfg.botaBarra ? ' con barra de orilla ' + _largoBarraIn(cfg, (cfg.lineas||[])[0]) + '"' : ' sin barra'));
+                      + (cfg.botaBarra ? ' con barra de orilla ' + _barraProtOpc(_largoBarraIn(cfg, (cfg.lineas||[])[0])).lIn + '"' : ' sin barra'));
     if(cfg.punt)    extras.push('protector de puntal ' + _opcDe(PUNTAL_OPC, cfg.puntSku||PUNTAL_SEL).txt + ' (marcos de en medio)');
     if((cfg.lineas||[]).some(function(l){return l.mallaOn;}))
                     extras.push('malla anticaída ' + _opcDe(SUJECION_OPC, cfg.sujSku||SUJECION_SEL).txt + ' de sujeción');
@@ -9072,7 +9119,11 @@ async function generarPDF(datos, opts){
     fy += 4;
     doc.setFontSize(8);
     doc.setTextColor(180,90,80);
-    doc.text('⚠ Productos sin precio en sistema: '+faltantes.join(', '), M, fy);
+    // Al cliente se le dice "por confirmar" (no "sin precio en sistema") y en
+    // varias lineas: con muchas piezas el texto se salia de la hoja.
+    const _fu = faltantes.filter(function(n, i){ return faltantes.indexOf(n) === i; });
+    const _txtF = doc.splitTextToSize('Precio por confirmar (no incluido en el total): ' + _fu.join(', '), W - 2*M);
+    doc.text(_txtF, M, fy);
   }
 
   // Nombre limpio para el archivo
@@ -9104,7 +9155,10 @@ async function generarPDF(datos, opts){
   // ISA-OS se vea que la cotizacion trae varios sistemas.
   const sistemaLabel = combi
     ? ('Plano mixto · ' + bloques.map(function(b){ return b.nombre; }).join(' + '))
-    : (sistemaActual==='piezas' ? 'Piezas sueltas' : (sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking' : 'Góndola')));
+    : (sistemaActual==='piezas' ? 'Piezas sueltas' : (sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking'
+      // Mecano y Cantilever llegaban a ISA-OS como "Góndola". El folio se queda en
+      // GW- porque ISA-OS solo reconoce RW-/GW-/PW- como cotizacion web.
+      : (sistemaActual==='mecano' ? 'Mecano' : (sistemaActual==='cantilever' ? 'Cantilever' : 'Góndola')))));
   const lineasVenta = lineasParaPDF.map(l => ({
     producto: l.producto,
     cantidad: l.cantidad,
