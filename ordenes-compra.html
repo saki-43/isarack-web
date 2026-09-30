@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<!-- saved from url=(0075)file:///C:/Users/Issac%20Romero/Downloads/ISARACK_Ordenes_Compra%20(7).html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>ISARACK — Órdenes de Compra</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 115'%3E%3Cpolygon points='50,5 95,30 95,85 50,110 5,85 5,30' fill='%23f97316'/%3E%3C/svg%3E">
 <style>
@@ -799,84 +799,7 @@
       <input type="text" id="filter-search" placeholder="Buscar por folio, razón social, contacto..." style="flex:1; min-width:200px;">
     </div>
 
-    <div id="history-list"><div class="history-card">
-      <div class="history-folio">
-        FOLIO<span class="num">59</span>
-      </div>
-      <div class="history-info">
-        <div class="top">ABEL — SURTIDORA MEXICANA DEL NOROESTE S.A. DE C.V.</div>
-        <div class="bottom">16/04/2026 · Contacto: DAVID CORDOBA · 2 ítem(s)</div>
-      </div>
-      <div class="history-total">$4,891.32</div>
-      <button class="btn btn-primary" data-open="o_1776371452729_ziign">Abrir</button>
-      <button class="btn btn-danger" data-del="o_1776371452729_ziign">🗑️</button>
-    </div><div class="history-card">
-      <div class="history-folio">
-        FOLIO<span class="num">58</span>
-      </div>
-      <div class="history-info">
-        <div class="top">BRAYAN — BRYAN ALEXIS</div>
-        <div class="bottom">16/04/2026 · Contacto: BRAYAN · 4 ítem(s)</div>
-      </div>
-      <div class="history-total">$30,363.00</div>
-      <button class="btn btn-primary" data-open="o_1776362461729_plec9">Abrir</button>
-      <button class="btn btn-danger" data-del="o_1776362461729_plec9">🗑️</button>
-    </div><div class="history-card">
-      <div class="history-folio">
-        FOLIO<span class="num">57</span>
-      </div>
-      <div class="history-info">
-        <div class="top">BRAYAN — BRYAN ALEXIS</div>
-        <div class="bottom">10/04/2026 · Contacto: BRAYAN · 4 ítem(s)</div>
-      </div>
-      <div class="history-total">$16,934.84</div>
-      <button class="btn btn-primary" data-open="o_1776361811185_51zu5">Abrir</button>
-      <button class="btn btn-danger" data-del="o_1776361811185_51zu5">🗑️</button>
-    </div><div class="history-card">
-      <div class="history-folio">
-        FOLIO<span class="num">56</span>
-      </div>
-      <div class="history-info">
-        <div class="top">GILBERTO — MANUEL RODRIGUEZ</div>
-        <div class="bottom">10/04/2026 · Contacto: GILBERTO RODRIGUEZ · 3 ítem(s)</div>
-      </div>
-      <div class="history-total">$39,636.00</div>
-      <button class="btn btn-primary" data-open="o_1776361629180_zh2rw">Abrir</button>
-      <button class="btn btn-danger" data-del="o_1776361629180_zh2rw">🗑️</button>
-    </div><div class="history-card">
-      <div class="history-folio">
-        FOLIO<span class="num">55</span>
-      </div>
-      <div class="history-info">
-        <div class="top">SAMUEL — SAMUEL GOMEZ</div>
-        <div class="bottom">10/04/2026 · Contacto: SAMUEL · 5 ítem(s)</div>
-      </div>
-      <div class="history-total">$43,674.00</div>
-      <button class="btn btn-primary" data-open="o_1776361441264_biiq8">Abrir</button>
-      <button class="btn btn-danger" data-del="o_1776361441264_biiq8">🗑️</button>
-    </div><div class="history-card">
-      <div class="history-folio">
-        FOLIO<span class="num">54</span>
-      </div>
-      <div class="history-info">
-        <div class="top">ABEL — CLAUDIA YANETH LARES</div>
-        <div class="bottom">09/04/2026 · Contacto: ABEL · 1 ítem(s)</div>
-      </div>
-      <div class="history-total">$3,082.50</div>
-      <button class="btn btn-primary" data-open="o_1776348490481_ldl4d">Abrir</button>
-      <button class="btn btn-danger" data-del="o_1776348490481_ldl4d">🗑️</button>
-    </div><div class="history-card">
-      <div class="history-folio">
-        FOLIO<span class="num">53</span>
-      </div>
-      <div class="history-info">
-        <div class="top">BRAYAN — BRYAN ALEXIS</div>
-        <div class="bottom">15/04/2026 · Contacto: BRAYAN · 5 ítem(s)</div>
-      </div>
-      <div class="history-total">$31,900.00</div>
-      <button class="btn btn-primary" data-open="o_1776318646130_w6hlc">Abrir</button>
-      <button class="btn btn-danger" data-del="o_1776318646130_w6hlc">🗑️</button>
-    </div></div>
+    <div id="history-list"></div>
   </div>
 
 </div>
@@ -1239,9 +1162,9 @@ function renderItems() {
     const tr = document.createElement('tr');
     if (item._dudoso) tr.classList.add('row-dudoso');
     tr.innerHTML = `
-      <td class="qty"><input type="number" step="any" value="${item.qty}" data-idx="${idx}" data-field="qty"></td>
+      <td class="qty"><input type="number" step="any" value="${escapeHtml(item.qty)}" data-idx="${idx}" data-field="qty"></td>
       <td><input type="text" value="${escapeHtml(item.desc)}" data-idx="${idx}" data-field="desc">${item._dudoso ? '<span class="dudoso-tag no-print" title="Revisa este dato, la IA no estaba segura">⚠ revisar</span>' : ''}</td>
-      <td class="price"><input type="number" step="any" value="${item.price}" data-idx="${idx}" data-field="price"></td>
+      <td class="price"><input type="number" step="any" value="${escapeHtml(item.price)}" data-idx="${idx}" data-field="price"></td>
       <td class="amount">${fmtMoney((parseFloat(item.qty)||0) * (parseFloat(item.price)||0))}</td>
       <td class="no-print"><button class="del-btn" data-del="${idx}" title="Eliminar fila">✕</button></td>
     `;
@@ -1366,7 +1289,7 @@ function loadOrderFromSaved(order) {
     ivaPct: order.ivaPct,
     isrRetenidoPct: order.isrRetenidoPct != null ? order.isrRetenidoPct : 1.25,
     ivaRetenidoPct: order.ivaRetenidoPct != null ? order.ivaRetenidoPct : 4,
-    items: JSON.parse(JSON.stringify(order.items))
+    items: JSON.parse(JSON.stringify(Array.isArray(order.items) ? order.items : []))
   };
   editingSavedId = order.id;
   currentPerson = order.person;
@@ -1515,11 +1438,11 @@ function renderHistory() {
       </div>
       <div class="history-info">
         <div class="top">${escapeHtml(o.person)} — ${escapeHtml(o.razonSocial || '(sin proveedor)')}</div>
-        <div class="bottom">${fmtDateDisplay(o.fecha)} · Contacto: ${escapeHtml(o.contacto || '—')} · ${o.items.length} ítem(s)</div>
+        <div class="bottom">${escapeHtml(fmtDateDisplay(o.fecha))} · Contacto: ${escapeHtml(o.contacto || '—')} · ${(Array.isArray(o.items) ? o.items.length : 0)} ítem(s)</div>
       </div>
       <div class="history-total">${fmtMoney(o._total)}</div>
-      <button class="btn btn-primary" data-open="${o.id}">Abrir</button>
-      <button class="btn btn-danger" data-del="${o.id}">🗑️</button>
+      <button class="btn btn-primary" data-open="${escapeHtml(o.id)}">Abrir</button>
+      <button class="btn btn-danger" data-del="${escapeHtml(o.id)}">🗑️</button>
     `;
     list.appendChild(card);
   });

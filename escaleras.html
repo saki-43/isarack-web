@@ -357,7 +357,9 @@ function calc(snap){
   ['wrapT1','wrapT2','wrapDesc','wrapPunta','hintTramos'].forEach(id=>$(id).style.display=esL?'block':'none');
   $('wrapPeralte').style.display='block';
 
-  if(altura<=0||huella<=0||pObj<=0){return;}
+  // Con un campo vacio o en 0 se quedaba el resultado anterior en pantalla y
+  // "Cotizar", "Copiar" e "Imprimir" mandaban un despiece que ya no correspondia.
+  if(!(altura>0)||!(huella>0)||!(pObj>0)){ window._despiece=[]; ['mats','metrics','chips','marcas','svgElev','svgPlan'].forEach(id=>{ const e=$(id); if(e) e.innerHTML=''; }); return; }
 
   const escalones=Math.max(1,Math.round(altura/pObj));
   const peralte=altura/escalones;
@@ -616,13 +618,28 @@ function drawMats(o){
   window._despiece=rows;
 }
 
-function enviarSamuel(){
-  let tel=localStorage.getItem('tel_samuel');
+// Deja el WhatsApp en formato wa.me: 52 + 10 digitos. Acepta "664 123 4567",
+// "526641234567" o "5216641234567". Regresa '' si no es un numero valido.
+function _telWa(t){
+  let d=String(t||'').replace(/\D/g,'');
+  if(d.length===10) d='52'+d;
+  else if(d.length===13 && d.indexOf('521')===0) d='52'+d.slice(3);
+  return (d.length===12 && d.indexOf('52')===0) ? d : '';
+}
+function _pedirTel(clave, texto){
+  let tel=_telWa(localStorage.getItem(clave));
   if(!tel){
-    const t=prompt('WhatsApp de Samuel Gómez (soldador). Solo números con lada de país, ej. 5216641234567:');
-    if(!t) return;
-    tel=t.replace(/\D/g,''); localStorage.setItem('tel_samuel',tel);
+    const t=prompt(texto+' (10 dígitos, ej. 664 123 4567):');
+    if(!t) return '';
+    tel=_telWa(t);
+    if(!tel){ alert('Ese número no es válido. Deben ser 10 dígitos.'); return ''; }
+    localStorage.setItem(clave,tel);
   }
+  return tel;
+}
+function enviarSamuel(){
+  const tel=_pedirTel('tel_samuel','WhatsApp de Samuel Gómez (soldador)');
+  if(!tel) return;
   const nombre=$('nombre').value||'la escalera';
   const cli=$('cliente').value||'';
   const msg=`Samuel, te paso el plano de ${nombre}${cli?(' ('+cli+')'):''} para fabricar. Adjunto el PDF.`;
@@ -634,12 +651,8 @@ function cotizar(){
   // El telefono se pregunta una vez y se guarda en este equipo, igual que el de
   // Samuel. Antes venia escrito en el codigo, pero esta pagina ya vive en el
   // sitio publico y el numero de Blanquita no tiene por que andar ahi.
-  let tel=localStorage.getItem('tel_blanquita');
-  if(!tel){
-    const t=prompt('WhatsApp de Blanquita (Aceros Ocotlán). Solo números con lada de país, ej. 5216641234567:');
-    if(!t) return;
-    tel=t.replace(/\D/g,''); localStorage.setItem('tel_blanquita',tel);
-  }
+  const tel=_pedirTel('tel_blanquita','WhatsApp de Blanquita (Aceros Ocotlán)');
+  if(!tel) return;
   const r=window._despiece||[];
   let txt=`Hola Blanquita, me cotiza este material por favor:\n\n`;
   r.forEach(x=>{txt+=`• ${x[1]} pza — ${x[0]}\n`;});

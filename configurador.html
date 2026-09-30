@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.30.04';
+const CFG_VERSION = '2026.09.30.07';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -748,6 +748,14 @@ const PASILLO_MAX_M = 50;
 // escribia menos lo subia en silencio: Isaac ponia 0.4 y se dibujaba 0.8
 // (30 sep 2026). Ahora se respeta lo que se escriba desde 0.10 m.
 const PASILLO_MIN_M = 0.1;
+// Lee un campo de pasillo: vacio = el valor por omision del sistema; cualquier
+// numero (incluido 0) se respeta dentro de [PASILLO_MIN_M, PASILLO_MAX_M]. Antes
+// "0" volvia al 3.5 por omision y "0.05" a 0.1: incoherente.
+function _pasilloDe(el, defM){
+  const v = el ? String(el.value).trim() : '';
+  if(v === '' || !isFinite(parseFloat(v))) return defM;
+  return Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(v)));
+}
 const IN_TO_M = 0.0254;
 // Placa de la pata de PICKING: sobresale 2" del marco hacia el FRENTE y hacia
 // ATRAS (en el sentido del fondo), no a lo largo de la fila (medido en obra,
@@ -786,7 +794,7 @@ const REJILLAS_COMBO_PIC = {
   120: {tipo:120, cantidad:1},   // 1 × R120 exacto
   200: {tipo:100, cantidad:2},   // 2 × R100 exacto
   230: {tipo:120, cantidad:2}    // 2 × R120 (cubre 240, sobra 10)
-  // 150 y 180 no tienen combinación buena con rejillas — caen a panel galvanizado
+  // 150 y 180 no tienen rejilla en inventario: se cotizan por nombre y salen "sin precio"
 };
 function tieneRejillaPicking(largoCm){ return REJILLAS_COMBO_PIC[largoCm] !== undefined; }
 
@@ -797,9 +805,15 @@ const MARCOS_SEL = {
   192: { 24:'SEL-0116', 36:'SEL-0117', 42:'SEL-0119', 48:'SEL-0122' },
   240: { 24:'SEL-0132', 36:'SEL-0133', 42:'SEL-0135', 48:'SEL-0137' },
   288: { 24:'SEL-0456', 36:'SEL-0151', 42:'SEL-0152', 48:'SEL-0158' },
-  312: { 42:'SEL-0168', 48:'SEL-0171' },
-  336: { 24:'SEL-0457', 36:null,       42:'SEL-0178', 48:'SEL-0180' },
-  360: { 42:'SEL-0183', 48:'SEL-0185' }
+  // 312/336/360: faltaban 5 combinaciones y el marco NO se cotizaba (salia la
+  // venta sin marcos). Y en 312x42 / 336x42 / 336x48 se usaban marcos
+  // especiales (GA12 doble diagonal, GAGE 12 PSA) que ISARACK no maneja
+  // (Isaac, 30 sep 2026). Esos van por NOMBRE del marco estandar: en cuanto se
+  // den de alta en el inventario de ISA-OS con ese nombre exacto, toman su
+  // precio solos; mientras, salen con el aviso de "sin precio".
+  312: { 24:'MARCO 312" X 24"', 36:'MARCO 312" X 36"', 42:'MARCO 312" X 42"', 48:'SEL-0171' },
+  336: { 24:'SEL-0457',         36:'MARCO 336" X 36"', 42:'MARCO 336" X 42"', 48:'MARCO 336" X 48"' },
+  360: { 24:'MARCO 360" X 24"', 36:'MARCO 360" X 36"', 42:'SEL-0183',         48:'SEL-0185' }
 };
 // Uniones para separar las 2 filas de un rack doble (medida = separación entre filas)
 const UNIONES_SEL = {
@@ -1055,13 +1069,15 @@ function _topeUniones(l){
   }
   return n;
 }
-// De las medidas que hay en almacen, la mas cercana a lo que pide la orilla.
-function _barraProtSku(lIn){
-  var mej = BARRA_PROT_OPC[0];
-  for(var i=1;i<BARRA_PROT_OPC.length;i++)
-    if(Math.abs(BARRA_PROT_OPC[i].lIn - lIn) < Math.abs(mej.lIn - lIn)) mej = BARRA_PROT_OPC[i];
-  return mej.sku;
+// La barra CORTA (42") es para orillas de hasta 42"; lo que pase de ahi lleva la
+// LARGA (96") (Isaac, 30 sep 2026). Antes se tomaba "la mas cercana" y una orilla
+// de 48" salia con barra de 42": 6" corta.
+function _barraProtOpc(lIn){
+  var ord = BARRA_PROT_OPC.slice().sort(function(a,b){ return a.lIn - b.lIn; });
+  for(var i=0;i<ord.length;i++) if(ord[i].lIn >= lIn) return ord[i];
+  return ord[ord.length-1];
 }
+function _barraProtSku(lIn){ return _barraProtOpc(lIn).sku; }
 
 // REGLA DE OBRA (ISARACK): la rejilla electrosoldada viene en 2 anchos, uno
 // por cada largo de viga. NO se puede poner rejilla 46" en viga 108" — quedan
@@ -1167,6 +1183,9 @@ const IVA_FIJO = 8;        // BC frontera, no editable
 // Flete con tabla de 5 bloques (igual que ISA-OS, sobre subtotal sin IVA)
 // Calcula el costo de instalación: 5% del valor de ventas, mínimo $80 USD
 function calcularInstalacion(materialUSD){
+  // Sin material (todo sin precio o carrito vacio) no se cobra el minimo de $80
+  // solo: el flete ya se comportaba asi.
+  if(!(materialUSD > 0)) return 0;
   const pct = materialUSD * 0.05;
   return Math.max(pct, 80);
 }
@@ -1232,11 +1251,18 @@ function cambiarUnidad(nueva){
   const ant = _uniPrev;
   _UNI_CAMPOS.forEach(id => {
     const e = document.getElementById(id); if(!e) return;
+    if(String(e.value).trim() === '') return;   // vacio se queda vacio (antes se volvia "0")
     const metros = (parseFloat(e.value) || 0) * (_UNI_F[ant] || 1);
     e.value = _uniDeM(metros, nueva);
   });
   unidadCota = nueva; _uniPrev = nueva;
   _uniEtiquetas();
+  // Los paneles de bloque (Pared X / Pared Y / pasillo del bloque) guardan metros
+  // y se pintan en la unidad del momento: hay que repintarlos o se quedan con la
+  // etiqueta y el numero viejos y el siguiente numero se lee en la unidad nueva.
+  ['renderLineasGondola','renderLineasPicking','renderLineasAlmacen','renderLineasMecano','renderLineasCantilever'].forEach(function(fn){
+    try{ if(typeof window[fn] === 'function') window[fn](); }catch(e){}
+  });
   if(typeof build === 'function') build();
 }
 // Bodega (cuarto con medidas para ver cuánto entra) + dimensiones actuales del rack
@@ -1298,7 +1324,9 @@ function crearMatRejillaTam(largoM, fondoM){
   const tex = texRejillaBase.clone();
   tex.needsUpdate = true;
   tex.repeat.set(Math.max(1, largoM/0.05), Math.max(1, fondoM/0.05));
-  return new THREE.MeshStandardMaterial({map: tex, metalness:0.3, roughness:0.6, side:THREE.DoubleSide});
+  const m = new THREE.MeshStandardMaterial({map: tex, metalness:0.3, roughness:0.6, side:THREE.DoubleSide});
+  m.userData.desechable = true;   // se libera en build() junto con su textura
+  return m;
 }
 
 // Material para barras de rejilla (acero galvanizado claro)
@@ -1915,7 +1943,7 @@ function getConfigPic(){
   const largoCm = parseInt(document.getElementById('picLargo').value);
   const niveles = parseInt(document.getElementById('picNiveles').value);
   const cuerpos = parseInt(document.getElementById('picCuerpos').value);
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('picPasillo').value) || 2.0));
+  const pasilloM = _pasilloDe(document.getElementById('picPasillo'), 2.0);
   const lineas = lineasPicking.map(l => {
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, largoM = l.largoCm/100;
     const cuerposA = l.cuerpos;
@@ -2997,17 +3025,31 @@ function bomPasarelaEntrepiso(cfg, add, lineasInfo){
 // lineal de 4 piezas". Y van 2 postes por metro.
 // Se suma UNA sola vez, con los metros medidos del 3D, para que la lista de
 // materiales no se pueda volver a separar de lo que se dibuja.
-function _addBarandalPas(add, cfg){
+// Se mide SOLO la isla que se esta cotizando (bloqueRef = {sis, i}). Antes se
+// medía todo el dibujo en cada isla: con 2 islas salian 38 ML en vez de 20, y en
+// plano combinado cada sistema cobraba el barandal de los dos.
+function _grupoDeIsla(bloqueRef){
+  if(!bloqueRef || typeof grupo === 'undefined' || !grupo) return null;
+  let hallado = null;
+  grupo.traverse(function(o){
+    if(hallado) return;
+    const b = o.userData && o.userData.bloque;
+    if(b && b.sis === bloqueRef.sis && b.i === bloqueRef.i) hallado = o;
+  });
+  return hallado;
+}
+function _addBarandalPas(add, cfg, bloqueRef){
   const alt = (cfg && cfg.pasarela && cfg.pasarela.alturaM) || 0;
-  const ml = _barandalMLDesde3D(typeof grupo !== 'undefined' ? grupo : null, alt);
+  const gIsla = _grupoDeIsla(bloqueRef);
+  const ml = _barandalMLDesde3D(gIsla || (typeof grupo !== 'undefined' ? grupo : null), alt);
   if(ml <= 0) return;
   add(PASARELA_BARANDAL, ml);
   add(PASARELA_POSTE_BAR, ml * 2);
 }
-function bomPasarela(cfg, add, lineasInfo){
+function bomPasarela(cfg, add, lineasInfo, bloqueRef){
   const nNiveles = cfg.pasarela.niveles || 1;
   const escActiva = cfg.pasarela.escalera !== 'no';
-  if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); _addBarandalPas(add, cfg); return; }
+  if(idModeloPasarela(cfg) === 'PS-2'){ bomPasarelaEntrepiso(cfg, add, lineasInfo); _addBarandalPas(add, cfg, bloqueRef); return; }
   // El piso del pasillo se apoya directo en las vigas de carga de los racks (naranjas).
   // No se cotiza viga extra de 48" por marco: no van en obra (referencia proyecto real).
   for(let i=0; i<lineasInfo.length-1; i++){
@@ -3045,7 +3087,7 @@ function bomPasarela(cfg, add, lineasInfo){
       }
     }
   }
-  _addBarandalPas(add, cfg);   // los metros de barandal, una sola vez
+  _addBarandalPas(add, cfg, bloqueRef);   // los metros de barandal de ESTA isla
 }
 let lineasPicking = [{tipo:'sencilla', cuerpos:1, cuerposB:null, altoIn:96, fondoIn:24, largoCm:120, niveles:4, abierta:true}];
 
@@ -3622,7 +3664,7 @@ function _pasilloDeBloque(cfg, bloque){
   const base = Number(cfg && cfg.pasilloM) || 0;
   const p = bloque && bloque.pasillo;
   if(p === null || p === undefined || !isFinite(Number(p)) || Number(p) <= 0) return base;
-  return Math.max(0.3, Math.min(PASILLO_MAX_M, Number(p)));
+  return Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, Number(p)));
 }
 function _filasDeBloque(lineas, iB){ return (lineas || []).filter(l => _bloqueDe(l) === iB); }
 // cfg recortado a las filas de UN bloque: las medidas totales se recalculan con
@@ -4755,8 +4797,6 @@ function lnToggle(i){
 }
 function lnSet(i, campo, valor){
   lineasAlmacen[i][campo] = valor;
-  // Combinación 336×36 no existe en catálogo → forzar fondo 42
-  if(lineasAlmacen[i].altoIn === 336 && lineasAlmacen[i].fondoIn === 36) lineasAlmacen[i].fondoIn = 42;
   renderLineasAlmacen();
   try{ actualizarStockEnDropdowns(); }catch(e){}
   build();
@@ -4781,7 +4821,7 @@ function getConfigSel(){
   const niveles = parseInt(document.getElementById('selNiveles').value);
   const cuerpos = parseInt(document.getElementById('selCuerpos').value);
   const filas = tipoFila==='doble' ? 2 : 1;
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('selPasillo').value) || 3.5));
+  const pasilloM = _pasilloDe(document.getElementById('selPasillo'), 3.5);
   const lineas = lineasAlmacen.map(l => {
     const vi = VIGAS_INFO[l.vigaSku] || VIGAS_INFO['SEL-0362'];
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, vigaM = vi.largoIn * IN_TO_M;
@@ -4851,7 +4891,7 @@ function getConfigMec(){
     bloque: _bloqueDe(l),
     profM: fondoM * (l.tipo === 'doble' ? 2 : 1)
   }));
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('mecPasillo').value) || 1.2));
+  const pasilloM = _pasilloDe(document.getElementById('mecPasillo'), 1.2);
   const cuerposTot = lineas.reduce((a,l)=>a + l.cuerpos * (l.tipo==='doble'?2:1), 0);
   const maxLenM = Math.max(...lineas.map(l=>l.largoTotM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -4874,7 +4914,7 @@ function getConfigCan(){
     bloque: _bloqueDe(l),
     largoZM: (l.cuerpos - 1) * separacionM
   }));
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('canPasillo').value) || 3.5));
+  const pasilloM = _pasilloDe(document.getElementById('canPasillo'), 3.5);
   const anchoTotalM = lineas.reduce((a,l)=>a+l.anchoBaseM,0) + pasilloM*(lineas.length-1);
   const maxLargoZM = Math.max(...lineas.map(l=>l.largoZM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -5371,8 +5411,10 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
     const f2 = box(pieW, pieT, pieD, matPie); f2.position.set(x, pieT/2, zBack); parent.add(f2);
     // Pernos y botas solo si el marco es cotizado (no ghost)
     if(!esGhost){
+      // 4 anclas por MARCO = 2 por placa, en esquinas opuestas (Isaac, 30 sep
+      // 2026). Antes se dibujaban 4 por placa (8 por marco) y se cotizaban 4.
       const pernoGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.025, 8);
-      [[-pieW/2+0.025,-pieD/2+0.025],[pieW/2-0.025,-pieD/2+0.025],[-pieW/2+0.025,pieD/2-0.025],[pieW/2-0.025,pieD/2-0.025]].forEach(([px,pz])=>{
+      [[-pieW/2+0.025,-pieD/2+0.025],[pieW/2-0.025,pieD/2-0.025]].forEach(([px,pz])=>{
         const pn1 = new THREE.Mesh(pernoGeo, matPerno); pn1.position.set(x+px, pieT+0.012, zFront+pz); parent.add(pn1);
         const pn2 = new THREE.Mesh(pernoGeo, matPerno); pn2.position.set(x+px, pieT+0.012, zBack+pz); parent.add(pn2);
       });
@@ -5574,8 +5616,7 @@ function buildGondola(){
 
   // Pasillo peatonal entre filas. Antes estaba fijo en 1.6 m y no habia forma
   // de cambiarlo; ahora va en el mismo campo que los otros 4 sistemas.
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M,
-    _uniAM((document.getElementById('gonPasillo')||{}).value) || 1.6));
+  const pasilloM = _pasilloDe(document.getElementById('gonPasillo'), 1.6);
 
   // Info geométrica de un juego de filas. Se usa dos veces: para el diseno
   // completo (camara y resumen) y para cada bloque por separado.
@@ -5922,6 +5963,7 @@ function crearTextoSprite(texto, color, contorno){
   tex.anisotropy = 4;
   tex.needsUpdate = true;
   const mat = new THREE.SpriteMaterial({map: tex, transparent: true, depthTest: false});
+  mat.userData.desechable = true;   // se libera en build() junto con su textura
   const sprite = new THREE.Sprite(mat);
   return sprite;
 }
@@ -6174,16 +6216,22 @@ function agregarBodega(parent){
     // Lo ocupado va de la pared a la orilla lejana del rack: si corriste el
     // bloque, ese hueco tambien se gasta de la bodega.
     const ocX = rx1 - xIz, ocZ = rz1 - zAt;
-    const cabe = (A >= ocX - 0.01) && (L >= ocZ - 0.01) && (H >= rd.y - 0.01);
+    // Con Pared X/Y negativa el rack se sale por la pared de ATRAS/IZQUIERDA:
+    // antes decia "✓ Cabe · sobra 14 m" con el rack entero fuera del cuarto.
+    const fueraX = (rx0 < xIz - 0.01) ? (xIz - rx0) : 0;
+    const fueraZ = (rz0 < zAt - 0.01) ? (zAt - rz0) : 0;
+    const cabe = (A >= ocX - 0.01) && (L >= ocZ - 0.01) && (H >= rd.y - 0.01) && !fueraX && !fueraZ;
     if(cabe){
       st.innerHTML = '✓ Cabe · sobra '+fmtCota(A-ocX)+' de ancho, '+fmtCota(L-ocZ)+' de largo y '+fmtCota(H-rd.y)+' de alto';
       st.style.color = '#2e7d32';
     } else {
       const falta = [];
-      if(A < ocX) falta.push('ancho ('+fmtCota(ocX-A)+' de más)');
-      if(L < ocZ) falta.push('largo ('+fmtCota(ocZ-L)+' de más)');
-      if(H < rd.y) falta.push('alto ('+fmtCota(rd.y-H)+' de más)');
-      st.innerHTML = '⚠ NO cabe — falta '+falta.join(', ');
+      if(A < ocX) falta.push('falta ancho ('+fmtCota(ocX-A)+' de más)');
+      if(L < ocZ) falta.push('falta largo ('+fmtCota(ocZ-L)+' de más)');
+      if(H < rd.y) falta.push('falta alto ('+fmtCota(rd.y-H)+' de más)');
+      if(fueraX) falta.push('se sale '+fmtCota(fueraX)+' por la pared de la izquierda (Pared X negativa)');
+      if(fueraZ) falta.push('se sale '+fmtCota(fueraZ)+' por la pared de atrás (Pared Y negativa)');
+      st.innerHTML = '⚠ NO cabe — '+falta.join(', ');
       st.style.color = '#c62828';
     }
   }
@@ -6380,10 +6428,14 @@ function ajustarSelectorColor(){
   if(!row || !optAzul || !selColor) return;
   if(sistemaActual === 'gondola' || sistemaActual === 'mecano' || sistemaActual === 'cantilever'){
     row.style.display = 'none';
+    // Se recuerda el color elegido: antes, con solo pasar por Gondola el azul del
+    // Selectivo/Picking se volvia verde para siempre.
+    if(selColor.value !== 'verde') selColor.dataset.elegido = selColor.value;
     selColor.value = 'verde';
     return;
   }
   row.style.display = '';
+  if(selColor.dataset.elegido){ selColor.value = selColor.dataset.elegido; delete selColor.dataset.elegido; }
   if(sistemaActual === 'picking'){
     optAzul.textContent = 'Azul industrial (+15%)';
   } else {
@@ -6689,6 +6741,20 @@ function _sistemasDibujados(){
 function _planoCombinado(){ return _sistemasDibujados().length > 1; }
 function planoToggle(s, on){
   const i = sistemasPlano.indexOf(s);
+  // Un sistema que entra al plano nacia en 0,0 ENCIMA del que ya estaba, y el
+  // "Cabe" ni lo notaba. Si todavia esta en 0,0, se acomoda a la derecha de lo
+  // que ya hay dibujado, con 1 m de separacion. Si ya lo habias movido, se respeta.
+  if(on && i < 0 && _sistemasDibujados().filter(function(x){ return x !== s; }).length && _rackDims){
+    try{
+      const _bl = {gondola:bloquesGondola, selectivo:bloquesAlmacen, picking:bloquesPicking,
+                   mecano:bloquesMecano, cantilever:bloquesCantilever}[s];
+      const b0 = _bl && _bl[0];
+      if(b0 && !(Number(b0.x) || 0) && !(Number(b0.z) || 0)){
+        const cx = (_rackCen && isFinite(_rackCen.x)) ? _rackCen.x : 0;
+        b0.x = Math.round((cx + _rackDims.x/2 + 1.0) * 100) / 100;
+      }
+    }catch(e){ console.warn('acomodar sistema nuevo', e); }
+  }
   if(on && i < 0) sistemasPlano.push(s);
   else if(!on && i >= 0) sistemasPlano.splice(i, 1);
   renderPlanoCombinado(); build();
@@ -6984,12 +7050,23 @@ function _buildSistema(s){
   else if(s === 'cantilever') buildCantilever();
   else buildGondola();
 }
+// Libera de la GPU lo que se creo SOLO para este dibujo: geometrias y los
+// materiales marcados "desechable" (textos de cotas y rejillas) con su textura.
+// Antes solo se liberaban geometrias: cada tecla en la bodega dejaba ~14
+// texturas de 512x160 colgadas y en celular la pagina acababa cerrandose.
+// Los materiales compartidos (colores del rack) NO se tocan.
+function _liberarObj(o){
+  if(o.geometry) o.geometry.dispose();
+  const ms = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+  ms.forEach(function(m){
+    if(!m || !m.userData || !m.userData.desechable) return;
+    if(m.map) m.map.dispose();
+    m.dispose();
+  });
+}
 function build(){
   if(grupo){
-    // Liberar geometrías de la GPU antes de descartar el grupo (evita fugas de memoria)
-    grupo.traverse(obj => {
-      if(obj.geometry) obj.geometry.dispose();
-    });
+    grupo.traverse(_liberarObj);
     scene.remove(grupo);
   }
   // RED DE SEGURIDAD: barrer cualquier objeto que se haya colgado de la escena
@@ -6998,7 +7075,7 @@ function build(){
   for(let i = scene.children.length - 1; i >= 0; i--){
     const obj = scene.children[i];
     if(obj.userData && obj.userData.fijo) continue;
-    obj.traverse(o => { if(o.geometry) o.geometry.dispose(); });
+    obj.traverse(_liberarObj);
     scene.remove(obj);
   }
   grupo = new THREE.Group();
@@ -7029,10 +7106,12 @@ function build(){
   // midiendo solo la geometría del rack (las cotas van marcadas y no cuentan).
   // Así "Mostrar bodega" sirve en los cinco sistemas, y en el que venga después.
   try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
-  if(!_rackDims || _bloquesMovidos()){
-    try{ const _d = _soloXZY(_dimsDesde3D(grupo)); if(_d) _rackDims = _d; }
-    catch(e){ console.warn('medir rack', e); }
-  }
+  // SIEMPRE se mide del 3D. Antes, con el bloque en 0,0 se usaba la formula de
+  // cada sistema (sin protecciones ni placas) y movido 1 cm se medía el 3D: el
+  // "Cabe" brincaba 24 cm. Ademas el centro (_rackCen) ya sale del 3D, asi que
+  // medida y centro quedan de la misma fuente.
+  try{ const _d = _soloXZY(_dimsDesde3D(grupo)); if(_d) _rackDims = _d; }
+  catch(e){ console.warn('medir rack', e); }
   // Con PASARELA el conjunto se sale del racking: corredor peatonal por fuera en
   // los dos extremos del largo y, en PS-1, la escalera al frente. La formula de
   // cada sistema solo mide el rack, asi que el "Cabe" decia que si y en obra no
@@ -7404,10 +7483,11 @@ function calcularBomPicking(){
     const sumaCuerpos = esD ? cA + cB : cA;
     // Posiciones cuerpo×nivel con carga: descuenta ramal PS-1, escalera PS-2 y túneles.
     const nivCarga = _nivCargaSel(l, cA, cB, esD, cfg, iLn, l.largoM);
-    // Solo la línea frontal pierde el módulo que cruza el ramal de acceso a la escalera (PS-1)
-    const idxRamal = iLn === 0 ? cuerpoRamalPasarela(cfg, -cfg.maxLenM/2, l.largoM, cA) : -1;
-    const nivQuitadosRamal = idxRamal >= 0 ? nivelesSinVigaPasarela(cfg, l.altoM, l.niveles, 'picking') * (esD ? 2 : 1) : 0;
-    const nivCargaFinal = nivCarga - nivQuitadosRamal;
+    // El cuerpo de salida de la escalera PS-1 ya viene descontado dentro de
+    // _nivCargaSel. Aqui se volvia a restar (como en Selectivo antes de su
+    // arreglo) y con pasarela de 2 niveles faltaban vigas: el 3D dibujaba 88 y
+    // se cotizaban 80.
+    const nivCargaFinal = nivCarga;
     // Marcos que el cliente ya tiene: 1 por lado marcado; en doble el mismo lado
     // descuenta 2, uno por cada sub-fila. Igual que en Selectivo.
     const nMarcosExisPorLadoP = (l.marcoIzqExistente ? 1 : 0) + (l.marcoDerExistente ? 1 : 0);
@@ -7415,21 +7495,29 @@ function calcularBomPicking(){
     // 1) Marcos picking (alto × fondo)
     const marcoSku = MARCOS_PIC[l.altoIn] && MARCOS_PIC[l.altoIn][l.fondoIn];
     if(marcoSku && nMarcos > 0) add(marcoSku, nMarcos);
-    // 2) Pies de poste: van INCLUIDOS en el marco picking — no se cotizan aparte
+    // 2) Pies de poste: van INCLUIDOS en el marco picking — no se cotizan aparte.
+    //    Anclas: 2 por marco picking, una por placa (Isaac, 30 sep 2026). Se
+    //    dibujaban pero no se cobraban.
+    if(nMarcos > 0) add(ANCLA_STD_SEL, 2 * nMarcos);
     // 3) Vigas/travesaños: 2 por nivel por cuerpo (frente + atrás)
     add(VIGAS_PIC[l.largoCm], 2 * nivCargaFinal);
     // 4) Carga del nivel (rejilla/panel/madera se ponen SOLO en los cuerpos×nivel con viga)
-    if(cfg.rejilla && tieneRejillaPicking(l.largoCm)){
+    // Se cobra SOLO lo que se eligio: rejilla lleva rejilla, panel lleva panel
+    // (Isaac, 30 sep 2026). Antes la rejilla de 150/180 cm caia callada a panel
+    // beige. Si la medida no existe en inventario, se pide por su NOMBRE y la
+    // cotizacion la marca "sin precio" en vez de desaparecerla.
+    if(cfg.rejilla){
       const combo = REJILLAS_COMBO_PIC[l.largoCm];
-      const skuRej = REJILLAS_PIC[combo.tipo] && REJILLAS_PIC[combo.tipo][l.fondoIn];
-      add(skuRej, combo.cantidad * nivCarga);
-    } else if(cfg.panel || (cfg.rejilla && !tieneRejillaPicking(l.largoCm))){
+      const skuRej = combo && REJILLAS_PIC[combo.tipo] && REJILLAS_PIC[combo.tipo][l.fondoIn];
+      if(skuRej) add(skuRej, combo.cantidad * nivCarga);
+      else add('REJILLA PICKING ' + l.largoCm + 'CMX' + l.fondoIn + '"', nivCarga);
+    } else if(cfg.panel){
       const skuPanel = PANELES_BEIGE_PIC[l.fondoIn];
       const piezasPorNivel = Math.ceil(l.largoCm / (8 * 2.54));
       add(skuPanel, piezasPorNivel * nivCarga);
     } else if(cfg.madera){
       const skuTam = TAM_PIC[l.largoCm] && TAM_PIC[l.largoCm][l.fondoIn];
-      if(skuTam) add(skuTam, nivCarga);
+      add(skuTam || ('TAM ' + l.largoCm + 'CMX' + l.fondoIn + '"'), nivCarga);
     }
   });
   // La pasarela se cuenta POR BLOQUE. Son los pasillos ENTRE filas vecinas, y
@@ -7443,7 +7531,7 @@ function calcularBomPicking(){
       const filas = _filasDeBloque(cfg.lineas, iB);
       if(filas.length < 2) return;
       const cfgB = _cfgDeBloqueGen(cfg, filas, 'largoTotM', b);
-      if(cfgB) bomPasarela(cfgB, add, filas);
+      if(cfgB) bomPasarela(cfgB, add, filas, {sis:'picking', i:iB});
     });
   }
   return orden.map(sku => [sku, items[sku]]);
@@ -7505,8 +7593,10 @@ function calcularBomSelectivo(){
       // Ver comentario "REGLA DE OBRA (ISARACK)" arriba, junto a REJILLAS_SEL.
       const anchoRej = REJILLA_ANCHO_POR_VIGA[l.vigaIn] || 46;
       const rejSku = (REJILLAS_SEL[l.fondoIn] || {})[anchoRej];
-      const rejPorViga = REJILLAS_POR_VIGA_SEL[l.vigaIn];
-      if(rejSku && rejPorViga) add(rejSku, rejPorViga * nivCarga);
+      const rejPorViga = REJILLAS_POR_VIGA_SEL[l.vigaIn] || 2;
+      // Fondo 24" no tiene rejilla en inventario: antes desaparecia callada de la
+      // cotizacion (el 3D si la dibujaba). Ahora va por nombre y sale "sin precio".
+      add(rejSku || ('REJILLA ELECTROSOLDADA ' + l.fondoIn + '"X' + anchoRej + '"'), rejPorViga * nivCarga);
     }
     if(cfg.panel){
       // Panel Beige por fondo (in): cada pieza es fondoIn × 8", cubre 8" de alto de viga
@@ -7601,7 +7691,7 @@ function calcularBomSelectivo(){
       const filas = _filasDeBloque(cfg.lineas, iB);
       if(filas.length < 2) return;
       const cfgB = _cfgDeBloqueGen(cfg, filas, 'largoM', b);
-      if(cfgB) bomPasarela(cfgB, add, filas);
+      if(cfgB) bomPasarela(cfgB, add, filas, {sis:'selectivo', i:iB});
     });
   }
   return orden.map(sku => [sku, items[sku]]);
@@ -7876,13 +7966,17 @@ function _lineasDeBom(bom, acc){
     }
     const key = item[0], cant = item[1];
     const inv = preciosCache ? preciosCache[key] : null;
-    if(!inv) acc.faltantes.push(key);
-    const puUSD = inv ? inv.precio : 0;
+    // Sin precio = la pieza no existe en inventario O esta en $0. Antes solo se
+    // avisaba si no existia, y una en $0 entraba callada a la cotizacion.
+    // (Isaac, 30 sep 2026: "si no tiene precio, manda un mensaje").
+    const puUSD = inv ? (Number(inv.precio) || 0) : 0;
+    const sinPrecio = !(puUSD > 0);
+    const producto = inv ? (inv.producto||key) : key;
+    if(sinPrecio) acc.faltantes.push(producto);
     const impUSD = puUSD * cant;
     acc.materialUSD += impUSD; acc.piezas += cant;
-    const sku = inv ? inv.sku : (key.startsWith('PIC-')||key.startsWith('GON-')||key.startsWith('ACC-')||key.startsWith('SEL-') ? key : '—');
-    const producto = inv ? (inv.producto||key) : key;
-    return { sku:sku, producto:producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD };
+    const sku = inv ? inv.sku : (/^[A-Z]{3}-\d/.test(key) ? key : '—');
+    return { sku:sku, producto:producto, cantidad:cant, precioUSD:puUSD, importeUSD:impUSD, sinPrecio:sinPrecio };
   });
 }
 
@@ -7994,11 +8088,11 @@ function renderCotizacion(){
     return ` <span class="stk ${cls}">${disp} disp</span>`;
   };
   const _liHTML = l => `
-    <div class="li">
+    <div class="li"${l.sinPrecio ? ' style="background:#FFF4E5"' : ''}>
       <div>
         <div class="sku">${l.sku}</div>
         <div class="prd">${l.producto}</div>
-        <div class="pu">${fmt(l.precioUSD)} / pza ${badgeStock(l)}</div>
+        <div class="pu">${l.sinPrecio ? '<b style="color:#c0392b">⚠ SIN PRECIO</b>' : fmt(l.precioUSD) + ' / pza'} ${badgeStock(l)}</div>
       </div>
       <div>
         <div class="qy">${l.cantidad}</div>
@@ -8024,6 +8118,16 @@ function renderCotizacion(){
     if(servicios.length) _html += _cab('SERVICIOS', '') + servicios.map(_liHTML).join('');
   } else {
     _html = lineas.map(_liHTML).join('');
+  }
+  // Aviso de piezas sin precio: la cotizacion sale CORTA y hay que decirlo.
+  const _sinPrecio = [];
+  bloques.forEach(function(b){ (b.faltantes || []).forEach(function(n){ if(_sinPrecio.indexOf(n) < 0) _sinPrecio.push(n); }); });
+  if(_sinPrecio.length){
+    _html = '<div style="background:#FFF4E5;border:1px solid #E8A33D;color:#7a4a00;border-radius:8px;padding:8px 10px;margin:4px 0 8px;font-size:12px;line-height:1.35">'
+      + '<b>⚠ ' + _sinPrecio.length + ' pieza' + (_sinPrecio.length !== 1 ? 's' : '') + ' sin precio en el sistema.</b> '
+      + 'El total NO las incluye; hay que confirmar su precio con ISARACK antes de cerrar la venta.'
+      + '<div style="margin-top:4px;color:#8a5a10">' + _sinPrecio.map(function(n){ return String(n).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }).join(' · ') + '</div></div>'
+      + _html;
   }
   document.getElementById('lista').innerHTML = _html;
 
@@ -8117,17 +8221,13 @@ async function sbFetch(path){
 // Cache de contactos de ISA-OS para el autocompletado del modal de cotizacion.
 // Trae la lista completa de la tabla 'contactos' UNA vez por sesion.
 let _contactosISACache = null;
+// v2026.09.30.05: DESACTIVADO. Bajaba hasta 5000 contactos de ISA-OS (nombre,
+// RFC, telefono, email, direccion) al navegador de CUALQUIER visitante del sitio
+// publico. El autollenado no llego a funcionar y exponia la cartera de clientes.
+// Cuando haya perfiles de cliente/distribuidor (con acceso propio), el
+// autollenado se hace desde ahi con los datos de ESE cliente nada mas.
 async function _cargarContactosISA(){
-  if(_contactosISACache) return _contactosISACache;
-  try{
-    const rows = await sbFetch('contactos?select=nombre,razon,rfc,tel,cel,email,dir,contacto&order=nombre.asc&limit=5000');
-    _contactosISACache = Array.isArray(rows) ? rows.filter(r=>r&&r.nombre) : [];
-    return _contactosISACache;
-  }catch(e){
-    console.warn('cargar contactos ISA:', e);
-    _contactosISACache = [];
-    return [];
-  }
+  return [];
 }
 
 // Devuelve el siguiente folio consecutivo para el prefijo dado (RW-/GW-/PW-).
@@ -8195,7 +8295,7 @@ async function cargarPrecios(){
   const map = {};
   inventarioArr = [];
   for(const row of data){
-    const item = { sku:row.sku, producto:row.producto, precio:parseFloat(row.precio), sistema:row.sistema, cantidad:parseInt(row.cantidad)||0 };
+    const item = { sku:row.sku, producto:row.producto, precio:(parseFloat(row.precio)||0), sistema:row.sistema, cantidad:parseInt(row.cantidad)||0 };
     map[row.producto] = item;
     map[row.sku] = item;
     inventarioArr.push(item);
@@ -8225,13 +8325,15 @@ async function cargarComprometido(){
   try{
     // Traer pedidos activos con inventario descontado
     // Las propiedades inventarioDescontado, entregado y cotData estan DENTRO de payload (jsonb)
-    const url = "orders?select=payload,estatus&payload->>inventarioDescontado=eq.true&estatus=not.in.(Cancelado,Completado,cancelado,completado)";
+    // v2026.09.30.05: se piden SOLO las lineas y la bandera de entregado. Antes
+    // bajaba el payload completo de cada pedido (cliente, contacto, documentos)
+    // al navegador de cualquier visitante del sitio publico.
+    const url = "orders?select=entregado:payload->>entregado,lineas:payload->cotData->lineas&payload->>inventarioDescontado=eq.true&estatus=not.in.(Cancelado,Completado,cancelado,completado)";
     const rows = await sbFetch(url);
     const bySku = {}, byProd = {};
     for(const o of rows){
-      const p = o.payload || {};
-      if((''+(p.entregado||'')).toLowerCase() === 'si') continue;
-      const lineas = (p.cotData && Array.isArray(p.cotData.lineas)) ? p.cotData.lineas : [];
+      if((''+(o.entregado||'')).toLowerCase() === 'si') continue;
+      const lineas = Array.isArray(o.lineas) ? o.lineas : [];
       for(const l of lineas){
         if(!l || l.tipo) continue;
         const cnt = Number(l.cantidad||0);
@@ -8444,7 +8546,7 @@ function configResumen(){
     if(cfg.rejilla) extras.push('rejilla');
     if(cfg.panel) extras.push('panel beige');
     if(cfg.botas)   extras.push('bota protectora ' + _opcDe(BOTA_OPC, cfg.botaSku||BOTA_SEL).txt
-                      + (cfg.botaBarra ? ' con barra de orilla ' + _largoBarraIn(cfg, (cfg.lineas||[])[0]) + '"' : ' sin barra'));
+                      + (cfg.botaBarra ? ' con barra de orilla ' + _barraProtOpc(_largoBarraIn(cfg, (cfg.lineas||[])[0])).lIn + '"' : ' sin barra'));
     if(cfg.punt)    extras.push('protector de puntal ' + _opcDe(PUNTAL_OPC, cfg.puntSku||PUNTAL_SEL).txt + ' (marcos de en medio)');
     if((cfg.lineas||[]).some(function(l){return l.mallaOn;}))
                     extras.push('malla anticaída ' + _opcDe(SUJECION_OPC, cfg.sujSku||SUJECION_SEL).txt + ' de sujeción');
@@ -8487,7 +8589,12 @@ function configResumen(){
     const cfg = getConfigMec();
     return {
       sistema: 'Mecano',
-      txt: 'Mecano · '+cfg.altoCm+'cm × '+cfg.anchoCm+'cm × '+cfg.fondoCm+'cm · '+cfg.niveles+' entrepaños · '+cfg.cuerpos+' módulo'+(cfg.cuerpos>1?'s':'')
+      // Todas las filas (antes solo describia la 1) y las dobles cuentan x2.
+      txt: 'Mecano · '+cfg.anchoCm+'cm × '+cfg.fondoCm+'cm · '
+        + cfg.lineas.map(function(l, i){
+            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.altoCm+'cm alto, '+l.niveles+' entrepaños, '+l.cuerpos+' módulo'+(l.cuerpos>1?'s':'');
+          }).join(' | ')
+        + ' · '+cfg.cuerposTot+' módulo'+(cfg.cuerposTot>1?'s':'')+' tot'
     };
   }
   if(sistemaActual === 'cantilever'){
@@ -8546,7 +8653,7 @@ function abrirFormCliente(){
   mBody.innerHTML = `
     <div style="margin-bottom:14px"><span class="badge">Configuración</span>
       <div style="margin-top:6px;font-size:13px;color:#555">${configResumen().txt}</div></div>
-    <div class="row"><label>Cliente * <span id="f_cli_hint" style="font-size:11px;color:#999;font-weight:400">— empieza a escribir para buscar en la base</span></label><input id="f_cliente" placeholder="Nombre o empresa" maxlength="80" autocomplete="off" list="f_cli_list"><datalist id="f_cli_list"></datalist></div>
+    <div class="row"><label>Cliente * <span id="f_cli_hint" style="font-size:11px;color:#999;font-weight:400"></span></label><input id="f_cliente" placeholder="Nombre o empresa" maxlength="80" autocomplete="off" list="f_cli_list"><datalist id="f_cli_list"></datalist></div>
     <div class="grid2">
       <div class="row"><label>Razón social</label><input id="f_razon" placeholder="Opcional" maxlength="120"></div>
       <div class="row"><label>RFC</label><input id="f_rfc" placeholder="Opcional" maxlength="13" style="text-transform:uppercase"></div>
@@ -8624,16 +8731,25 @@ function abrirFormCliente(){
     if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ mostrarError('El correo electrónico no es válido.'); return; }
     if(rfc && !/^([A-ZÑ&]{3,4})\d{6}([A-Z0-9]{3})?$/.test(rfc)){ mostrarError('El RFC no tiene formato válido (ej: XAXX010101000).'); return; }
     // Filtro anti-groserías (lista básica)
-    const PROHIBIDAS = ['pendej','chinga','pinche','cabron','cabrón','puta','puto','madre tu','wey','pito','verga','joto','maric','culero','mierda','coño','coger','pendejo','estupido','estúpido','idiota','imbecil','imbécil','tarado','baboso','mames','naco','pinch','fuck','shit','bitch','asshole','dick'];
+    // Filtro anti-groserias POR PALABRA COMPLETA. Antes buscaba pedazos de texto
+    // y rechazaba clientes reales: "Computadoras" (puta), "Maricela" (maric),
+    // "Diputados", "Recoger", "Nacozari", "Dickson", "Capitolio"...
+    // RAICES: se rechaza la palabra que EMPIECE asi (pendejo, pendejadas...).
+    const _sinAcento = t => String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const PALABRAS = ['puta','puto','putas','putos','wey','guey','pito','verga','joto','culero','culera','mierda','cono',
+                      'coger','idiota','imbecil','tarado','tarada','baboso','babosa','mames','naco','naca','pinche','pinches',
+                      'cabron','cabrona','fuck','shit','bitch','asshole','dick','maricon','marica','estupido','estupida'];
+    const RAICES = ['pendej','chingad','chingue','chingon','hijodeput'];
     const camposTexto = { 'nombre del cliente': cliente, 'razón social': razon, 'contacto': contacto, 'dirección': dir };
     for(const [nombreCampo, valor] of Object.entries(camposTexto)){
       if(!valor) continue;
-      const lower = valor.toLowerCase();
-      for(const palabra of PROHIBIDAS){
-        if(lower.includes(palabra)){
-          mostrarError('Por favor evita lenguaje ofensivo en el campo "'+nombreCampo+'".');
-          return;
-        }
+      const plano = _sinAcento(valor);
+      const pals = plano.split(/[^a-z0-9ñ]+/).filter(Boolean);
+      const mala = pals.some(w => PALABRAS.indexOf(w) >= 0 || RAICES.some(r => w.indexOf(r) === 0))
+                || /\bchinga\s+tu\b|\bmadre\s+tu\b|\btu\s+madre\b/.test(plano);
+      if(mala){
+        mostrarError('Por favor evita lenguaje ofensivo en el campo "'+nombreCampo+'".');
+        return;
       }
     }
     generarPDF({ cliente, razon, rfc, contacto, tel, email, dir });
@@ -9074,7 +9190,11 @@ async function generarPDF(datos, opts){
     fy += 4;
     doc.setFontSize(8);
     doc.setTextColor(180,90,80);
-    doc.text('⚠ Productos sin precio en sistema: '+faltantes.join(', '), M, fy);
+    // Al cliente se le dice "por confirmar" (no "sin precio en sistema") y en
+    // varias lineas: con muchas piezas el texto se salia de la hoja.
+    const _fu = faltantes.filter(function(n, i){ return faltantes.indexOf(n) === i; });
+    const _txtF = doc.splitTextToSize('Precio por confirmar (no incluido en el total): ' + _fu.join(', '), W - 2*M);
+    doc.text(_txtF, M, fy);
   }
 
   // Nombre limpio para el archivo
@@ -9106,7 +9226,10 @@ async function generarPDF(datos, opts){
   // ISA-OS se vea que la cotizacion trae varios sistemas.
   const sistemaLabel = combi
     ? ('Plano mixto · ' + bloques.map(function(b){ return b.nombre; }).join(' + '))
-    : (sistemaActual==='piezas' ? 'Piezas sueltas' : (sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking' : 'Góndola')));
+    : (sistemaActual==='piezas' ? 'Piezas sueltas' : (sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking'
+      // Mecano y Cantilever llegaban a ISA-OS como "Góndola". El folio se queda en
+      // GW- porque ISA-OS solo reconoce RW-/GW-/PW- como cotizacion web.
+      : (sistemaActual==='mecano' ? 'Mecano' : (sistemaActual==='cantilever' ? 'Cantilever' : 'Góndola')))));
   const lineasVenta = lineasParaPDF.map(l => ({
     producto: l.producto,
     cantidad: l.cantidad,
@@ -9402,8 +9525,20 @@ function addEvents(){
   document.getElementById('reset').addEventListener('click', ()=>{rotY=0.7; rotX=0.32;});
   document.getElementById('wa').addEventListener('click', function(){ if(typeof gtag==='function') gtag('event','cotizacion_whatsapp',{sistema:sistemaActual}); });
   document.getElementById('wa').addEventListener('click', ()=>{
-    const cfg = configResumen();
-    const txt = 'Hola, solicito cotización desde el configurador 3D:\n\n'+cfg.txt;
+    // Plano combinado: el mensaje lleva TODOS los sistemas del plano, no solo la
+    // pestaña abierta.
+    const _dib = _sistemasDibujados();
+    let cuerpoTxt = '';
+    if(_dib.length > 1){
+      const _prev = sistemaActual;
+      try{
+        cuerpoTxt = _dib.map(function(sis){ sistemaActual = sis; try{ return (configResumen() || {}).txt || ''; }catch(e){ return ''; } })
+                        .filter(Boolean).join('\n\n');
+      } finally { sistemaActual = _prev; }
+    } else {
+      cuerpoTxt = configResumen().txt;
+    }
+    const txt = 'Hola, solicito cotización desde el configurador 3D:\n\n'+cuerpoTxt;
     const url = 'https://wa.me/5216644211088?text=' + encodeURIComponent(txt);
     window.open(url, '_blank');
   });
@@ -9434,15 +9569,28 @@ function addEvents(){
 const _PREFIJO_SIS = {picking:'pic', selectivo:'sel', mecano:'mec', cantilever:'can'};
 function estadoConfigurador(){
   const st = {s: sistemaActual, c: {}, l: {}, plano: sistemasPlano.slice()};
-  const pre = _PREFIJO_SIS[sistemaActual] || null;
+  // Se guardan los campos de TODOS los sistemas que se ven (plano combinado) y
+  // los generales (color, vista en planta, gondola). Antes solo iban los de la
+  // pestaña activa: al abrir el link se perdian la pasarela, el pasillo y el alto
+  // del otro sistema, y el color azul o la vista en planta si estabas en otra
+  // pestaña (auditoria 30 sep 2026).
+  const _visibles = _sistemasDibujados().concat([sistemaActual]);
+  const _prefsVis = _visibles.map(function(x){ return _PREFIJO_SIS[x]; }).filter(Boolean);
   document.querySelectorAll('#ctrl input, #ctrl select').forEach(el => {
     if(!el.id) return;
-    // Guardar solo los campos del sistema activo: los de los otros tabs no pintan nada
-    const propio = pre ? el.id.startsWith(pre)
-                       : !/^(pic|sel|mec|can)[A-Z]/.test(el.id);
-    if(!propio && el.id !== 'auto') return;
+    const m = /^(pic|sel|mec|can)[A-Z]/.exec(el.id);
+    if(m && _prefsVis.indexOf(m[1]) < 0) return;   // campo de un sistema que no se ve
     st.c[el.id] = (el.type === 'checkbox') ? (el.checked ? 1 : 0) : el.value;
   });
+  // Alturas de nivel a mano de Picking: sus campos se crean al vuelo, asi que se
+  // guardan como dato y se reponen despues de pintar.
+  try{
+    const _chkA = document.getElementById('picAlturaManual');
+    const _conA = document.getElementById('picAlturasContainer');
+    if(_chkA && _chkA.checked && _conA){
+      st.alPic = Array.from(_conA.querySelectorAll('input[type=number]')).map(function(i){ return parseFloat(i.value) || 0; });
+    }
+  }catch(e){}
   // Con plano combinado el enlace tiene que llevar las filas de TODOS los
   // sistemas dibujados; si no, al abrirlo el cliente ve uno solo.
   _sistemasDibujados().forEach(function(x){
@@ -9596,7 +9744,11 @@ function _visorChkOrient(){
 }
 function resumenVisor(){
   const el = document.getElementById('medidasResumen');
-  const txt = el ? el.textContent.trim().replace(/\s+/g,' ') : '';
+  // Los <br> del resumen se vuelven " · " (con textContent se pegaban las
+  // palabras: "Picking · 1 filaLargo 1.20 m").
+  const _tmp = document.createElement('div');
+  _tmp.innerHTML = el ? el.innerHTML.replace(/<br\s*\/?>/gi, ' · ') : '';
+  const txt = _tmp.textContent.trim().replace(/\s+/g,' ');
   const sub = document.getElementById('visorSub');
   if(sub) sub.textContent = txt.slice(0, 160);
 }
@@ -9643,6 +9795,15 @@ function animate(){
 }
 
 cargarImagenIsaac();
+// Coma decimal: en Mexico se escribe "0,4". Los campos numericos no la aceptan y
+// "0,4" quedaba como "04" = 4 m (10 veces mas). Se cambia la coma por punto al
+// teclearla, en todos los campos numericos del configurador.
+document.addEventListener('keydown', function(e){
+  const t = e.target;
+  if(e.key !== ',' || !t || t.tagName !== 'INPUT' || t.type !== 'number') return;
+  e.preventDefault();
+  try{ document.execCommand('insertText', false, '.'); }catch(_e){}
+}, true);
 // Leer ?sistema= de la URL y activar ese tab al iniciar
 // Link de cliente: aplicar la configuración codificada antes de construir
 let _visorPendiente = null;
@@ -9656,7 +9817,7 @@ let _visorPendiente = null;
 (function(){
   const params = new URLSearchParams(location.search);
   const sysParam = params.get('sistema');
-  if(sysParam && ['gondola','picking','selectivo'].includes(sysParam)){
+  if(sysParam && ['gondola','picking','selectivo','mecano','cantilever'].includes(sysParam)){
     sistemaActual = sysParam;
     // Activar el tab visualmente (se aplica antes de init() para que build() vea el sistema correcto)
     document.querySelectorAll('#tabs .tab').forEach(t=>{
@@ -9666,6 +9827,8 @@ let _visorPendiente = null;
     document.getElementById('opGondola').style.display   = sysParam==='gondola'   ? '' : 'none';
     document.getElementById('opPicking').style.display   = sysParam==='picking'   ? '' : 'none';
     document.getElementById('opSelectivo').style.display = sysParam==='selectivo' ? '' : 'none';
+    document.getElementById('opMecano').style.display    = sysParam==='mecano'    ? '' : 'none';
+    document.getElementById('opCantilever').style.display = sysParam==='cantilever' ? '' : 'none';
     document.getElementById('bodegaShared').style.display = (sysParam==='piezas') ? 'none' : '';
   }
 })();
@@ -9679,6 +9842,25 @@ if(_visorPendiente !== null){
   try{ renderLineasPicking(); }catch(e){}
   try{ renderLineasMecano(); }catch(e){}
   try{ renderLineasCantilever(); }catch(e){}
+  document.getElementById('opMecano').style.display     = sistemaActual==='mecano'     ? '' : 'none';
+  document.getElementById('opCantilever').style.display = sistemaActual==='cantilever' ? '' : 'none';
+  // Lo que aplicarEstado no puede reponer antes de init(): la vista en planta
+  // necesita la camara ortografica, y las alturas de Picking sus campos.
+  try{
+    const _stV = decodificarEstado(new URLSearchParams(location.search).get('d')) || {};
+    if(Array.isArray(_stV.alPic) && _stV.alPic.length){
+      actualizarInputsAlturasNivel('picking');
+      const _conA = document.getElementById('picAlturasContainer');
+      const _ins = _conA ? _conA.querySelectorAll('input[type=number]') : [];
+      _ins.forEach(function(inp, i){ if(_stV.alPic[i] > 0) inp.value = _stV.alPic[i]; });
+      if(_conA) _conA.dataset.personalizado = 'yes';
+    }
+    if(_stV.c && _stV.c.colorRack){ const _cr = document.getElementById('colorRack'); if(_cr) _cr.value = _stV.c.colorRack; }
+    try{ ajustarSelectorColor(); }catch(e){}
+    const _cp = document.getElementById('chkPlanta');
+    if(_cp && !!_cp.checked !== !!vistaPlanta) toggleVistaPlanta(_cp.checked);
+    else if(_cp && _cp.checked && vistaPlanta && camera !== camOrto){ vistaPlanta = false; toggleVistaPlanta(true); }
+  }catch(e){ console.warn('reponer link', e); }
   build();
   activarModoVisor(_visorPendiente);
   setTimeout(resumenVisor, 400);
