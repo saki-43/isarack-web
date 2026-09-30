@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.30.04';
+const CFG_VERSION = '2026.09.30.05';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -8117,17 +8117,13 @@ async function sbFetch(path){
 // Cache de contactos de ISA-OS para el autocompletado del modal de cotizacion.
 // Trae la lista completa de la tabla 'contactos' UNA vez por sesion.
 let _contactosISACache = null;
+// v2026.09.30.05: DESACTIVADO. Bajaba hasta 5000 contactos de ISA-OS (nombre,
+// RFC, telefono, email, direccion) al navegador de CUALQUIER visitante del sitio
+// publico. El autollenado no llego a funcionar y exponia la cartera de clientes.
+// Cuando haya perfiles de cliente/distribuidor (con acceso propio), el
+// autollenado se hace desde ahi con los datos de ESE cliente nada mas.
 async function _cargarContactosISA(){
-  if(_contactosISACache) return _contactosISACache;
-  try{
-    const rows = await sbFetch('contactos?select=nombre,razon,rfc,tel,cel,email,dir,contacto&order=nombre.asc&limit=5000');
-    _contactosISACache = Array.isArray(rows) ? rows.filter(r=>r&&r.nombre) : [];
-    return _contactosISACache;
-  }catch(e){
-    console.warn('cargar contactos ISA:', e);
-    _contactosISACache = [];
-    return [];
-  }
+  return [];
 }
 
 // Devuelve el siguiente folio consecutivo para el prefijo dado (RW-/GW-/PW-).
@@ -8225,13 +8221,15 @@ async function cargarComprometido(){
   try{
     // Traer pedidos activos con inventario descontado
     // Las propiedades inventarioDescontado, entregado y cotData estan DENTRO de payload (jsonb)
-    const url = "orders?select=payload,estatus&payload->>inventarioDescontado=eq.true&estatus=not.in.(Cancelado,Completado,cancelado,completado)";
+    // v2026.09.30.05: se piden SOLO las lineas y la bandera de entregado. Antes
+    // bajaba el payload completo de cada pedido (cliente, contacto, documentos)
+    // al navegador de cualquier visitante del sitio publico.
+    const url = "orders?select=entregado:payload->>entregado,lineas:payload->cotData->lineas&payload->>inventarioDescontado=eq.true&estatus=not.in.(Cancelado,Completado,cancelado,completado)";
     const rows = await sbFetch(url);
     const bySku = {}, byProd = {};
     for(const o of rows){
-      const p = o.payload || {};
-      if((''+(p.entregado||'')).toLowerCase() === 'si') continue;
-      const lineas = (p.cotData && Array.isArray(p.cotData.lineas)) ? p.cotData.lineas : [];
+      if((''+(o.entregado||'')).toLowerCase() === 'si') continue;
+      const lineas = Array.isArray(o.lineas) ? o.lineas : [];
       for(const l of lineas){
         if(!l || l.tipo) continue;
         const cnt = Number(l.cantidad||0);
@@ -8546,7 +8544,7 @@ function abrirFormCliente(){
   mBody.innerHTML = `
     <div style="margin-bottom:14px"><span class="badge">Configuración</span>
       <div style="margin-top:6px;font-size:13px;color:#555">${configResumen().txt}</div></div>
-    <div class="row"><label>Cliente * <span id="f_cli_hint" style="font-size:11px;color:#999;font-weight:400">— empieza a escribir para buscar en la base</span></label><input id="f_cliente" placeholder="Nombre o empresa" maxlength="80" autocomplete="off" list="f_cli_list"><datalist id="f_cli_list"></datalist></div>
+    <div class="row"><label>Cliente * <span id="f_cli_hint" style="font-size:11px;color:#999;font-weight:400"></span></label><input id="f_cliente" placeholder="Nombre o empresa" maxlength="80" autocomplete="off" list="f_cli_list"><datalist id="f_cli_list"></datalist></div>
     <div class="grid2">
       <div class="row"><label>Razón social</label><input id="f_razon" placeholder="Opcional" maxlength="120"></div>
       <div class="row"><label>RFC</label><input id="f_rfc" placeholder="Opcional" maxlength="13" style="text-transform:uppercase"></div>
