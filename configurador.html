@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.30.06';
+const CFG_VERSION = '2026.09.30.07';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -748,6 +748,14 @@ const PASILLO_MAX_M = 50;
 // escribia menos lo subia en silencio: Isaac ponia 0.4 y se dibujaba 0.8
 // (30 sep 2026). Ahora se respeta lo que se escriba desde 0.10 m.
 const PASILLO_MIN_M = 0.1;
+// Lee un campo de pasillo: vacio = el valor por omision del sistema; cualquier
+// numero (incluido 0) se respeta dentro de [PASILLO_MIN_M, PASILLO_MAX_M]. Antes
+// "0" volvia al 3.5 por omision y "0.05" a 0.1: incoherente.
+function _pasilloDe(el, defM){
+  const v = el ? String(el.value).trim() : '';
+  if(v === '' || !isFinite(parseFloat(v))) return defM;
+  return Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(v)));
+}
 const IN_TO_M = 0.0254;
 // Placa de la pata de PICKING: sobresale 2" del marco hacia el FRENTE y hacia
 // ATRAS (en el sentido del fondo), no a lo largo de la fila (medido en obra,
@@ -1175,6 +1183,9 @@ const IVA_FIJO = 8;        // BC frontera, no editable
 // Flete con tabla de 5 bloques (igual que ISA-OS, sobre subtotal sin IVA)
 // Calcula el costo de instalación: 5% del valor de ventas, mínimo $80 USD
 function calcularInstalacion(materialUSD){
+  // Sin material (todo sin precio o carrito vacio) no se cobra el minimo de $80
+  // solo: el flete ya se comportaba asi.
+  if(!(materialUSD > 0)) return 0;
   const pct = materialUSD * 0.05;
   return Math.max(pct, 80);
 }
@@ -1240,11 +1251,18 @@ function cambiarUnidad(nueva){
   const ant = _uniPrev;
   _UNI_CAMPOS.forEach(id => {
     const e = document.getElementById(id); if(!e) return;
+    if(String(e.value).trim() === '') return;   // vacio se queda vacio (antes se volvia "0")
     const metros = (parseFloat(e.value) || 0) * (_UNI_F[ant] || 1);
     e.value = _uniDeM(metros, nueva);
   });
   unidadCota = nueva; _uniPrev = nueva;
   _uniEtiquetas();
+  // Los paneles de bloque (Pared X / Pared Y / pasillo del bloque) guardan metros
+  // y se pintan en la unidad del momento: hay que repintarlos o se quedan con la
+  // etiqueta y el numero viejos y el siguiente numero se lee en la unidad nueva.
+  ['renderLineasGondola','renderLineasPicking','renderLineasAlmacen','renderLineasMecano','renderLineasCantilever'].forEach(function(fn){
+    try{ if(typeof window[fn] === 'function') window[fn](); }catch(e){}
+  });
   if(typeof build === 'function') build();
 }
 // Bodega (cuarto con medidas para ver cuánto entra) + dimensiones actuales del rack
@@ -1306,7 +1324,9 @@ function crearMatRejillaTam(largoM, fondoM){
   const tex = texRejillaBase.clone();
   tex.needsUpdate = true;
   tex.repeat.set(Math.max(1, largoM/0.05), Math.max(1, fondoM/0.05));
-  return new THREE.MeshStandardMaterial({map: tex, metalness:0.3, roughness:0.6, side:THREE.DoubleSide});
+  const m = new THREE.MeshStandardMaterial({map: tex, metalness:0.3, roughness:0.6, side:THREE.DoubleSide});
+  m.userData.desechable = true;   // se libera en build() junto con su textura
+  return m;
 }
 
 // Material para barras de rejilla (acero galvanizado claro)
@@ -1923,7 +1943,7 @@ function getConfigPic(){
   const largoCm = parseInt(document.getElementById('picLargo').value);
   const niveles = parseInt(document.getElementById('picNiveles').value);
   const cuerpos = parseInt(document.getElementById('picCuerpos').value);
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('picPasillo').value) || 2.0));
+  const pasilloM = _pasilloDe(document.getElementById('picPasillo'), 2.0);
   const lineas = lineasPicking.map(l => {
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, largoM = l.largoCm/100;
     const cuerposA = l.cuerpos;
@@ -3644,7 +3664,7 @@ function _pasilloDeBloque(cfg, bloque){
   const base = Number(cfg && cfg.pasilloM) || 0;
   const p = bloque && bloque.pasillo;
   if(p === null || p === undefined || !isFinite(Number(p)) || Number(p) <= 0) return base;
-  return Math.max(0.3, Math.min(PASILLO_MAX_M, Number(p)));
+  return Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, Number(p)));
 }
 function _filasDeBloque(lineas, iB){ return (lineas || []).filter(l => _bloqueDe(l) === iB); }
 // cfg recortado a las filas de UN bloque: las medidas totales se recalculan con
@@ -4801,7 +4821,7 @@ function getConfigSel(){
   const niveles = parseInt(document.getElementById('selNiveles').value);
   const cuerpos = parseInt(document.getElementById('selCuerpos').value);
   const filas = tipoFila==='doble' ? 2 : 1;
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('selPasillo').value) || 3.5));
+  const pasilloM = _pasilloDe(document.getElementById('selPasillo'), 3.5);
   const lineas = lineasAlmacen.map(l => {
     const vi = VIGAS_INFO[l.vigaSku] || VIGAS_INFO['SEL-0362'];
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, vigaM = vi.largoIn * IN_TO_M;
@@ -4871,7 +4891,7 @@ function getConfigMec(){
     bloque: _bloqueDe(l),
     profM: fondoM * (l.tipo === 'doble' ? 2 : 1)
   }));
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('mecPasillo').value) || 1.2));
+  const pasilloM = _pasilloDe(document.getElementById('mecPasillo'), 1.2);
   const cuerposTot = lineas.reduce((a,l)=>a + l.cuerpos * (l.tipo==='doble'?2:1), 0);
   const maxLenM = Math.max(...lineas.map(l=>l.largoTotM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -4894,7 +4914,7 @@ function getConfigCan(){
     bloque: _bloqueDe(l),
     largoZM: (l.cuerpos - 1) * separacionM
   }));
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, _uniAM(document.getElementById('canPasillo').value) || 3.5));
+  const pasilloM = _pasilloDe(document.getElementById('canPasillo'), 3.5);
   const anchoTotalM = lineas.reduce((a,l)=>a+l.anchoBaseM,0) + pasilloM*(lineas.length-1);
   const maxLargoZM = Math.max(...lineas.map(l=>l.largoZM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
@@ -5596,8 +5616,7 @@ function buildGondola(){
 
   // Pasillo peatonal entre filas. Antes estaba fijo en 1.6 m y no habia forma
   // de cambiarlo; ahora va en el mismo campo que los otros 4 sistemas.
-  const pasilloM = Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M,
-    _uniAM((document.getElementById('gonPasillo')||{}).value) || 1.6));
+  const pasilloM = _pasilloDe(document.getElementById('gonPasillo'), 1.6);
 
   // Info geométrica de un juego de filas. Se usa dos veces: para el diseno
   // completo (camara y resumen) y para cada bloque por separado.
@@ -5944,6 +5963,7 @@ function crearTextoSprite(texto, color, contorno){
   tex.anisotropy = 4;
   tex.needsUpdate = true;
   const mat = new THREE.SpriteMaterial({map: tex, transparent: true, depthTest: false});
+  mat.userData.desechable = true;   // se libera en build() junto con su textura
   const sprite = new THREE.Sprite(mat);
   return sprite;
 }
@@ -6196,16 +6216,22 @@ function agregarBodega(parent){
     // Lo ocupado va de la pared a la orilla lejana del rack: si corriste el
     // bloque, ese hueco tambien se gasta de la bodega.
     const ocX = rx1 - xIz, ocZ = rz1 - zAt;
-    const cabe = (A >= ocX - 0.01) && (L >= ocZ - 0.01) && (H >= rd.y - 0.01);
+    // Con Pared X/Y negativa el rack se sale por la pared de ATRAS/IZQUIERDA:
+    // antes decia "✓ Cabe · sobra 14 m" con el rack entero fuera del cuarto.
+    const fueraX = (rx0 < xIz - 0.01) ? (xIz - rx0) : 0;
+    const fueraZ = (rz0 < zAt - 0.01) ? (zAt - rz0) : 0;
+    const cabe = (A >= ocX - 0.01) && (L >= ocZ - 0.01) && (H >= rd.y - 0.01) && !fueraX && !fueraZ;
     if(cabe){
       st.innerHTML = '✓ Cabe · sobra '+fmtCota(A-ocX)+' de ancho, '+fmtCota(L-ocZ)+' de largo y '+fmtCota(H-rd.y)+' de alto';
       st.style.color = '#2e7d32';
     } else {
       const falta = [];
-      if(A < ocX) falta.push('ancho ('+fmtCota(ocX-A)+' de más)');
-      if(L < ocZ) falta.push('largo ('+fmtCota(ocZ-L)+' de más)');
-      if(H < rd.y) falta.push('alto ('+fmtCota(rd.y-H)+' de más)');
-      st.innerHTML = '⚠ NO cabe — falta '+falta.join(', ');
+      if(A < ocX) falta.push('falta ancho ('+fmtCota(ocX-A)+' de más)');
+      if(L < ocZ) falta.push('falta largo ('+fmtCota(ocZ-L)+' de más)');
+      if(H < rd.y) falta.push('falta alto ('+fmtCota(rd.y-H)+' de más)');
+      if(fueraX) falta.push('se sale '+fmtCota(fueraX)+' por la pared de la izquierda (Pared X negativa)');
+      if(fueraZ) falta.push('se sale '+fmtCota(fueraZ)+' por la pared de atrás (Pared Y negativa)');
+      st.innerHTML = '⚠ NO cabe — '+falta.join(', ');
       st.style.color = '#c62828';
     }
   }
@@ -6402,10 +6428,14 @@ function ajustarSelectorColor(){
   if(!row || !optAzul || !selColor) return;
   if(sistemaActual === 'gondola' || sistemaActual === 'mecano' || sistemaActual === 'cantilever'){
     row.style.display = 'none';
+    // Se recuerda el color elegido: antes, con solo pasar por Gondola el azul del
+    // Selectivo/Picking se volvia verde para siempre.
+    if(selColor.value !== 'verde') selColor.dataset.elegido = selColor.value;
     selColor.value = 'verde';
     return;
   }
   row.style.display = '';
+  if(selColor.dataset.elegido){ selColor.value = selColor.dataset.elegido; delete selColor.dataset.elegido; }
   if(sistemaActual === 'picking'){
     optAzul.textContent = 'Azul industrial (+15%)';
   } else {
@@ -6711,6 +6741,20 @@ function _sistemasDibujados(){
 function _planoCombinado(){ return _sistemasDibujados().length > 1; }
 function planoToggle(s, on){
   const i = sistemasPlano.indexOf(s);
+  // Un sistema que entra al plano nacia en 0,0 ENCIMA del que ya estaba, y el
+  // "Cabe" ni lo notaba. Si todavia esta en 0,0, se acomoda a la derecha de lo
+  // que ya hay dibujado, con 1 m de separacion. Si ya lo habias movido, se respeta.
+  if(on && i < 0 && _sistemasDibujados().filter(function(x){ return x !== s; }).length && _rackDims){
+    try{
+      const _bl = {gondola:bloquesGondola, selectivo:bloquesAlmacen, picking:bloquesPicking,
+                   mecano:bloquesMecano, cantilever:bloquesCantilever}[s];
+      const b0 = _bl && _bl[0];
+      if(b0 && !(Number(b0.x) || 0) && !(Number(b0.z) || 0)){
+        const cx = (_rackCen && isFinite(_rackCen.x)) ? _rackCen.x : 0;
+        b0.x = Math.round((cx + _rackDims.x/2 + 1.0) * 100) / 100;
+      }
+    }catch(e){ console.warn('acomodar sistema nuevo', e); }
+  }
   if(on && i < 0) sistemasPlano.push(s);
   else if(!on && i >= 0) sistemasPlano.splice(i, 1);
   renderPlanoCombinado(); build();
@@ -7006,12 +7050,23 @@ function _buildSistema(s){
   else if(s === 'cantilever') buildCantilever();
   else buildGondola();
 }
+// Libera de la GPU lo que se creo SOLO para este dibujo: geometrias y los
+// materiales marcados "desechable" (textos de cotas y rejillas) con su textura.
+// Antes solo se liberaban geometrias: cada tecla en la bodega dejaba ~14
+// texturas de 512x160 colgadas y en celular la pagina acababa cerrandose.
+// Los materiales compartidos (colores del rack) NO se tocan.
+function _liberarObj(o){
+  if(o.geometry) o.geometry.dispose();
+  const ms = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+  ms.forEach(function(m){
+    if(!m || !m.userData || !m.userData.desechable) return;
+    if(m.map) m.map.dispose();
+    m.dispose();
+  });
+}
 function build(){
   if(grupo){
-    // Liberar geometrías de la GPU antes de descartar el grupo (evita fugas de memoria)
-    grupo.traverse(obj => {
-      if(obj.geometry) obj.geometry.dispose();
-    });
+    grupo.traverse(_liberarObj);
     scene.remove(grupo);
   }
   // RED DE SEGURIDAD: barrer cualquier objeto que se haya colgado de la escena
@@ -7020,7 +7075,7 @@ function build(){
   for(let i = scene.children.length - 1; i >= 0; i--){
     const obj = scene.children[i];
     if(obj.userData && obj.userData.fijo) continue;
-    obj.traverse(o => { if(o.geometry) o.geometry.dispose(); });
+    obj.traverse(_liberarObj);
     scene.remove(obj);
   }
   grupo = new THREE.Group();
@@ -7051,10 +7106,12 @@ function build(){
   // midiendo solo la geometría del rack (las cotas van marcadas y no cuentan).
   // Así "Mostrar bodega" sirve en los cinco sistemas, y en el que venga después.
   try{ _COTA_PEND.forEach(f => f()); _COTA_PEND = []; }catch(e){}
-  if(!_rackDims || _bloquesMovidos()){
-    try{ const _d = _soloXZY(_dimsDesde3D(grupo)); if(_d) _rackDims = _d; }
-    catch(e){ console.warn('medir rack', e); }
-  }
+  // SIEMPRE se mide del 3D. Antes, con el bloque en 0,0 se usaba la formula de
+  // cada sistema (sin protecciones ni placas) y movido 1 cm se medía el 3D: el
+  // "Cabe" brincaba 24 cm. Ademas el centro (_rackCen) ya sale del 3D, asi que
+  // medida y centro quedan de la misma fuente.
+  try{ const _d = _soloXZY(_dimsDesde3D(grupo)); if(_d) _rackDims = _d; }
+  catch(e){ console.warn('medir rack', e); }
   // Con PASARELA el conjunto se sale del racking: corredor peatonal por fuera en
   // los dos extremos del largo y, en PS-1, la escalera al frente. La formula de
   // cada sistema solo mide el rack, asi que el "Cabe" decia que si y en obra no
@@ -8532,7 +8589,12 @@ function configResumen(){
     const cfg = getConfigMec();
     return {
       sistema: 'Mecano',
-      txt: 'Mecano · '+cfg.altoCm+'cm × '+cfg.anchoCm+'cm × '+cfg.fondoCm+'cm · '+cfg.niveles+' entrepaños · '+cfg.cuerpos+' módulo'+(cfg.cuerpos>1?'s':'')
+      // Todas las filas (antes solo describia la 1) y las dobles cuentan x2.
+      txt: 'Mecano · '+cfg.anchoCm+'cm × '+cfg.fondoCm+'cm · '
+        + cfg.lineas.map(function(l, i){
+            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.altoCm+'cm alto, '+l.niveles+' entrepaños, '+l.cuerpos+' módulo'+(l.cuerpos>1?'s':'');
+          }).join(' | ')
+        + ' · '+cfg.cuerposTot+' módulo'+(cfg.cuerposTot>1?'s':'')+' tot'
     };
   }
   if(sistemaActual === 'cantilever'){
@@ -8669,16 +8731,25 @@ function abrirFormCliente(){
     if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ mostrarError('El correo electrónico no es válido.'); return; }
     if(rfc && !/^([A-ZÑ&]{3,4})\d{6}([A-Z0-9]{3})?$/.test(rfc)){ mostrarError('El RFC no tiene formato válido (ej: XAXX010101000).'); return; }
     // Filtro anti-groserías (lista básica)
-    const PROHIBIDAS = ['pendej','chinga','pinche','cabron','cabrón','puta','puto','madre tu','wey','pito','verga','joto','maric','culero','mierda','coño','coger','pendejo','estupido','estúpido','idiota','imbecil','imbécil','tarado','baboso','mames','naco','pinch','fuck','shit','bitch','asshole','dick'];
+    // Filtro anti-groserias POR PALABRA COMPLETA. Antes buscaba pedazos de texto
+    // y rechazaba clientes reales: "Computadoras" (puta), "Maricela" (maric),
+    // "Diputados", "Recoger", "Nacozari", "Dickson", "Capitolio"...
+    // RAICES: se rechaza la palabra que EMPIECE asi (pendejo, pendejadas...).
+    const _sinAcento = t => String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const PALABRAS = ['puta','puto','putas','putos','wey','guey','pito','verga','joto','culero','culera','mierda','cono',
+                      'coger','idiota','imbecil','tarado','tarada','baboso','babosa','mames','naco','naca','pinche','pinches',
+                      'cabron','cabrona','fuck','shit','bitch','asshole','dick','maricon','marica','estupido','estupida'];
+    const RAICES = ['pendej','chingad','chingue','chingon','hijodeput'];
     const camposTexto = { 'nombre del cliente': cliente, 'razón social': razon, 'contacto': contacto, 'dirección': dir };
     for(const [nombreCampo, valor] of Object.entries(camposTexto)){
       if(!valor) continue;
-      const lower = valor.toLowerCase();
-      for(const palabra of PROHIBIDAS){
-        if(lower.includes(palabra)){
-          mostrarError('Por favor evita lenguaje ofensivo en el campo "'+nombreCampo+'".');
-          return;
-        }
+      const plano = _sinAcento(valor);
+      const pals = plano.split(/[^a-z0-9ñ]+/).filter(Boolean);
+      const mala = pals.some(w => PALABRAS.indexOf(w) >= 0 || RAICES.some(r => w.indexOf(r) === 0))
+                || /\bchinga\s+tu\b|\bmadre\s+tu\b|\btu\s+madre\b/.test(plano);
+      if(mala){
+        mostrarError('Por favor evita lenguaje ofensivo en el campo "'+nombreCampo+'".');
+        return;
       }
     }
     generarPDF({ cliente, razon, rfc, contacto, tel, email, dir });
@@ -9454,8 +9525,20 @@ function addEvents(){
   document.getElementById('reset').addEventListener('click', ()=>{rotY=0.7; rotX=0.32;});
   document.getElementById('wa').addEventListener('click', function(){ if(typeof gtag==='function') gtag('event','cotizacion_whatsapp',{sistema:sistemaActual}); });
   document.getElementById('wa').addEventListener('click', ()=>{
-    const cfg = configResumen();
-    const txt = 'Hola, solicito cotización desde el configurador 3D:\n\n'+cfg.txt;
+    // Plano combinado: el mensaje lleva TODOS los sistemas del plano, no solo la
+    // pestaña abierta.
+    const _dib = _sistemasDibujados();
+    let cuerpoTxt = '';
+    if(_dib.length > 1){
+      const _prev = sistemaActual;
+      try{
+        cuerpoTxt = _dib.map(function(sis){ sistemaActual = sis; try{ return (configResumen() || {}).txt || ''; }catch(e){ return ''; } })
+                        .filter(Boolean).join('\n\n');
+      } finally { sistemaActual = _prev; }
+    } else {
+      cuerpoTxt = configResumen().txt;
+    }
+    const txt = 'Hola, solicito cotización desde el configurador 3D:\n\n'+cuerpoTxt;
     const url = 'https://wa.me/5216644211088?text=' + encodeURIComponent(txt);
     window.open(url, '_blank');
   });
@@ -9486,15 +9569,28 @@ function addEvents(){
 const _PREFIJO_SIS = {picking:'pic', selectivo:'sel', mecano:'mec', cantilever:'can'};
 function estadoConfigurador(){
   const st = {s: sistemaActual, c: {}, l: {}, plano: sistemasPlano.slice()};
-  const pre = _PREFIJO_SIS[sistemaActual] || null;
+  // Se guardan los campos de TODOS los sistemas que se ven (plano combinado) y
+  // los generales (color, vista en planta, gondola). Antes solo iban los de la
+  // pestaña activa: al abrir el link se perdian la pasarela, el pasillo y el alto
+  // del otro sistema, y el color azul o la vista en planta si estabas en otra
+  // pestaña (auditoria 30 sep 2026).
+  const _visibles = _sistemasDibujados().concat([sistemaActual]);
+  const _prefsVis = _visibles.map(function(x){ return _PREFIJO_SIS[x]; }).filter(Boolean);
   document.querySelectorAll('#ctrl input, #ctrl select').forEach(el => {
     if(!el.id) return;
-    // Guardar solo los campos del sistema activo: los de los otros tabs no pintan nada
-    const propio = pre ? el.id.startsWith(pre)
-                       : !/^(pic|sel|mec|can)[A-Z]/.test(el.id);
-    if(!propio && el.id !== 'auto') return;
+    const m = /^(pic|sel|mec|can)[A-Z]/.exec(el.id);
+    if(m && _prefsVis.indexOf(m[1]) < 0) return;   // campo de un sistema que no se ve
     st.c[el.id] = (el.type === 'checkbox') ? (el.checked ? 1 : 0) : el.value;
   });
+  // Alturas de nivel a mano de Picking: sus campos se crean al vuelo, asi que se
+  // guardan como dato y se reponen despues de pintar.
+  try{
+    const _chkA = document.getElementById('picAlturaManual');
+    const _conA = document.getElementById('picAlturasContainer');
+    if(_chkA && _chkA.checked && _conA){
+      st.alPic = Array.from(_conA.querySelectorAll('input[type=number]')).map(function(i){ return parseFloat(i.value) || 0; });
+    }
+  }catch(e){}
   // Con plano combinado el enlace tiene que llevar las filas de TODOS los
   // sistemas dibujados; si no, al abrirlo el cliente ve uno solo.
   _sistemasDibujados().forEach(function(x){
@@ -9648,7 +9744,11 @@ function _visorChkOrient(){
 }
 function resumenVisor(){
   const el = document.getElementById('medidasResumen');
-  const txt = el ? el.textContent.trim().replace(/\s+/g,' ') : '';
+  // Los <br> del resumen se vuelven " · " (con textContent se pegaban las
+  // palabras: "Picking · 1 filaLargo 1.20 m").
+  const _tmp = document.createElement('div');
+  _tmp.innerHTML = el ? el.innerHTML.replace(/<br\s*\/?>/gi, ' · ') : '';
+  const txt = _tmp.textContent.trim().replace(/\s+/g,' ');
   const sub = document.getElementById('visorSub');
   if(sub) sub.textContent = txt.slice(0, 160);
 }
@@ -9695,6 +9795,15 @@ function animate(){
 }
 
 cargarImagenIsaac();
+// Coma decimal: en Mexico se escribe "0,4". Los campos numericos no la aceptan y
+// "0,4" quedaba como "04" = 4 m (10 veces mas). Se cambia la coma por punto al
+// teclearla, en todos los campos numericos del configurador.
+document.addEventListener('keydown', function(e){
+  const t = e.target;
+  if(e.key !== ',' || !t || t.tagName !== 'INPUT' || t.type !== 'number') return;
+  e.preventDefault();
+  try{ document.execCommand('insertText', false, '.'); }catch(_e){}
+}, true);
 // Leer ?sistema= de la URL y activar ese tab al iniciar
 // Link de cliente: aplicar la configuración codificada antes de construir
 let _visorPendiente = null;
@@ -9708,7 +9817,7 @@ let _visorPendiente = null;
 (function(){
   const params = new URLSearchParams(location.search);
   const sysParam = params.get('sistema');
-  if(sysParam && ['gondola','picking','selectivo'].includes(sysParam)){
+  if(sysParam && ['gondola','picking','selectivo','mecano','cantilever'].includes(sysParam)){
     sistemaActual = sysParam;
     // Activar el tab visualmente (se aplica antes de init() para que build() vea el sistema correcto)
     document.querySelectorAll('#tabs .tab').forEach(t=>{
@@ -9718,6 +9827,8 @@ let _visorPendiente = null;
     document.getElementById('opGondola').style.display   = sysParam==='gondola'   ? '' : 'none';
     document.getElementById('opPicking').style.display   = sysParam==='picking'   ? '' : 'none';
     document.getElementById('opSelectivo').style.display = sysParam==='selectivo' ? '' : 'none';
+    document.getElementById('opMecano').style.display    = sysParam==='mecano'    ? '' : 'none';
+    document.getElementById('opCantilever').style.display = sysParam==='cantilever' ? '' : 'none';
     document.getElementById('bodegaShared').style.display = (sysParam==='piezas') ? 'none' : '';
   }
 })();
@@ -9731,6 +9842,25 @@ if(_visorPendiente !== null){
   try{ renderLineasPicking(); }catch(e){}
   try{ renderLineasMecano(); }catch(e){}
   try{ renderLineasCantilever(); }catch(e){}
+  document.getElementById('opMecano').style.display     = sistemaActual==='mecano'     ? '' : 'none';
+  document.getElementById('opCantilever').style.display = sistemaActual==='cantilever' ? '' : 'none';
+  // Lo que aplicarEstado no puede reponer antes de init(): la vista en planta
+  // necesita la camara ortografica, y las alturas de Picking sus campos.
+  try{
+    const _stV = decodificarEstado(new URLSearchParams(location.search).get('d')) || {};
+    if(Array.isArray(_stV.alPic) && _stV.alPic.length){
+      actualizarInputsAlturasNivel('picking');
+      const _conA = document.getElementById('picAlturasContainer');
+      const _ins = _conA ? _conA.querySelectorAll('input[type=number]') : [];
+      _ins.forEach(function(inp, i){ if(_stV.alPic[i] > 0) inp.value = _stV.alPic[i]; });
+      if(_conA) _conA.dataset.personalizado = 'yes';
+    }
+    if(_stV.c && _stV.c.colorRack){ const _cr = document.getElementById('colorRack'); if(_cr) _cr.value = _stV.c.colorRack; }
+    try{ ajustarSelectorColor(); }catch(e){}
+    const _cp = document.getElementById('chkPlanta');
+    if(_cp && !!_cp.checked !== !!vistaPlanta) toggleVistaPlanta(_cp.checked);
+    else if(_cp && _cp.checked && vistaPlanta && camera !== camOrto){ vistaPlanta = false; toggleVistaPlanta(true); }
+  }catch(e){ console.warn('reponer link', e); }
   build();
   activarModoVisor(_visorPendiente);
   setTimeout(resumenVisor, 400);
