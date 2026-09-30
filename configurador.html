@@ -733,7 +733,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.09.30.07';
+const CFG_VERSION = '2026.09.30.08';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3435,7 +3435,7 @@ function renderLineasMecano(){
   const cont = document.getElementById('mecLineasList');
   const _htmlBloquesM = _bloquesHtml('lm', bloquesMecano, lineasMecano, _bloqueActivoMec());
   cont.innerHTML = lineasMecano.map((l, i) => {
-    const nivOpts = [3,4,5,6,7].map(n=>[n,String(n)]);
+    const nivOpts = [3,4,5,6,7,8,9,10].map(n=>[n,String(n)]);
     const detalle =
       '<div><div style="color:#666;margin-bottom:1px">Alto</div><select onchange="lmSet('+i+',\'altoCm\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(MEC_ALTOS, l.altoCm)+'</select></div>'
       +'<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lmSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>';
@@ -4385,7 +4385,7 @@ function _nivModEditor(l, i, esD, cA, cB, setFn){
     h += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
     for(let c = 0; c < n; c++){
       h += '<div style="text-align:center"><div style="font-size:8.5px;color:#999;margin-bottom:1px">M'+(c+1)+'</div>'
-        + '<input type="number" min="0" max="12" value="'+arr[c]+'" onchange="'+setFn+'('+i+',\''+f+'\','+c+',this.value)" style="width:36px;padding:3px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:5px;text-align:center;background:#fff"></div>';
+        + '<input type="number" min="0" max="'+(setFn === 'lnNivSet' ? 15 : 12)+'" value="'+arr[c]+'" onchange="'+setFn+'('+i+',\''+f+'\','+c+',this.value)" style="width:36px;padding:3px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:5px;text-align:center;background:#fff"></div>';
     }
     h += '</div>';
     return h;
@@ -4408,7 +4408,7 @@ function lnNivMod(i, on){
 function lnNivSet(i, fila, c, val){
   const l = lineasAlmacen[i];
   const _n = parseInt(val);
-  const v = Math.max(0, Math.min(12, Number.isFinite(_n) ? _n : 1));   // 0 recorta el modulo
+  const v = Math.max(0, Math.min(15, Number.isFinite(_n) ? _n : 1));   // 0 recorta el modulo
   const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
   if(!Array.isArray(l[key])) l[key] = [];
   l[key][c] = v;
@@ -4463,7 +4463,7 @@ function renderLineasAlmacen(){
     const chip = !l.abierta
       ? '<div onclick="lnToggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+letraB+l.altoIn+'" × '+l.fondoIn+'" · viga '+(info.largoIn||'')+'" · '+l.niveles+' niv</div>'
       : '';
-    const nivOpts = [2,3,4,5,6,7,8,9,10,11,12].map(n=>[n,String(n)]);
+    const nivOpts = [2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(n=>[n,String(n)]);
     const cA = l.cuerpos, cB = (l.cuerposB==null ? l.cuerpos : l.cuerposB);
     const filasAB = (l.abierta && esD)
       ? '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:3px;font-size:10px">'
