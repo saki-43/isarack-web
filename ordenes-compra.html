@@ -932,8 +932,23 @@ async function ocSincronizarNube(){
   if(!nube) return;
   const porId = {};
   loadOrders().forEach(o => { if(o.id) porId[o.id] = o; });
+  // Ordenes que solo existen en ESTE equipo (por ejemplo, guardadas en una copia
+  // del archivo sin nube): se suben ahora para no perderlas.
+  const enNube = new Set(nube.map(o => o.id));
+  const soloLocal = Object.values(porId).filter(o => o.id && !enNube.has(o.id));
+  soloLocal.forEach(o => { ocCloudUpsert(o); });
+  if (soloLocal.length) showToast('☁ ' + soloLocal.length + ' orden(es) de este equipo subidas a la nube');
   nube.forEach(o => { if(o.id) porId[o.id] = o; });   // la nube pisa
   saveOrders(Object.values(porId));
+  // La hoja en blanco toma el siguiente folio considerando TAMBIEN los de la nube
+  // (antes un equipo nuevo empezaba en 53 aunque la nube fuera en 92).
+  if (!editingSavedId && currentOrder) {
+    const sig = getNextFolio();
+    if ((parseInt(currentOrder.folio) || 0) < sig) {
+      currentOrder.folio = sig;
+      const fEl = document.getElementById('folio'); if (fEl) fEl.value = sig;
+    }
+  }
   const hv = document.getElementById('history-view');
   if(hv && hv.classList.contains('active')) renderHistory();
 }
@@ -1367,6 +1382,16 @@ function saveCurrentOrder() {
       return;
     }
   }
+  // Folio repetido: si otra orden ya usa este folio, se toma el siguiente libre y
+  // se avisa. Antes se podian guardar varias hojas con el mismo folio (128 x3,
+  // Isaac, 2 oct 2026).
+  const _fol = parseInt(currentOrder.folio) || 0;
+  if (orders.some(o => (parseInt(o.folio) || 0) === _fol)) {
+    const libre = getNextFolio();
+    showToast('⚠ El folio ' + _fol + ' ya estaba usado — esta orden queda como #' + libre, true);
+    currentOrder.folio = libre;
+    const fEl = document.getElementById('folio'); if (fEl) fEl.value = libre;
+  }
   const id = 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
   const nuevo = { ...currentOrder, id, savedAt: now };
   orders.push(nuevo);
@@ -1429,12 +1454,16 @@ function renderHistory() {
     return;
   }
   list.innerHTML = '';
+  // Folios repetidos (de antes de que se bloquearan): se marcan en rojo para
+  // corregirlos a mano.
+  const _cuentaFolio = {};
+  orders.forEach(o => { const f = parseInt(o.folio) || 0; _cuentaFolio[f] = (_cuentaFolio[f] || 0) + 1; });
   filtered.forEach(o => {
     const card = document.createElement('div');
     card.className = 'history-card';
     card.innerHTML = `
       <div class="history-folio">
-        FOLIO<span class="num">${escapeHtml(o.folio)}</span>
+        FOLIO<span class="num">${escapeHtml(o.folio)}</span>${(_cuentaFolio[parseInt(o.folio) || 0] > 1) ? '<span style="display:block;color:#c0392b;font-size:10px;font-weight:700">⚠ repetido</span>' : ''}
       </div>
       <div class="history-info">
         <div class="top">${escapeHtml(o.person)} — ${escapeHtml(o.razonSocial || '(sin proveedor)')}</div>
@@ -1564,10 +1593,24 @@ document.getElementById('btn-save').addEventListener('click', () => {
   saveCurrentOrder();
 });
 
+// IMPRIMIR: guarda la orden, imprime y al terminar pasa sola a la siguiente con
+// folio nuevo. Asi una hoja impresa SIEMPRE queda registrada y la que sigue no
+// puede salir con el mismo folio (Isaac, 2 oct 2026). "Guardar" sigue sin
+// cambiar el folio, para poder corregir antes de imprimir.
+let _ocTrasImprimir = false;
 document.getElementById('btn-print').addEventListener('click', () => {
-  readOrderFromForm();
-  calculateTotals();
+  saveCurrentOrder();
+  _ocTrasImprimir = true;
   window.print();
+});
+window.addEventListener('afterprint', () => {
+  if (!_ocTrasImprimir) return;
+  _ocTrasImprimir = false;
+  setTimeout(() => {
+    const impresa = currentOrder.folio;
+    loadOrderFromDefaults(currentPerson);
+    showToast('✓ Orden #' + impresa + ' guardada · lista la #' + currentOrder.folio);
+  }, 300);
 });
 
 document.getElementById('btn-new').addEventListener('click', async () => {
