@@ -395,6 +395,7 @@ gtag('config', 'G-XXXXXXXXXX');
         <option value="84">7' (84" · 2.13 m)</option>
         <option value="96" selected>8' (96" · 2.44 m)</option>
         <option value="120">10' (120" · 3.05 m)</option>
+        <option value="156">13' (156" · 3.96 m)</option>
         <option value="192">16' (192" · 4.88 m)</option>
       </select>
       <select id="picFondo">
@@ -734,7 +735,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.05.01';
+const CFG_VERSION = '2026.10.05.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -770,6 +771,7 @@ const MARCOS_PIC = {
   84:  { 18:'PIC-0036', 24:'PIC-0037', 36:'PIC-0038' },   // 7'
   96:  { 18:'PIC-0040', 24:'PIC-0041', 36:'PIC-0042' },   // 8'
   120: { 18:null,       24:'PIC-0012', 36:'PIC-0013' },   // 10'
+  156: { 18:'PIC-0022', 24:'PIC-0023', 36:'PIC-0024' },   // 13' (Isaac, 5 oct 2026)
   192: { 18:null,       24:null,       36:'PIC-0029' }    // 16' (solo fondo 36")
 };
 // Rejilla picking por (largo cm, fondo in) — solo disponibles para 100 y 120 cm
@@ -2124,7 +2126,7 @@ function getConfigPic(){
 }
 
 // ── Distribución del almacén (Picking): líneas independientes con pasillo ──
-const PIC_ALTOS  = [[73,'6\' (73")'],[84,'7\' (84")'],[96,'8\' (96")'],[120,'10\' (120")'],[192,'16\' (192")']];
+const PIC_ALTOS  = [[73,'6\' (73")'],[84,'7\' (84")'],[96,'8\' (96")'],[120,'10\' (120")'],[156,'13\' (156")'],[192,'16\' (192")']];
 const PIC_FONDOS = [[18,'18" (46 cm)'],[24,'24" (61 cm)'],[36,'36" (91 cm)']];
 const PIC_LARGOS = [[100,'100 cm'],[120,'120 cm'],[150,'150 cm'],[180,'180 cm'],[200,'200 cm'],[230,'230 cm']];
 // ── Pasarela (2° piso sobre pasillos de picking) ──
