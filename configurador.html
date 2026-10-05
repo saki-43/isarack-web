@@ -735,7 +735,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.05.02';
+const CFG_VERSION = '2026.10.05.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2665,10 +2665,19 @@ function nivelSalidaEscaleraPS1(cfg, l, fila, k){
 // ── Marcos que cargan la pasarela ──
 // Regla de obra: el marco de soporte va 4' (48") más alto que el nivel más alto de pasarela.
 // Se sube al siguiente marco disponible del catálogo si la medida exacta no existe.
+// Los marcos que cargan la pasarela son del MISMO sistema que el rack: en
+// Picking se usaban marcos de Selectivo (Isaac, 5 oct 2026).
+function _pasEsPicking(){ return typeof sistemaActual !== 'undefined' && sistemaActual === 'picking'; }
+function _tablaMarcosPas(){ return _pasEsPicking() ? MARCOS_PIC : MARCOS_SEL; }
 function altoMarcoPasarela(cfg){
   const nNiveles = cfg.pasarela.niveles || 1;
   const requerido = cfg.pasarela.alturaIn * nNiveles + 48;
-  const disponibles = Object.keys(MARCOS_SEL).map(Number).sort((a,b)=>a-b);
+  const tabla = _tablaMarcosPas();
+  const fondo = fondoMarcoPasarelaIn(cfg);
+  const todos = Object.keys(tabla).map(Number).sort((a,b)=>a-b);
+  // Se prefieren los altos que SI tienen marco en el fondo del rack
+  const conFondo = todos.filter(a => tabla[a] && tabla[a][fondo]);
+  const disponibles = conFondo.length ? conFondo : todos;
   return disponibles.find(a => a >= requerido) || disponibles[disponibles.length-1];
 }
 // El marco de pasarela usa el mismo fondo que los marcos del rack
@@ -2679,22 +2688,26 @@ function fondoMarcoPasarelaIn(cfg){
 function skuMarcoPasarela(cfg){
   const alto = altoMarcoPasarela(cfg);
   const fondo = fondoMarcoPasarelaIn(cfg);
-  const fila = MARCOS_SEL[alto] || {};
+  const fila = _tablaMarcosPas()[alto] || {};
+  if(_pasEsPicking()) return fila[fondo] || fila[24] || fila[36] || fila[18] || null;
   return fila[fondo] || fila[42] || fila[48] || fila[36] || null;
 }
 // Dibuja un marco IGUAL a los del rack: mismos postes, placa de pie,
 // 2 travesaños y celosía en zigzag cada 2 ft. Los postes se separan en Z.
 function marcoPasarela3D(xCen, zCen, fondoM, alto, eje, mat){
   const g = new THREE.Group();
-  const postW = 0.076, postD = 0.076;
+  const _pic = _pasEsPicking();
+  if(_pic && typeof matMarcoPic !== 'undefined') mat = matMarcoPic;   // mismo verde/poste que el picking
+  const postW = _pic ? 0.05 : 0.076, postD = _pic ? 0.05 : 0.076;
   const zFront =  fondoM/2 - postD/2;
   const zBack  = -fondoM/2 + postD/2;
   [zFront, zBack].forEach(zP => {
     const p = box(postW, alto, postD, mat);
     p.position.set(0, alto/2, zP);
     g.add(p);
-    const pieW = 0.24, pieT = 0.014, pieD = 0.22;
-    const pie = box(pieW, pieT, pieD, (typeof matPieSel !== 'undefined' ? matPieSel : mat));
+    // Picking: su placa (2" al frente y atras del poste); Selectivo: la suya
+    const pieW = _pic ? postW : 0.24, pieT = _pic ? 0.012 : 0.014, pieD = _pic ? (postD + 2 * PIE_PIC_SOBRA_M) : 0.22;
+    const pie = box(pieW, pieT, pieD, _pic ? matPiePic : (typeof matPieSel !== 'undefined' ? matPieSel : mat));
     pie.position.set(0, pieT/2, zP);
     g.add(pie);
   });
