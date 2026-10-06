@@ -326,6 +326,18 @@ footer a:hover{color:#f97316}
         </div>
       </div>
 
+      <div class="system-card" onclick="location.href='/configurador.html#aplick'">
+        <div class="system-visual" style="padding:0">
+          <img src="/proyectos/aplick.jpg" alt="Anaquel Aplick ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:center 40%">
+        </div>
+        <div class="system-body">
+          <h3>Anaquel Aplick</h3>
+          <p>Anaquel de ángulo ranurado de 48" × 24" × 84" de alto, con rejilla de alambre. Armado sin tornillos, ideal para bodegas, talleres y almacenes.</p>
+          <button class="more-info-btn" onclick="event.stopPropagation();abrirSysModal('aplick')">ℹ Ver detalles</button>
+          <span class="more">Cotizar en 3D →</span>
+        </div>
+      </div>
+
       <div class="system-card">
         <div class="system-visual" style="padding:0">
           <img src="/proyectos/archivero.jpg" alt="Archivero móvil ISARACK" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">
@@ -707,6 +719,22 @@ const SISTEMAS = {
     ],
     apps: ['Centros de distribución de alta rotación', 'Cámaras frías y congelación', 'Industria alimenticia y bebidas', 'Farmacéutica con control de caducidad'],
     ventajas: ['Rotación PEPS automática sin montacargas guiando', 'Aprovecha altura y profundidad del almacén', 'Menor tiempo de picking y despacho', 'Reduce pasillos operativos', 'Ideal para productos con caducidad']
+  },
+  aplick: {
+    titulo: 'Anaquel Aplick',
+    img: '/proyectos/aplick.jpg',
+    lead: 'Anaquel metálico de ángulo ranurado con rejilla de alambre. Cada anaquel es independiente y se arma sin tornillos en minutos.',
+    specs: [
+      ['Medida', '48" de frente × 24" de fondo'],
+      ['Altura', '84" (2.13 m)'],
+      ['Niveles', '2 a 6, a la altura que necesites'],
+      ['Entrepaño', 'Rejilla de alambre (opcional)'],
+      ['Color', 'Gris'],
+      ['Armado', 'Sin tornillos']
+    ],
+    apps: ['Bodegas y almacenes', 'Talleres y refaccionarias', 'Cuartos de material y herramienta', 'Comercio y back-office'],
+    ventajas: ['Rejilla que deja pasar luz y aire', 'Niveles ajustables', 'Se arma en minutos', 'Fácil de mover y reacomodar'],
+    cta: '/configurador.html#aplick'
   },
   cantilever: {
     titulo: 'Cantilever',
