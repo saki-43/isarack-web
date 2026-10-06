@@ -232,6 +232,7 @@ gtag('config', 'G-XXXXXXXXXX');
     <div class="tab" data-sys="picking"><svg class="tabico" viewBox="0 0 16 16"><path d="M2 1v14M14 1v14M2 6h12M2 11h12" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><rect x="4.5" y="7.5" width="3" height="3" rx=".4" fill="currentColor"/><rect x="9" y="2.8" width="3" height="2.8" rx=".4" fill="currentColor"/></svg>Picking</div>
     <div class="tab" data-sys="selectivo"><svg class="tabico" viewBox="0 0 16 16"><path d="M2 1v14M14 1v14M2 8h12M2 14.5h12" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><rect x="4" y="3.6" width="3.4" height="3.4" rx=".4" fill="currentColor"/><rect x="8.8" y="10" width="3.4" height="3.4" rx=".4" fill="currentColor"/></svg>Selectivo</div>
     <div class="tab" data-sys="mecano"><svg class="tabico" viewBox="0 0 16 16"><path d="M3 1v14M13 1v14M3 4.5h10M3 8h10M3 11.5h10" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>Mecano</div>
+    <div class="tab" data-sys="aplick"><svg class="tabico" viewBox="0 0 16 16"><path d="M3 1v14M13 1v14" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M3 4h10M3 9h10M3 14h10" stroke="currentColor" stroke-width="1.2" fill="none" stroke-dasharray="1.4 1"/></svg>Aplick</div>
     <div class="tab" data-sys="cantilever"><svg class="tabico" viewBox="0 0 16 16"><path d="M4 1v14M2 15h4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M4 4h9M4 8h9M4 12h9" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>Cantilever</div>
     <div class="tab" id="tabPiezas" data-sys="piezas" style="display:none"><svg class="tabico" viewBox="0 0 16 16"><path d="M8 2.2 12.6 4.9v5.4L8 13l-4.6-2.7V4.9z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><circle cx="8" cy="7.6" r="2" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>Piezas</div>
   </div>
@@ -575,6 +576,28 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
   </div>
 
+  <!-- Opciones APLICK -->
+  <div id="opAplick" style="display:none">
+    <div class="row">
+      <label>Distribución del almacén</label>
+      <div id="aplLineasList" style="display:flex;flex-direction:column;gap:4px;margin:4px 0"></div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button type="button" onclick="laAdd('sencilla')" style="flex:1;font-size:10.5px;padding:5px 4px;background:#eef4fb;border:1px solid #b5d4f4;color:#185FA5;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila sencilla</button>
+        <button type="button" onclick="laAdd('doble')" style="flex:1;font-size:10.5px;padding:5px 4px;background:#faf0ea;border:1px solid #f0c4ae;color:#993C1D;border-radius:5px;cursor:pointer;font-weight:600">＋ Fila doble</button>
+      </div>
+    </div>
+    <div class="row" id="aplPasilloRow" style="display:none">
+      <label class="lblPasillo">Pasillo entre líneas (m)</label>
+      <input type="number" id="aplPasillo" value="1.2" min="0.1" max="50" step="0.1" style="width:100%">
+    </div>
+    <div class="row">
+      <div style="font-size:12px;color:#666;padding:6px 8px;background:#f5f5f5;border-radius:4px">
+        Anaquel 48" × 24" × 84" alto · gris · con rejilla<br>
+        <span style="color:#DA6635;font-weight:600">Por anaquel: 4 postes + por nivel 2 vigas 48" + 2 vigas 24" + 1 rejilla</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Opciones CANTILEVER -->
   <div id="opCantilever" style="display:none">
     <div class="row">
@@ -631,6 +654,7 @@ gtag('config', 'G-XXXXXXXXXX');
         <option value="GONDOLAS">Góndola</option>
         <option value="MECANO">Mecano</option>
         <option value="CANTILEVER">Cantilever</option>
+        <option value="APLICK">Aplick</option>
       </select>
     </div>
     <label class="chk"><input type="checkbox" id="pzSoloExist" checked> Solo con existencia</label>
@@ -735,7 +759,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.05.04';
+const CFG_VERSION = '2026.10.06.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1228,7 +1252,7 @@ const _UNI_F = {m: 1, cm: 0.01, in: 0.0254};   // cuantos metros vale 1 de cada 
 let _uniPrev = 'm';
 // Campos que se capturan en la unidad elegida
 const _UNI_CAMPOS = ['bodAncho','bodLargo','bodAlto',
-                     'gonPasillo','picPasillo','selPasillo','mecPasillo','canPasillo'];
+                     'gonPasillo','picPasillo','selPasillo','mecPasillo','canPasillo','aplPasillo'];
 function _uniFactor(u){ return _UNI_F[u || unidadCota] || 1; }
 // texto del campo -> metros
 function _uniAM(v){ return (parseFloat(v) || 0) * _uniFactor(); }
@@ -1263,7 +1287,7 @@ function cambiarUnidad(nueva){
   // Los paneles de bloque (Pared X / Pared Y / pasillo del bloque) guardan metros
   // y se pintan en la unidad del momento: hay que repintarlos o se quedan con la
   // etiqueta y el numero viejos y el siguiente numero se lee en la unidad nueva.
-  ['renderLineasGondola','renderLineasPicking','renderLineasAlmacen','renderLineasMecano','renderLineasCantilever','renderColumnasBod'].forEach(function(fn){
+  ['renderLineasGondola','renderLineasPicking','renderLineasAlmacen','renderLineasMecano','renderLineasCantilever','renderLineasAplick','renderColumnasBod'].forEach(function(fn){
     try{ if(typeof window[fn] === 'function') window[fn](); }catch(e){}
   });
   if(typeof build === 'function') build();
@@ -4807,7 +4831,7 @@ function lnFilaBloque(i, iB){
 // Dos botones no abren menu: un clic y ya. De paso se ve cual esta puesto sin
 // tener que abrir nada.
 const _RENDER_SIS = {ln:'renderLineasAlmacen', lp:'renderLineasPicking', lm:'renderLineasMecano',
-                     lc:'renderLineasCantilever', gon:'renderLineasGondola'};
+                     lc:'renderLineasCantilever', gon:'renderLineasGondola', la:'renderLineasAplick'};
 function _bloqueGiro(pfx, iB, g){
   const set = window[pfx + 'BloqueSet'];
   if(typeof set === 'function') set(iB, 'giro', g);
@@ -4844,7 +4868,7 @@ function _giroBotones(pfx, iB, giro){
 // pasillo que medir.
 function _campoPasilloBloque(pfx, iB, b, nFilas, u){
   if((nFilas || 0) < 2) return '';
-  const idSis = {ln:'selPasillo', lp:'picPasillo', lm:'mecPasillo', lc:'canPasillo', gon:'gonPasillo'}[pfx];
+  const idSis = {ln:'selPasillo', lp:'picPasillo', lm:'mecPasillo', lc:'canPasillo', gon:'gonPasillo', la:'aplPasillo'}[pfx];
   const el = idSis ? document.getElementById(idSis) : null;
   const delSis = el ? el.value : '';
   const val = (b && b.pasillo) ? _uniDeM(b.pasillo) : '';
@@ -6587,7 +6611,7 @@ function ajustarSelectorColor(){
   const optAzul = document.getElementById('optAzul');
   const selColor = document.getElementById('colorRack');
   if(!row || !optAzul || !selColor) return;
-  if(sistemaActual === 'gondola' || sistemaActual === 'mecano' || sistemaActual === 'cantilever'){
+  if(sistemaActual === 'gondola' || sistemaActual === 'mecano' || sistemaActual === 'cantilever' || sistemaActual === 'aplick'){
     row.style.display = 'none';
     // Se recuerda el color elegido: antes, con solo pasar por Gondola el azul del
     // Selectivo/Picking se volvia verde para siempre.
@@ -6887,8 +6911,8 @@ function _dimsDesde3D(g){
 // Varios sistemas dibujados en la misma bodega. Cada uno se coloca con las
 // coordenadas de SU bloque (Pared X / Pared Y / Giro de su pestaña); "Separar
 // de pared" no sirve para esto porque mueve el cuarto, no el rack.
-const SIS_PLANO = ['gondola', 'picking', 'selectivo', 'mecano', 'cantilever'];
-const SIS_NOMBRE = {gondola:'Góndola', picking:'Picking', selectivo:'Selectivo', mecano:'Mecano', cantilever:'Cantilever'};
+const SIS_PLANO = ['gondola', 'picking', 'selectivo', 'mecano', 'cantilever', 'aplick'];
+const SIS_NOMBRE = {gondola:'Góndola', picking:'Picking', selectivo:'Selectivo', mecano:'Mecano', cantilever:'Cantilever', aplick:'Aplick'};
 let sistemasPlano = [];   // vacio = todo funciona igual que siempre
 function _enPlano(s){ return sistemasPlano.indexOf(s) >= 0; }
 // Lo que se DIBUJA: los palomeados, mas la pestaña en la que estas (para no
@@ -6908,7 +6932,7 @@ function planoToggle(s, on){
   if(on && i < 0 && _sistemasDibujados().filter(function(x){ return x !== s; }).length && _rackDims){
     try{
       const _bl = {gondola:bloquesGondola, selectivo:bloquesAlmacen, picking:bloquesPicking,
-                   mecano:bloquesMecano, cantilever:bloquesCantilever}[s];
+                   mecano:bloquesMecano, cantilever:bloquesCantilever, aplick:bloquesAplick}[s];
       const b0 = _bl && _bl[0];
       if(b0 && !(Number(b0.x) || 0) && !(Number(b0.z) || 0)){
         const cx = (_rackCen && isFinite(_rackCen.x)) ? _rackCen.x : 0;
@@ -7191,7 +7215,7 @@ function _bloquesMovidos(){
   const lista = dib.length ? dib : [sistemaActual];
   const de = {gondola: () => bloquesGondola, picking: () => bloquesPicking,
               selectivo: () => bloquesAlmacen, mecano: () => bloquesMecano,
-              cantilever: () => bloquesCantilever};
+              cantilever: () => bloquesCantilever, aplick: () => bloquesAplick};
   for(let i = 0; i < lista.length; i++){
     const f = de[lista[i]];
     if(!f) continue;
@@ -7209,6 +7233,7 @@ function _buildSistema(s){
   else if(s === 'picking') buildPicking();
   else if(s === 'mecano') buildMecano();
   else if(s === 'cantilever') buildCantilever();
+  else if(s === 'aplick') buildAplick();
   else buildGondola();
 }
 // Libera de la GPU lo que se creo SOLO para este dibujo: geometrias y los
@@ -7367,6 +7392,9 @@ function build(){
     }
   } else if(sistemaActual === 'mecano'){
     const cfg = getConfigMec();
+    extremoIzq = cfg.maxLenM / 2 + 0.9;
+  } else if(sistemaActual === 'aplick'){
+    const cfg = getConfigApl();
     extremoIzq = cfg.maxLenM / 2 + 0.9;
   } else if(sistemaActual === 'cantilever'){
     const cfg = getConfigCan();
@@ -7566,6 +7594,278 @@ function calcularBomMecano(){
   });
   return orden.map(sku => [sku, items[sku]]);
 }
+
+// ══════════════════ APLICK ══════════════════
+// Anaquel de angulo ranurado con rejilla (Isaac, 6 oct 2026). Medida unica:
+// 48" de frente × 24" de fondo × 84" de alto, color gris, solo con rejilla.
+// Cada anaquel es INDIVIDUAL: 2 cuerpos en fila llevan 8 postes, no 6.
+// Por nivel: 2 vigas de 48" (frente y fondo) + 2 vigas de 24" (costados) + 1 rejilla.
+const APL = {
+  POSTE:   'APL-0005',   // BARRA APLIC 2133 mm (84")
+  VIGA48:  'APL-0011',   // VIGA APLIC 48"
+  VIGA24:  'APL-0010',   // VIGA APLIC 24"
+  REJILLA: 'APL-0009'    // REJILLA APLIC 24"X48"
+};
+const APL_ANCHO_IN = 48, APL_FONDO_IN = 24, APL_ALTO_IN = 84;
+const APL_NIV_MIN = 2, APL_NIV_MAX = 6;
+// Separacion entre anaqueles vecinos: son individuales, cada uno con sus postes.
+const APL_SEP_M = 0.01;
+
+let lineasAplick = [{tipo:'sencilla', cuerpos:1, cuerposB:null, niveles:3, abierta:true}];
+let bloquesAplick = [{x:0, z:0, giro:0}];
+let _bloqueActApl = 0;
+function _bloquesNormApl(){ bloquesAplick = _bloquesNormEn(bloquesAplick, lineasAplick); }
+function _bloqueActivoApl(){ _bloquesNormApl(); return Math.max(0, Math.min(bloquesAplick.length - 1, _bloqueActApl || 0)); }
+
+function renderLineasAplick(){
+  const cont = document.getElementById('aplLineasList');
+  if(!cont) return;
+  const htmlB = _bloquesHtml('la', bloquesAplick, lineasAplick, _bloqueActivoApl());
+  cont.innerHTML = lineasAplick.map((l, i) => {
+    const nivOpts = [];
+    for(let n = APL_NIV_MIN; n <= APL_NIV_MAX; n++) nivOpts.push([n, String(n)]);
+    const detalle =
+      '<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Niveles de rejilla</div><select onchange="laSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px">'+_opts(nivOpts, l.niveles)+'</select></div>';
+    const letraB = bloquesAplick.length > 1 ? '📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ' : '';
+    const selB = bloquesAplick.length > 1
+      ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px;padding-top:3px"><span style="font-size:10px;color:#666;font-weight:600">📦 Bloque</span>'
+        + '<select onchange="laFilaBloque('+i+',this.value)" style="font-size:10px;padding:2px 4px;border:1px solid #d9d4c5;border-radius:5px;background:#fff">'
+        + bloquesAplick.map(function(bb, ib){ return '<option value="'+ib+'"'+(_bloqueDe(l)===ib?' selected':'')+'>'+String.fromCharCode(65+ib)+'</option>'; }).join('')
+        + '</select></div>'
+      : '';
+    return _cardLinea('la', i, l, {total: lineasAplick.length, abPermitido:false,
+      chip: letraB+'48"×24"×84" · '+l.niveles+' niveles', detalle: detalle + selB});
+  }).join('');
+  cont.innerHTML = htmlB + cont.innerHTML;
+  const pr = document.getElementById('aplPasilloRow');
+  if(pr) pr.style.display = lineasAplick.length > 1 ? '' : 'none';
+}
+function laAdd(tipo, iB){
+  if(lineasAplick.length >= 8) return;
+  _bloquesNormApl();
+  const destino = Number.isFinite(parseInt(iB)) ? Math.max(0, Math.min(bloquesAplick.length-1, parseInt(iB))) : _bloqueActivoApl();
+  const delB = _filasDeBloque(lineasAplick, destino);
+  const u = delB[delB.length-1] || lineasAplick[lineasAplick.length-1];
+  lineasAplick.forEach(l=>l.abierta=false);
+  lineasAplick.push({tipo, cuerpos:u.cuerpos, cuerposB:null, niveles:u.niveles, abierta:false, bloque:destino});
+  _bloqueActApl = destino;
+  renderLineasAplick(); build();
+}
+function laDup(i){ _dupFila(lineasAplick, i, renderLineasAplick, 8); }
+function laDel(i){ if(lineasAplick.length<=1) return; lineasAplick.splice(i,1); renderLineasAplick(); build(); }
+function laCuerpos(i,d){ const l=lineasAplick[i]; l.cuerpos=Math.max(1,Math.min(30,l.cuerpos+d)); renderLineasAplick(); build(); }
+function laTipo(i){ lineasAplick[i].tipo = lineasAplick[i].tipo==='doble'?'sencilla':'doble'; renderLineasAplick(); build(); }
+function laToggle(i){ lineasAplick[i].abierta = !lineasAplick[i].abierta; renderLineasAplick(); }
+function laSet(i,c,v){
+  if(c === 'niveles') v = Math.max(APL_NIV_MIN, Math.min(APL_NIV_MAX, parseInt(v) || 3));
+  lineasAplick[i][c]=v; renderLineasAplick(); build();
+}
+function laBloqueActivo(iB, ev){ _bloqueActApl = parseInt(iB) || 0; if(_clicEnCampo(ev)) return; renderLineasAplick(); }
+function laBloqueAdd(){
+  _bloquesNormApl();
+  if(bloquesAplick.length >= 6) return;
+  const ult = bloquesAplick[bloquesAplick.length - 1] || {x:0, z:0};
+  bloquesAplick.push({x: Number(ult.x || 0) + 6, z: Number(ult.z || 0), giro: 0, pas: false, pasillo: null});
+  renderLineasAplick(); build();
+}
+function laBloqueDel(iB){
+  _bloquesNormApl();
+  if(bloquesAplick.length <= 1) return;
+  lineasAplick.forEach(l => { const b = _bloqueDe(l);
+    if(b === iB) l.bloque = 0; else if(b > iB) l.bloque = b - 1; });
+  bloquesAplick.splice(iB, 1);
+  renderLineasAplick(); build();
+}
+function laBloqueSet(iB, campo, val){
+  _bloquesNormApl();
+  const b = bloquesAplick[iB];
+  if(!b) return;
+  if(campo === 'giro') b.giro = (Number(val) === 90) ? 90 : 0;
+  else if(campo === 'pasillo'){
+    const n = _uniAM(val);
+    b.pasillo = (isFinite(n) && n > 0) ? Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, n)) : null;
+  }
+  else b[campo] = Math.max(-50, Math.min(50, _uniAM(val) || 0));
+  build();
+}
+function laFilaBloque(i, iB){
+  _bloquesNormApl();
+  lineasAplick[i].bloque = Math.max(0, Math.min(bloquesAplick.length - 1, parseInt(iB) || 0));
+  renderLineasAplick(); build();
+}
+
+function getConfigApl(){
+  const anchoM = APL_ANCHO_IN*IN_TO_M, fondoM = APL_FONDO_IN*IN_TO_M, altoM = APL_ALTO_IN*IN_TO_M;
+  const paso = anchoM + APL_SEP_M;
+  const lineas = lineasAplick.map(l => ({
+    tipo: l.tipo, cuerpos: l.cuerpos, niveles: l.niveles,
+    altoM: altoM,
+    largoTotM: paso * l.cuerpos - APL_SEP_M,
+    bloque: _bloqueDe(l),
+    profM: fondoM * (l.tipo === 'doble' ? 2 : 1) + (l.tipo === 'doble' ? APL_SEP_M : 0)
+  }));
+  const pasilloM = _pasilloDe(document.getElementById('aplPasillo'), 1.2);
+  const cuerposTot = lineas.reduce((a,l)=>a + l.cuerpos * (l.tipo==='doble'?2:1), 0);
+  const maxLenM = Math.max(...lineas.map(l=>l.largoTotM));
+  const profTotalM = lineas.reduce((a,l)=>a+l.profM,0) + pasilloM*(lineas.length-1);
+  return { anchoM, fondoM, altoM, paso, lineas, pasilloM, cuerposTot, maxLenM, maxAltoM: altoM, profTotalM,
+           detalle: cuerposTot <= 12 };
+}
+
+// Alturas (m) de cada nivel de rejilla: el primero a 4" del piso y el ultimo
+// en el remate de arriba; los de en medio repartidos parejo.
+function _aplAlturas(altoM, niveles){
+  const y0 = 4*IN_TO_M, y1 = altoM - 1.5*IN_TO_M;
+  if(niveles <= 1) return [y0];
+  const out = [];
+  for(let n = 0; n < niveles; n++) out.push(y0 + (y1 - y0) * n / (niveles - 1));
+  return out;
+}
+let _aplMats = null;
+function _aplMateriales(){
+  if(_aplMats) return _aplMats;
+  _aplMats = {
+    poste:   new THREE.MeshStandardMaterial({color:0x7d8287, roughness:0.55, metalness:0.45}),
+    viga:    new THREE.MeshStandardMaterial({color:0x878c91, roughness:0.55, metalness:0.45}),
+    alambre: new THREE.MeshStandardMaterial({color:0xb9bdc1, roughness:0.35, metalness:0.7}),
+    hueco:   new THREE.MeshStandardMaterial({color:0x2e3135, roughness:0.9, metalness:0})
+  };
+  return _aplMats;
+}
+// Un anaquel Aplick: x de 0 a anchoM, z centrado en 0.
+function _buildAplickUno(parent, x0, cfg, niveles){
+  const M = _aplMateriales();
+  const W = cfg.anchoM, D = cfg.fondoM, H = cfg.altoM;
+  const pa = 1.5*IN_TO_M, esp = 0.0025;          // angulo de 1.5" de ala
+  // 4 postes de angulo (dos alas cada uno) con sus perforaciones al frente
+  [[0, -1], [W, -1], [0, 1], [W, 1]].forEach(function(p){
+    const sx = p[0] === 0 ? 1 : -1, sz = p[1] < 0 ? 1 : -1;
+    const xp = x0 + p[0], zp = p[1] * D/2;
+    const alaX = box(pa, H, esp, M.poste);  alaX.position.set(xp + sx*pa/2, H/2, zp + sz*esp/2); parent.add(alaX);
+    const alaZ = box(esp, H, pa, M.poste);  alaZ.position.set(xp + sx*esp/2, H/2, zp + sz*pa/2); parent.add(alaZ);
+    // ranuras: rayitas oscuras en la cara de afuera del ala del frente/fondo.
+    // Con muchos anaqueles se omiten: son puro detalle y cargan el dibujo.
+    if(cfg.detalle !== false){
+      for(let y = 0.08; y < H - 0.05; y += 0.09){
+        const r = box(0.006, 0.03, 0.001, M.hueco);
+        r.position.set(xp + sx*pa*0.55, y, zp - sz*0.0006);
+        parent.add(r);
+      }
+    }
+  });
+  // Niveles: marco de 4 vigas + rejilla
+  const vh = 1.6*IN_TO_M, vt = 0.012;            // peralte de la viga y grueso
+  _aplAlturas(H, niveles).forEach(function(y){
+    const vf = box(W - 0.004, vh, vt, M.viga); vf.position.set(x0 + W/2, y - vh/2, -D/2 + vt/2); parent.add(vf);
+    const vb = box(W - 0.004, vh, vt, M.viga); vb.position.set(x0 + W/2, y - vh/2,  D/2 - vt/2); parent.add(vb);
+    const vl = box(vt, vh, D - 0.004, M.viga); vl.position.set(x0 + vt/2, y - vh/2, 0); parent.add(vl);
+    const vr = box(vt, vh, D - 0.004, M.viga); vr.position.set(x0 + W - vt/2, y - vh/2, 0); parent.add(vr);
+    // Rejilla: alambres a lo largo cada ~2.5" y travesaños cada ~6"
+    const yw = y + 0.004, ww = 0.0035;
+    const nL = Math.max(2, Math.round(D / (2.5*IN_TO_M)));
+    for(let k = 0; k <= nL; k++){
+      const z = -D/2 + 0.01 + (D - 0.02) * k / nL;
+      const a = box(W - 0.02, ww, ww, M.alambre); a.position.set(x0 + W/2, yw, z); parent.add(a);
+    }
+    const nT = Math.max(2, Math.round(W / (6*IN_TO_M)));
+    for(let k = 0; k <= nT; k++){
+      const x = x0 + 0.01 + (W - 0.02) * k / nT;
+      const t = box(ww, ww*1.6, D - 0.02, M.alambre); t.position.set(x, yw - ww, 0); parent.add(t);
+    }
+  });
+}
+function buildAplickScene(parent, cfg, niveles, cuerpos){
+  for(let c = 0; c < cuerpos; c++) _buildAplickUno(parent, c * cfg.paso, cfg, niveles);
+}
+function buildAplick(){
+  const cfg = getConfigApl();
+  function armarBloque(cfg){
+    const lineas = cfg.lineas;
+    const xInicio = -cfg.maxLenM/2;
+    let zAtras = -cfg.profTotalM/2;
+    const pasillos = [];
+    lineas.forEach((l, iL) => {
+      const gLin = new THREE.Group();
+      if(l.tipo === 'doble'){
+        const fA = new THREE.Group();
+        buildAplickScene(fA, cfg, l.niveles, l.cuerpos);
+        fA.position.set(-l.largoTotM/2, 0, (cfg.fondoM + APL_SEP_M)/2);
+        gLin.add(fA);
+        const fB = new THREE.Group();
+        buildAplickScene(fB, cfg, l.niveles, l.cuerpos);
+        fB.rotation.y = Math.PI;
+        fB.position.set(l.largoTotM/2, 0, -(cfg.fondoM + APL_SEP_M)/2);
+        gLin.add(fB);
+      } else {
+        const f = new THREE.Group();
+        buildAplickScene(f, cfg, l.niveles, l.cuerpos);
+        f.position.set(-l.largoTotM/2, 0, 0);
+        gLin.add(f);
+      }
+      gLin.position.x = xInicio + l.largoTotM/2;
+      gLin.position.z = zAtras + l.profM/2;
+      grupo.add(gLin);
+      if(iL < lineas.length - 1) pasillos.push(zAtras + l.profM + cfg.pasilloM/2);
+      zAtras += l.profM + cfg.pasilloM;
+    });
+    if(cfg.pasilloM && pasillos.length){
+      const xP = -cfg.maxLenM/2 - 1.2;
+      pasillos.forEach(zc => cotaPasillo(grupo, zc, cfg.pasilloM, xP, 'z'));
+    }
+  }
+  _bloquesNormApl();
+  const raiz = grupo;
+  bloquesAplick.forEach((b, iB) => {
+    const cfgB = _cfgDeBloqueGen(cfg, _filasDeBloque(cfg.lineas, iB), 'largoTotM', b);
+    if(!cfgB) return;
+    cfgB.paso = cfg.paso; cfgB.anchoM = cfg.anchoM; cfgB.fondoM = cfg.fondoM; cfgB.altoM = cfg.altoM; cfgB.detalle = cfg.detalle;
+    const gB = new THREE.Group();
+    grupo = gB;
+    try{ armarBloque(cfgB); }
+    finally{ grupo = raiz; }
+    gB.userData.bloque = {sis:'aplick', i:iB};
+    _colocarBloque(gB, b);
+    grupo.add(gB);
+  });
+  const maxLen = cfg.maxLenM, profTotal = cfg.profTotalM;
+  targetY = cfg.maxAltoM * 0.46;
+  camDist = Math.max(cfg.maxAltoM*1.5 + 1.0, maxLen*0.9 + 1.2, profTotal*1.6 + 1.0);
+  agregarCotas(grupo, maxLen, profTotal, cfg.maxAltoM, null, 0);
+  if(cfg.lineas.length === 1){
+    agregarCotasClaros(grupo, _aplAlturas(cfg.altoM, cfg.lineas[0].niveles), -maxLen/2 - 0.25, profTotal/2 + 0.05);
+  }
+  const lineas = cfg.lineas;
+  const filaTxt = lineas.length === 1 ? (lineas[0].tipo==='doble'?'1 doble':'1 sencilla') : lineas.length + ' líneas';
+  document.getElementById('dims').innerHTML =
+    'Aplick · '+filaTxt+' · Largo <b>'+maxLen.toFixed(2)+' m</b> · Alto <b>'+cfg.maxAltoM.toFixed(2)+' m</b> · '+
+    cfg.cuerposTot+' anaquel'+(cfg.cuerposTot>1?'es':'');
+  const lineasHtml = lineas.length > 1
+    ? '<span style="font-size:10px;color:#888">' + lineas.map((l,i)=>'L'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaq · '+l.niveles+' niv').join(' | ') + '</span>'
+    : '';
+  document.getElementById('medidasResumen').innerHTML =
+    '<b>Aplick · '+filaTxt+'</b><br>'+
+    'Largo <b>'+maxLen.toFixed(2)+' m</b> · Alto <b>'+cfg.maxAltoM.toFixed(2)+' m</b> · Fondo total <b>'+profTotal.toFixed(2)+' m</b>'+
+    (lineas.length>1 ? ' <span style="color:#888">(incl. pasillos '+cfg.pasilloM.toFixed(1)+' m)</span>' : '')+'<br>'+
+    lineasHtml;
+}
+function calcularBomAplick(){
+  const cfg = getConfigApl();
+  const items = {}; const orden = [];
+  function add(sku, q){
+    if(!sku || !q) return;
+    if(items[sku]===undefined){ items[sku]=0; orden.push(sku); }
+    items[sku] += q;
+  }
+  cfg.lineas.forEach(l => {
+    const anaqueles = l.cuerpos * (l.tipo === 'doble' ? 2 : 1);
+    add(APL.POSTE,   4 * anaqueles);
+    add(APL.VIGA48,  2 * l.niveles * anaqueles);
+    add(APL.VIGA24,  2 * l.niveles * anaqueles);
+    add(APL.REJILLA, l.niveles * anaqueles);
+  });
+  return orden.map(sku => [sku, items[sku]]);
+}
+
 
 // Core: BOM de UNA fila con parametros explicitos. Multiplicador aplica a "doble"
 // (2 gondolas espalda con espalda). Retorna [[sku, qty]...].
@@ -8196,6 +8496,7 @@ function calcularBOM(){
   if(sistemaActual === 'picking')   return calcularBomPicking();
   if(sistemaActual === 'mecano')    return calcularBomMecano();
   if(sistemaActual === 'cantilever')return calcularBomCantilever();
+  if(sistemaActual === 'aplick')    return calcularBomAplick();
   return calcularBomGondola();
 }
 
@@ -8336,6 +8637,15 @@ function renderCotizacion(){
       <div class="s"><div class="v">${cxn}</div><div class="l">${cxnLbl}</div></div>
       <div class="s"><div class="v">${piezasTot}</div><div class="l">Piezas</div></div>
     `;
+  } else if(sistemaActual === 'aplick'){
+    const cfg = getConfigApl();
+    const nivs = cfg.lineas.map(l => l.niveles);
+    const nivTxt = Math.min(...nivs) === Math.max(...nivs) ? String(nivs[0]) : Math.min(...nivs)+'–'+Math.max(...nivs);
+    document.getElementById('stats').innerHTML = `
+      <div class="s"><div class="v">${cfg.cuerposTot}</div><div class="l">Anaqueles</div></div>
+      <div class="s"><div class="v">${nivTxt}</div><div class="l">Niveles</div></div>
+      <div class="s"><div class="v">${piezasTot}</div><div class="l">Piezas</div></div>
+    `;
   } else {
     const mods = parseInt(document.getElementById('modulos').value);
     const cabs = parseInt(document.getElementById('cabeceras').value);
@@ -8457,7 +8767,7 @@ async function sbInsertVenta(body){
 
 async function cargarPrecios(){
   if(preciosCache) return preciosCache;
-  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO,MECANO,CANTILEVER)&select=sku,producto,precio,sistema,cantidad");
+  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO,MECANO,CANTILEVER,APLICK)&select=sku,producto,precio,sistema,cantidad");
   const map = {};
   inventarioArr = [];
   for(const row of data){
@@ -8763,6 +9073,17 @@ function configResumen(){
         + ' · '+cfg.cuerposTot+' módulo'+(cfg.cuerposTot>1?'s':'')+' tot'
     };
   }
+  if(sistemaActual === 'aplick'){
+    const cfg = getConfigApl();
+    return {
+      sistema: 'Aplick',
+      txt: 'Aplick · 48" × 24" × 84" alto · gris con rejilla · '
+        + cfg.lineas.map(function(l, i){
+            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaquel'+(l.cuerpos>1?'es':'')+', '+l.niveles+' niveles';
+          }).join(' | ')
+        + ' · '+cfg.cuerposTot+' anaquel'+(cfg.cuerposTot>1?'es':'')+' tot'
+    };
+  }
   if(sistemaActual === 'cantilever'){
     const cfg = getConfigCan();
     const desg = cfg.lineas.map((l,i)=>'L'+(i+1)+': '+l.tipo+' '+l.columnas+' col '+l.altoFt+'ft brazo '+l.brazoIn+'in '+l.niveles+' niv').join(' | ');
@@ -8958,6 +9279,11 @@ function captura3D(){
       alto = cfg.maxAltoM;
     } else if(sistemaActual === 'mecano'){
       const cfg = getConfigMec();
+      xExt = cfg.maxLenM;
+      zExt = cfg.profTotalM;
+      alto = cfg.maxAltoM;
+    } else if(sistemaActual === 'aplick'){
+      const cfg = getConfigApl();
       xExt = cfg.maxLenM;
       zExt = cfg.profTotalM;
       alto = cfg.maxAltoM;
@@ -9395,7 +9721,7 @@ async function generarPDF(datos, opts){
     : (sistemaActual==='piezas' ? 'Piezas sueltas' : (sistemaActual==='selectivo' ? 'Rack Selectivo' : (sistemaActual==='picking' ? 'Picking'
       // Mecano y Cantilever llegaban a ISA-OS como "Góndola". El folio se queda en
       // GW- porque ISA-OS solo reconoce RW-/GW-/PW- como cotizacion web.
-      : (sistemaActual==='mecano' ? 'Mecano' : (sistemaActual==='cantilever' ? 'Cantilever' : 'Góndola')))));
+      : (sistemaActual==='mecano' ? 'Mecano' : (sistemaActual==='cantilever' ? 'Cantilever' : (sistemaActual==='aplick' ? 'Aplick' : 'Góndola'))))));
   const lineasVenta = lineasParaPDF.map(l => ({
     producto: l.producto,
     cantidad: l.cantidad,
@@ -9615,6 +9941,8 @@ function addEvents(){
   // duplicaban una vez por fila agregada (Isaac, 21 sep 2026).
   renderLineasMecano();
   renderLineasCantilever();
+  renderLineasAplick();
+  document.getElementById('aplPasillo').addEventListener('change', build);
   document.getElementById('mecPasillo').addEventListener('change', build);
   document.getElementById('canPasillo').addEventListener('change', build);
   // El bloque de la bodega nace con display:none en el HTML y solo se encendia
@@ -9674,6 +10002,7 @@ function addEvents(){
       document.getElementById('opSelectivo').style.display = sistemaActual==='selectivo' ? '' : 'none';
       document.getElementById('opMecano').style.display    = sistemaActual==='mecano'    ? '' : 'none';
       document.getElementById('opCantilever').style.display = sistemaActual==='cantilever' ? '' : 'none';
+      document.getElementById('opAplick').style.display = sistemaActual==='aplick' ? '' : 'none';
       document.getElementById('bodegaShared').style.display = (sistemaActual==='piezas') ? 'none' : '';
       if(sistemaActual === 'piezas'){
         // Solo se precarga si el carrito está vacío: si ya estabas editando, no se pisa.
@@ -9722,7 +10051,7 @@ function addEvents(){
 
   // Deep-link: abrir en un sistema específico según hash (#selectivo, #picking, #gondola)
   const hash = (location.hash || '').replace('#','').toLowerCase();
-  if(hash === 'selectivo' || hash === 'picking' || hash === 'gondola' || hash === 'mecano' || hash === 'cantilever'){
+  if(hash === 'selectivo' || hash === 'picking' || hash === 'gondola' || hash === 'mecano' || hash === 'cantilever' || hash === 'aplick'){
     const tab = document.querySelector('#tabs .tab[data-sys="'+hash+'"]');
     if(tab) tab.click();
   }
@@ -9732,7 +10061,7 @@ function addEvents(){
 // ══════════ MODO VISOR: link de solo lectura para el cliente ══════════
 // Codifica toda la configuración en la URL. Si el link trae ?v=1 la app abre
 // sin paneles ni controles: el cliente solo puede girar y acercar.
-const _PREFIJO_SIS = {picking:'pic', selectivo:'sel', mecano:'mec', cantilever:'can'};
+const _PREFIJO_SIS = {picking:'pic', selectivo:'sel', mecano:'mec', cantilever:'can', aplick:'apl'};
 function estadoConfigurador(){
   const st = {s: sistemaActual, c: {}, l: {}, plano: sistemasPlano.slice()};
   // Se guardan los campos de TODOS los sistemas que se ven (plano combinado) y
@@ -9765,12 +10094,14 @@ function estadoConfigurador(){
     else if(x === 'picking'){ st.l.pic = lineasPicking; st.l.bloqPic = bloquesPicking; }
     else if(x === 'mecano'){ st.l.mec = lineasMecano; st.l.bloqMec = bloquesMecano; }
     else if(x === 'cantilever'){ st.l.can = lineasCantilever; st.l.bloqCan = bloquesCantilever; }
+    else if(x === 'aplick'){ st.l.apl = lineasAplick; st.l.bloqApl = bloquesAplick; }
   });
   if(sistemaActual === 'gondola'){ st.l.gon = lineasGondola; st.l.bloqGon = bloquesGondola; }
   else if(sistemaActual === 'selectivo'){ st.l.alm = lineasAlmacen; st.l.bloq = bloquesAlmacen; }
   else if(sistemaActual === 'picking'){ st.l.pic = lineasPicking; st.l.bloqPic = bloquesPicking; }
   else if(sistemaActual === 'mecano'){ st.l.mec = lineasMecano; st.l.bloqMec = bloquesMecano; }
   else if(sistemaActual === 'cantilever'){ st.l.can = lineasCantilever; st.l.bloqCan = bloquesCantilever; }
+  else if(sistemaActual === 'aplick'){ st.l.apl = lineasAplick; st.l.bloqApl = bloquesAplick; }
   else if(sistemaActual === 'piezas')     st.pz = piezasCarrito.map(c => [c.sku, c.cant]);
   try{ st.nb = {n: (typeof nivelesPorBahia !== 'undefined' ? nivelesPorBahia : null),
                 a: (typeof alturasPorBahia !== 'undefined' ? alturasPorBahia : null)}; }catch(e){}
@@ -9806,6 +10137,9 @@ function aplicarEstado(st){
     if(st.l.can) lineasCantilever = st.l.can;
     bloquesCantilever = Array.isArray(st.l.bloqCan) && st.l.bloqCan.length ? st.l.bloqCan : [{x:0, z:0, giro:0}];
     try{ _bloquesNormCan(); }catch(e){}
+    if(Array.isArray(st.l.apl) && st.l.apl.length) lineasAplick = st.l.apl;
+    bloquesAplick = Array.isArray(st.l.bloqApl) && st.l.bloqApl.length ? st.l.bloqApl : [{x:0, z:0, giro:0}];
+    try{ _bloquesNormApl(); }catch(e){}
     if(Array.isArray(st.l.gon) && st.l.gon.length) lineasGondola = st.l.gon;
     bloquesGondola = Array.isArray(st.l.bloqGon) && st.l.bloqGon.length ? st.l.bloqGon : [{x:0, z:0, giro:0}];
     try{ _bloquesNormGon(); }catch(e){}
@@ -9852,7 +10186,7 @@ function aplicarEstado(st){
     // que se mando (correr el cuarto -sx es lo mismo que correr el rack +sx).
     const _sxV = _uniAM(st.bod.sx), _syV = _uniAM(st.bod.sy);
     if(_sxV || _syV){
-      [bloquesGondola, bloquesPicking, bloquesAlmacen, bloquesMecano, bloquesCantilever]
+      [bloquesGondola, bloquesPicking, bloquesAlmacen, bloquesMecano, bloquesCantilever, bloquesAplick]
         .forEach(function(bs){ if(Array.isArray(bs)) bs.forEach(function(b){
           b.x = (Number(b.x) || 0) + _sxV; b.z = (Number(b.z) || 0) + _syV; }); });
     }
@@ -9993,7 +10327,7 @@ let _visorPendiente = null;
 (function(){
   const params = new URLSearchParams(location.search);
   const sysParam = params.get('sistema');
-  if(sysParam && ['gondola','picking','selectivo','mecano','cantilever'].includes(sysParam)){
+  if(sysParam && ['gondola','picking','selectivo','mecano','cantilever','aplick'].includes(sysParam)){
     sistemaActual = sysParam;
     // Activar el tab visualmente (se aplica antes de init() para que build() vea el sistema correcto)
     document.querySelectorAll('#tabs .tab').forEach(t=>{
@@ -10005,6 +10339,7 @@ let _visorPendiente = null;
     document.getElementById('opSelectivo').style.display = sysParam==='selectivo' ? '' : 'none';
     document.getElementById('opMecano').style.display    = sysParam==='mecano'    ? '' : 'none';
     document.getElementById('opCantilever').style.display = sysParam==='cantilever' ? '' : 'none';
+    document.getElementById('opAplick').style.display = sysParam==='aplick' ? '' : 'none';
     document.getElementById('bodegaShared').style.display = (sysParam==='piezas') ? 'none' : '';
   }
 })();
@@ -10019,6 +10354,8 @@ if(_visorPendiente !== null){
   try{ renderLineasPicking(); }catch(e){}
   try{ renderLineasMecano(); }catch(e){}
   try{ renderLineasCantilever(); }catch(e){}
+  try{ renderLineasAplick(); }catch(e){}
+  document.getElementById('opAplick').style.display = sistemaActual==='aplick' ? '' : 'none';
   document.getElementById('opMecano').style.display     = sistemaActual==='mecano'     ? '' : 'none';
   document.getElementById('opCantilever').style.display = sistemaActual==='cantilever' ? '' : 'none';
   // Lo que aplicarEstado no puede reponer antes de init(): la vista en planta
