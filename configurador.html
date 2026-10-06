@@ -592,8 +592,8 @@ gtag('config', 'G-XXXXXXXXXX');
     </div>
     <div class="row">
       <div style="font-size:12px;color:#666;padding:6px 8px;background:#f5f5f5;border-radius:4px">
-        Anaquel 48" × 24" × 84" alto · gris · con rejilla<br>
-        <span style="color:#DA6635;font-weight:600">Por anaquel: 4 postes + por nivel 2 vigas 48" + 2 vigas 24" + 1 rejilla</span>
+        Anaquel 48" × 24" × 84" alto · gris · rejilla opcional<br>
+        <span style="color:#DA6635;font-weight:600">Por anaquel: 4 postes + por nivel 2 vigas 48" + 2 vigas 24" (+ 1 rejilla si lleva)</span>
       </div>
     </div>
   </div>
@@ -759,7 +759,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.06.01';
+const CFG_VERSION = '2026.10.06.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -7611,7 +7611,10 @@ const APL_NIV_MIN = 2, APL_NIV_MAX = 6;
 // Separacion entre anaqueles vecinos: son individuales, cada uno con sus postes.
 const APL_SEP_M = 0.01;
 
-let lineasAplick = [{tipo:'sencilla', cuerpos:1, cuerposB:null, niveles:3, abierta:true}];
+let lineasAplick = [{tipo:'sencilla', cuerpos:1, cuerposB:null, niveles:3, rejilla:true, abierta:true}];
+// La rejilla es opcional por fila (Isaac, 6 oct 2026). Filas de links viejos no
+// traen el campo: se toman CON rejilla, que es como se cotizaron.
+function _aplConRejilla(l){ return !l || l.rejilla !== false; }
 let bloquesAplick = [{x:0, z:0, giro:0}];
 let _bloqueActApl = 0;
 function _bloquesNormApl(){ bloquesAplick = _bloquesNormEn(bloquesAplick, lineasAplick); }
@@ -7625,7 +7628,8 @@ function renderLineasAplick(){
     const nivOpts = [];
     for(let n = APL_NIV_MIN; n <= APL_NIV_MAX; n++) nivOpts.push([n, String(n)]);
     const detalle =
-      '<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Niveles de rejilla</div><select onchange="laSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px">'+_opts(nivOpts, l.niveles)+'</select></div>';
+      '<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="laSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px">'+_opts(nivOpts, l.niveles)+'</select></div>'
+      +'<div style="display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#444;cursor:pointer;padding-bottom:3px"><input type="checkbox" onchange="laSet('+i+',\'rejilla\',this.checked)"'+(_aplConRejilla(l)?' checked':'')+'> Con rejilla</label></div>';
     const letraB = bloquesAplick.length > 1 ? '📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ' : '';
     const selB = bloquesAplick.length > 1
       ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px;padding-top:3px"><span style="font-size:10px;color:#666;font-weight:600">📦 Bloque</span>'
@@ -7634,7 +7638,7 @@ function renderLineasAplick(){
         + '</select></div>'
       : '';
     return _cardLinea('la', i, l, {total: lineasAplick.length, abPermitido:false,
-      chip: letraB+'48"×24"×84" · '+l.niveles+' niveles', detalle: detalle + selB});
+      chip: letraB+'48"×24"×84" · '+l.niveles+' niveles'+(_aplConRejilla(l)?'':' · sin rejilla'), detalle: detalle + selB});
   }).join('');
   cont.innerHTML = htmlB + cont.innerHTML;
   const pr = document.getElementById('aplPasilloRow');
@@ -7647,7 +7651,7 @@ function laAdd(tipo, iB){
   const delB = _filasDeBloque(lineasAplick, destino);
   const u = delB[delB.length-1] || lineasAplick[lineasAplick.length-1];
   lineasAplick.forEach(l=>l.abierta=false);
-  lineasAplick.push({tipo, cuerpos:u.cuerpos, cuerposB:null, niveles:u.niveles, abierta:false, bloque:destino});
+  lineasAplick.push({tipo, cuerpos:u.cuerpos, cuerposB:null, niveles:u.niveles, rejilla:_aplConRejilla(u), abierta:false, bloque:destino});
   _bloqueActApl = destino;
   renderLineasAplick(); build();
 }
@@ -7698,7 +7702,7 @@ function getConfigApl(){
   const anchoM = APL_ANCHO_IN*IN_TO_M, fondoM = APL_FONDO_IN*IN_TO_M, altoM = APL_ALTO_IN*IN_TO_M;
   const paso = anchoM + APL_SEP_M;
   const lineas = lineasAplick.map(l => ({
-    tipo: l.tipo, cuerpos: l.cuerpos, niveles: l.niveles,
+    tipo: l.tipo, cuerpos: l.cuerpos, niveles: l.niveles, rejilla: _aplConRejilla(l),
     altoM: altoM,
     largoTotM: paso * l.cuerpos - APL_SEP_M,
     bloque: _bloqueDe(l),
@@ -7733,7 +7737,7 @@ function _aplMateriales(){
   return _aplMats;
 }
 // Un anaquel Aplick: x de 0 a anchoM, z centrado en 0.
-function _buildAplickUno(parent, x0, cfg, niveles){
+function _buildAplickUno(parent, x0, cfg, niveles, conRejilla){
   const M = _aplMateriales();
   const W = cfg.anchoM, D = cfg.fondoM, H = cfg.altoM;
   const pa = 1.5*IN_TO_M, esp = 0.0025;          // angulo de 1.5" de ala
@@ -7760,6 +7764,7 @@ function _buildAplickUno(parent, x0, cfg, niveles){
     const vb = box(W - 0.004, vh, vt, M.viga); vb.position.set(x0 + W/2, y - vh/2,  D/2 - vt/2); parent.add(vb);
     const vl = box(vt, vh, D - 0.004, M.viga); vl.position.set(x0 + vt/2, y - vh/2, 0); parent.add(vl);
     const vr = box(vt, vh, D - 0.004, M.viga); vr.position.set(x0 + W - vt/2, y - vh/2, 0); parent.add(vr);
+    if(conRejilla === false) return;
     // Rejilla: alambres a lo largo cada ~2.5" y travesaños cada ~6"
     const yw = y + 0.004, ww = 0.0035;
     const nL = Math.max(2, Math.round(D / (2.5*IN_TO_M)));
@@ -7774,8 +7779,8 @@ function _buildAplickUno(parent, x0, cfg, niveles){
     }
   });
 }
-function buildAplickScene(parent, cfg, niveles, cuerpos){
-  for(let c = 0; c < cuerpos; c++) _buildAplickUno(parent, c * cfg.paso, cfg, niveles);
+function buildAplickScene(parent, cfg, niveles, cuerpos, conRejilla){
+  for(let c = 0; c < cuerpos; c++) _buildAplickUno(parent, c * cfg.paso, cfg, niveles, conRejilla);
 }
 function buildAplick(){
   const cfg = getConfigApl();
@@ -7788,17 +7793,17 @@ function buildAplick(){
       const gLin = new THREE.Group();
       if(l.tipo === 'doble'){
         const fA = new THREE.Group();
-        buildAplickScene(fA, cfg, l.niveles, l.cuerpos);
+        buildAplickScene(fA, cfg, l.niveles, l.cuerpos, l.rejilla);
         fA.position.set(-l.largoTotM/2, 0, (cfg.fondoM + APL_SEP_M)/2);
         gLin.add(fA);
         const fB = new THREE.Group();
-        buildAplickScene(fB, cfg, l.niveles, l.cuerpos);
+        buildAplickScene(fB, cfg, l.niveles, l.cuerpos, l.rejilla);
         fB.rotation.y = Math.PI;
         fB.position.set(l.largoTotM/2, 0, -(cfg.fondoM + APL_SEP_M)/2);
         gLin.add(fB);
       } else {
         const f = new THREE.Group();
-        buildAplickScene(f, cfg, l.niveles, l.cuerpos);
+        buildAplickScene(f, cfg, l.niveles, l.cuerpos, l.rejilla);
         f.position.set(-l.largoTotM/2, 0, 0);
         gLin.add(f);
       }
@@ -7861,7 +7866,7 @@ function calcularBomAplick(){
     add(APL.POSTE,   4 * anaqueles);
     add(APL.VIGA48,  2 * l.niveles * anaqueles);
     add(APL.VIGA24,  2 * l.niveles * anaqueles);
-    add(APL.REJILLA, l.niveles * anaqueles);
+    if(l.rejilla) add(APL.REJILLA, l.niveles * anaqueles);
   });
   return orden.map(sku => [sku, items[sku]]);
 }
@@ -9077,9 +9082,9 @@ function configResumen(){
     const cfg = getConfigApl();
     return {
       sistema: 'Aplick',
-      txt: 'Aplick · 48" × 24" × 84" alto · gris con rejilla · '
+      txt: 'Aplick · 48" × 24" × 84" alto · gris · '
         + cfg.lineas.map(function(l, i){
-            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaquel'+(l.cuerpos>1?'es':'')+', '+l.niveles+' niveles';
+            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaquel'+(l.cuerpos>1?'es':'')+', '+l.niveles+' niveles'+(l.rejilla?'':' sin rejilla');
           }).join(' | ')
         + ' · '+cfg.cuerposTot+' anaquel'+(cfg.cuerposTot>1?'es':'')+' tot'
     };
