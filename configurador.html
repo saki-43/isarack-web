@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.13';
+const CFG_VERSION = '2026.10.07.14';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -4306,7 +4306,7 @@ function _gonLineasAgrupadas(materialUSD){
       cantidad: cant,
       precioUSD: materialUSD / cant,
       importeUSD: materialUSD,
-      _esGondolaAgrupada: true
+      _esGondolaAgrupada: true, _fila: 0
     }];
   }
   // Multi-fila: repartir materialUSD proporcional al número de módulos de cada fila.
@@ -4323,7 +4323,7 @@ function _gonLineasAgrupadas(materialUSD){
       cantidad: cant,
       precioUSD: precioPorMod,
       importeUSD: imp,
-      _esGondolaAgrupada: true
+      _esGondolaAgrupada: true, _fila: i
     };
   });
 }
@@ -9017,15 +9017,19 @@ function _bloquesCotiza(){
       if(sis !== 'piezas' && sis !== 'gondola') lineas.forEach(function(l){ l._sis = sis; });
       // Descuento por articulo: el importe ya sale neto; precioUSD se queda en
       // lista (ISA-OS lo recibe con su % aparte). descUSD = lo descontado.
+      // Se aplica DESPUES del recargo azul y del agrupado de gondola: en gondola
+      // el descuento va por fila agrupada (llave 'L1', 'L2'...), no por pieza.
       let descUSD = 0;
-      if(sis !== 'gondola') lineas.forEach(function(l){
-        l._sisD = sis;
-        const pct = _descDe(sis, l.sku);
-        if(!(pct > 0)) return;
-        const d = l.importeUSD * pct / 100;
-        l.descPct = pct; l.importeUSD -= d; descUSD += d;
-      });
-      acc.materialUSD -= descUSD;
+      const _aplicaDesc = function(ls){
+        ls.forEach(function(l){
+          l._sisD = sis;
+          l._dKey = l._esGondolaAgrupada ? ('L' + ((l._fila || 0) + 1)) : l.sku;
+          const pct = _descDe(sis, l._dKey);
+          if(!(pct > 0)) return;
+          const d = l.importeUSD * pct / 100;
+          l.descPct = pct; l.importeUSD -= d; descUSD += d;
+        });
+      };
       // PICKING de color azul: el 15% va SOLO sobre el material del picking.
       if(sis === 'picking'){
         const colorPic = (document.getElementById('colorRack') || {}).value || 'verde';
@@ -9039,6 +9043,8 @@ function _bloquesCotiza(){
       // GONDOLA: se agrupa SOLO su material. El desglose se guarda para el PDF interno.
       let desglose = null;
       if(sis === 'gondola'){ desglose = lineas.slice(); lineas = _gonLineasAgrupadas(acc.materialUSD); }
+      _aplicaDesc(lineas.filter(function(l){ return l.sku !== 'REC-AZUL'; }));
+      acc.materialUSD -= descUSD;
       let cfgTxt = '';
       try{ cfgTxt = (configResumen() || {}).txt || ''; }catch(e){ console.warn('configResumen de '+sis+':', e); }
       out.push({ sis:sis, nombre:(SIS_NOMBRE[sis] || sis), lineas:lineas,
@@ -9127,7 +9133,7 @@ function renderCotizacion(){
         <div class="qy">${l.cantidad}</div>
         <div class="im">${fmt(l.importeUSD)}</div>
         ${(_equipo && l._sisD && !l.sinPrecio) ? `<div style="display:flex;justify-content:flex-end;align-items:center;gap:4px;margin-top:3px">
-          <input type="number" min="0" max="100" step="0.5" value="${l.descPct || ''}" placeholder="0" title="Descuento de esta pieza" onchange="bomDesc('${l._sisD}','${l.sku}',this.value)" style="width:42px;font-size:10.5px;padding:0 3px;border:1px solid #ddd;border-radius:5px;text-align:right"><span style="font-size:10px;color:#9aa0a6">%</span>
+          <input type="number" min="0" max="100" step="0.5" value="${l.descPct || ''}" placeholder="0" title="Descuento de esta pieza" onchange="bomDesc('${l._sisD}','${l._dKey}',this.value)" style="width:42px;font-size:10.5px;padding:0 3px;border:1px solid #ddd;border-radius:5px;text-align:right"><span style="font-size:10px;color:#9aa0a6">%</span>
           ${l._sis ? `<button type="button" onclick="bomQuitar('${l._sis}','${l.sku}')" title="Quitar de la cotización (el cliente no lo ocupa)" style="width:auto;margin:0;border:1px solid #e3e3e3;background:#fff;color:#b0b0b0;border-radius:5px;font-size:10px;padding:0 6px;cursor:pointer">✕ quitar</button>` : ''}
         </div>` : ''}
       </div>
