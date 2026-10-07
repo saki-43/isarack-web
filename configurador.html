@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.14';
+const CFG_VERSION = '2026.10.07.15';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -9848,6 +9848,25 @@ function _condicionesPDF(datos){
     ['GARANTIA SOBRE MATERIAL NUEVO:', ' 12 MESES']
   ];
 }
+// PNG (con fondo transparente) -> JPEG con fondo blanco, maximo `maxW` px de ancho.
+function _jpegDeDataURL(dataUrl, maxW, q){
+  return new Promise(function(ok){
+    try{
+      const im = new Image();
+      im.onload = function(){
+        const k = Math.min(1, (maxW || im.width) / im.width);
+        const c = document.createElement('canvas');
+        c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(im, 0, 0, c.width, c.height);
+        c.toBlob(function(b){ ok(b); }, 'image/jpeg', q || 0.85);
+      };
+      im.onerror = function(){ ok(null); };
+      im.src = dataUrl;
+    }catch(e){ ok(null); }
+  });
+}
 function captura3D(){
   try{
     let xExt, zExt, alto;
@@ -10342,6 +10361,20 @@ async function generarPDF(datos, opts){
         body: pdfBlob
       });
     }catch(e){ console.error('Upload PDF:', e); }
+
+    // 1b) La imagen del diseño aparte. ISA-OS no guarda el PDF: vuelve a armar el
+    // presupuesto con las partidas de la venta, y la imagen se perdia. La lee de
+    // planos/cotizaciones-web/{folio}.jpg. (Isaac, 7 oct 2026)
+    try{
+      if(img3D){
+        const jpg = await _jpegDeDataURL(img3D, 1400, 0.85);
+        if(jpg) await fetch(SB_URL + '/storage/v1/object/planos/cotizaciones-web/' + encodeURIComponent(folio) + '.jpg', {
+          method: 'POST',
+          headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+          body: jpg
+        });
+      }
+    }catch(e){ console.error('Upload render:', e); }
 
     // 2) Insertar venta en tabla ventas (aparece en pestaña 🌐 Web de ISA-OS)
     try{
