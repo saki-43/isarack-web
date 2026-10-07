@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.15';
+const CFG_VERSION = '2026.10.07.16';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -8788,7 +8788,10 @@ function pzTraerDelRack(){
   pzRefrescar();
 }
 
+// Liberado a todos el 7 oct 2026: el configurador ya no se expone a terceros
+// (Isaac). Piezas, descuento por partida y "✕ quitar" salen en cualquier equipo.
 function pzVisible(){
+  return true;
   try{
     if(new URLSearchParams(location.search).get('piezas') === '1'){
       localStorage.setItem('isarack_piezas','1');
