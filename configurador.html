@@ -760,7 +760,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.06';
+const CFG_VERSION = '2026.10.07.07';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1310,6 +1310,31 @@ const COL_DEF_M = 12 * 0.0254;                                 // 12" x 12" por 
 // (Isaac, 7 oct 2026): la lista se puede plegar y las etiquetas apagar. Con las
 // etiquetas apagadas, la de una columna que choca con un rack SI se ve (en rojo).
 let colListaAbierta = true, colEtiquetas = true;
+// Nombre de cada columna como en un plano de arquitectura (Isaac, 7 oct 2026):
+// LETRA = eje en Y (de la pared de atras hacia el frente: A, B, C...) y NUMERO =
+// eje en X (de la pared izquierda a la derecha: 1, 2, 3...). Las que estan sobre
+// la misma linea comparten letra y las que quedan una frente a otra comparten
+// numero: A-3 y B-3 estan alineadas. Se calcula de la posicion, asi que al mover
+// o agregar columnas los nombres se acomodan solos. Columnas a menos de 0.5 m en
+// un eje se cuentan sobre la misma linea.
+function _letraEje(n){ let t = ''; n = n + 1; while(n > 0){ const r = (n - 1) % 26; t = String.fromCharCode(65 + r) + t; n = Math.floor((n - 1) / 26); } return t; }
+function _ejesDe(vals){
+  const ord = vals.map(function(v, i){ return {v: v, i: i}; }).sort(function(a, b){ return a.v - b.v; });
+  const eje = new Array(vals.length); let g = -1, ult = null;
+  ord.forEach(function(o){ if(ult === null || o.v - ult > 0.5) g++; eje[o.i] = g; ult = o.v; });
+  return eje;
+}
+function _nombresColumnas(){
+  const fil = _ejesDe(columnasBod.map(function(c){ return c.z; }));
+  const col = _ejesDe(columnasBod.map(function(c){ return c.x; }));
+  const vistos = {};
+  return columnasBod.map(function(c, i){
+    let n = _letraEje(fil[i]) + '-' + (col[i] + 1);
+    vistos[n] = (vistos[n] || 0) + 1;
+    if(vistos[n] > 1) n += ' (' + vistos[n] + ')';   // dos en el mismo cruce de ejes
+    return {nombre: n, fila: fil[i], col: col[i]};
+  });
+}
 function colBodListaToggle(){ colListaAbierta = !colListaAbierta; renderColumnasBod(); }
 function colBodEtiquetas(on){ colEtiquetas = !!on; build(); }
 function _colEsc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -1327,10 +1352,15 @@ function renderColumnasBod(){
       + (colListaAbierta ? '▾ Esconder coordenadas' : '▸ Ver coordenadas') + ' (' + columnasBod.length + ')</button>'
       + '<label style="display:flex;align-items:center;gap:3px;cursor:pointer;margin:0"><input type="checkbox" onchange="colBodEtiquetas(this.checked)"' + (colEtiquetas ? ' checked' : '') + '> Etiquetas en el plano</label></div>';
   }
-  if(colListaAbierta) columnasBod.forEach(function(c, i){
+  const _nom = _nombresColumnas();
+  // La lista va en el orden de los ejes: A-1, A-2, ... B-1, B-2 ...
+  const _ord = columnasBod.map(function(c, i){ return i; })
+    .sort(function(a, b){ return (_nom[a].fila - _nom[b].fila) || (_nom[a].col - _nom[b].col) || (a - b); });
+  if(colListaAbierta) _ord.forEach(function(i){
+    const c = columnasBod[i];
     h += '<div style="background:#fff;border:1px solid #e6e0d4;border-radius:6px;padding:4px 5px;margin-bottom:4px">'
       + '<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:#555">'
-      + '<b style="color:#444;min-width:22px">C'+(i+1)+'</b><span style="color:#999">Medida</span>'
+      + '<b style="color:#444;min-width:30px">'+_colEsc(_nom[i].nombre)+'</b><span style="color:#999">Medida</span>'
       + inp(c.w, 'colBodSet('+i+',\'w\',this.value)', 42) + '×' + inp(c.d, 'colBodSet('+i+',\'d\',this.value)', 42) + '<span style="color:#999">'+u+'</span>'
       + '<span style="flex:1"></span>'
       + '<button type="button" onclick="colBodQuitar('+i+')" title="Quitar columna" style="flex:0 0 22px;width:22px;min-width:0;height:20px;border:1px solid #e6b3b3;color:#A32D2D;background:#fff;border-radius:4px;font-size:10px;padding:0;cursor:pointer">✕</button></div>'
@@ -1344,7 +1374,7 @@ function renderColumnasBod(){
     + '<span>Separación (centro a centro) ↔</span>' + inp(colSepX, 'colBodSep(\'x\',this.value)', 48)
     + '<span>↕</span>' + inp(colSepZ, 'colBodSep(\'z\',this.value)', 48) + '<span style="color:#999">'+u+'</span></div>';
   if(columnasBod.length){
-    h += '<button type="button" onclick="colBodCuadricula()" style="margin-top:4px;width:100%;font-size:10px;padding:3px;border:1px dashed #b9c6d6;background:#f7fafd;color:#185FA5;border-radius:5px;cursor:pointer">▦ Llenar toda la bodega en cuadrícula desde C1</button>';
+    h += '<button type="button" onclick="colBodCuadricula()" style="margin-top:4px;width:100%;font-size:10px;padding:3px;border:1px dashed #b9c6d6;background:#f7fafd;color:#185FA5;border-radius:5px;cursor:pointer">▦ Llenar toda la bodega en cuadrícula</button>';
   }
   box.innerHTML = h;
 }
@@ -1426,21 +1456,24 @@ function _dibujarColumnasBod(parent, H, A, L){
     });
   }catch(e){}
   const choques = [];
+  const _nom = _nombresColumnas();
   columnasBod.forEach(function(c, i){
     const x0 = c.x - c.w/2, x1 = c.x + c.w/2, z0 = c.z - c.d/2, z1 = c.z + c.d/2;
     const choca = islas.some(function(b){ return x0 < b.max.x - 0.005 && x1 > b.min.x + 0.005 && z0 < b.max.z - 0.005 && z1 > b.min.z + 0.005; });
-    if(choca) choques.push('C' + (i+1));
+    if(choca) choques.push(_nom[i].nombre);
     const col = box(c.w, H, c.d, choca ? matChoque : mat);
     col.position.set(c.x, H/2, c.z);
     g.add(col);
     if(!colEtiquetas && !choca) return;
     try{
-      const etq = 'C' + (i+1) + ' · ' + _uniDeM(c.w) + '×' + _uniDeM(c.d) + ' ' + _uniSufijo();
+      const etq = _nom[i].nombre + ' · ' + _uniDeM(c.w) + '×' + _uniDeM(c.d) + ' ' + _uniSufijo();
       const sp = crearTextoSprite(etq, choca ? '#c0392b' : '#4a4f55');
       // Proporcional a la bodega: en una nave de 20 m la etiqueta de 0.9 m no se leia
       const _sw = Math.min(6, Math.max(0.9, Math.max(A || 0, L || 0) * 0.09));
       sp.scale.set(_sw, _sw * 0.31, 1);
-      sp.position.set(c.x, H + 0.25, c.z);
+      // Arriba de la columna (hacia la pared de atras), no encima: en la planta la
+      // etiqueta tapaba la columna y solo se veia el texto.
+      sp.position.set(c.x, H + 0.25, c.z - c.d/2 - _sw*0.31/2 - 0.05);
       g.add(sp);
     }catch(e){}
   });
