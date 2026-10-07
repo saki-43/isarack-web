@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.12';
+const CFG_VERSION = '2026.10.07.13';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -8666,9 +8666,18 @@ var PZ_OCULTAR_SIN_PRECIO = true;   // ← pendiente de revisar con Isaac
 // el cliente no lo ocupa. (Isaac, 7 oct 2026)
 var bomQuitados = {};
 var _pzUltimoSis = null, _pzUltimoBomRaw = null;
-// Descuento % sobre el MATERIAL (flete e instalacion no). Solo el equipo lo pone;
-// el cliente lo ve ya aplicado en su link y en el PDF. (Isaac, 7 oct 2026)
-var descPct = 0;
+// Descuento % POR ARTICULO ({selectivo:{'SEL-0119':10}, ...}). Flete e instalacion
+// no llevan. Solo el equipo lo pone; el cliente lo ve ya aplicado en su link y en
+// el PDF. Primero fue un % global y Isaac lo pidio por partida. (7 oct 2026)
+var bomDescs = {};
+function _descDe(sis, sku){ const m = bomDescs[sis]; return (m && Number(m[sku])) || 0; }
+function bomDesc(sis, sku, val){
+  const v = Math.max(0, Math.min(100, Math.round((parseFloat(val) || 0) * 100) / 100));
+  const m = Object.assign({}, bomDescs[sis] || {});
+  if(v > 0) m[sku] = v; else delete m[sku];
+  if(Object.keys(m).length) bomDescs[sis] = m; else delete bomDescs[sis];
+  renderCotizacion();
+}
 function _skuItemBom(item){
   if(Array.isArray(item)){ const inv = preciosCache ? preciosCache[item[0]] : null; return (inv && inv.sku) || String(item[0]); }
   return item ? item.sku : null;
@@ -9006,6 +9015,17 @@ function _bloquesCotiza(){
       let lineas = _lineasDeBom(bom, acc);
       // Las de material se pueden quitar (✕) — no gondola, que se agrupa
       if(sis !== 'piezas' && sis !== 'gondola') lineas.forEach(function(l){ l._sis = sis; });
+      // Descuento por articulo: el importe ya sale neto; precioUSD se queda en
+      // lista (ISA-OS lo recibe con su % aparte). descUSD = lo descontado.
+      let descUSD = 0;
+      if(sis !== 'gondola') lineas.forEach(function(l){
+        l._sisD = sis;
+        const pct = _descDe(sis, l.sku);
+        if(!(pct > 0)) return;
+        const d = l.importeUSD * pct / 100;
+        l.descPct = pct; l.importeUSD -= d; descUSD += d;
+      });
+      acc.materialUSD -= descUSD;
       // PICKING de color azul: el 15% va SOLO sobre el material del picking.
       if(sis === 'picking'){
         const colorPic = (document.getElementById('colorRack') || {}).value || 'verde';
@@ -9023,7 +9043,7 @@ function _bloquesCotiza(){
       try{ cfgTxt = (configResumen() || {}).txt || ''; }catch(e){ console.warn('configResumen de '+sis+':', e); }
       out.push({ sis:sis, nombre:(SIS_NOMBRE[sis] || sis), lineas:lineas,
                  materialUSD:acc.materialUSD, piezas:acc.piezas, faltantes:acc.faltantes,
-                 desglose:desglose, cfgTxt:cfgTxt, quitados:quitados });
+                 desglose:desglose, cfgTxt:cfgTxt, quitados:quitados, descUSD:descUSD });
     });
   } finally { sistemaActual = prev; }
   return out;
@@ -9055,8 +9075,8 @@ function renderCotizacion(){
   const sym = monedaSel==='MXN' ? '$' : 'US$';
   const fmt = usd => sym + (usd*tc).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-  let materialUSD = 0, piezasTot = 0;
-  bloques.forEach(function(b){ materialUSD += b.materialUSD; piezasTot += b.piezas; });
+  let materialUSD = 0, piezasTot = 0, descUSD = 0;
+  bloques.forEach(function(b){ materialUSD += b.materialUSD; piezasTot += b.piezas; descUSD += b.descUSD || 0; });
 
   // El desglose de góndola que guarda el PDF interno sale de SU bloque, no de
   // la lista revuelta.
@@ -9064,9 +9084,11 @@ function renderCotizacion(){
   const _bGon = bloques.filter(function(b){ return b.sis === 'gondola'; })[0];
   if(_bGon) window._desgloseGondola = _bGon.desglose;
 
-  // Flete e instalación: UNA sola vez, sobre el material de todo el plano.
-  const fleteUSD = (requiereEnvio && materialUSD > 0) ? calcularFlete(materialUSD).flete : 0;
-  const instalacionUSD = requiereInstalacion ? calcularInstalacion(materialUSD) : 0;
+  // Flete e instalación: UNA sola vez, sobre el material de todo el plano
+  // (a precio de lista: el descuento no les pega).
+  const _baseServ = materialUSD + descUSD;
+  const fleteUSD = (requiereEnvio && _baseServ > 0) ? calcularFlete(_baseServ).flete : 0;
+  const instalacionUSD = requiereInstalacion ? calcularInstalacion(_baseServ) : 0;
   const servicios = [];
   if(requiereEnvio){
     servicios.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
@@ -9078,8 +9100,7 @@ function renderCotizacion(){
   bloques.forEach(function(b){ lineas = lineas.concat(b.lineas); });
   lineas = lineas.concat(servicios);
 
-  const descUSD = materialUSD * (descPct/100);
-  const subtotalUSD = materialUSD - descUSD + fleteUSD + instalacionUSD;
+  const subtotalUSD = materialUSD + fleteUSD + instalacionUSD;
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
   const _equipo = pzVisible();
@@ -9100,12 +9121,15 @@ function renderCotizacion(){
       <div>
         <div class="sku">${l.sku}</div>
         <div class="prd">${l.producto}</div>
-        <div class="pu">${l.sinPrecio ? '<b style="color:#c0392b">⚠ SIN PRECIO</b>' : fmt(l.precioUSD) + ' / pza'} ${badgeStock(l)}</div>
+        <div class="pu">${l.sinPrecio ? '<b style="color:#c0392b">⚠ SIN PRECIO</b>' : fmt(l.precioUSD) + ' / pza'}${l.descPct > 0 ? ' <b style="color:#1e8449">−' + l.descPct + '%</b>' : ''} ${badgeStock(l)}</div>
       </div>
       <div>
         <div class="qy">${l.cantidad}</div>
         <div class="im">${fmt(l.importeUSD)}</div>
-        ${(_equipo && l._sis) ? `<div style="text-align:right;margin-top:3px"><button type="button" onclick="bomQuitar('${l._sis}','${l.sku}')" title="Quitar de la cotización (el cliente no lo ocupa)" style="border:1px solid #e3e3e3;background:#fff;color:#b0b0b0;border-radius:5px;font-size:10px;padding:0 6px;cursor:pointer">✕ quitar</button></div>` : ''}
+        ${(_equipo && l._sisD && !l.sinPrecio) ? `<div style="display:flex;justify-content:flex-end;align-items:center;gap:4px;margin-top:3px">
+          <input type="number" min="0" max="100" step="0.5" value="${l.descPct || ''}" placeholder="0" title="Descuento de esta pieza" onchange="bomDesc('${l._sisD}','${l.sku}',this.value)" style="width:42px;font-size:10.5px;padding:0 3px;border:1px solid #ddd;border-radius:5px;text-align:right"><span style="font-size:10px;color:#9aa0a6">%</span>
+          ${l._sis ? `<button type="button" onclick="bomQuitar('${l._sis}','${l.sku}')" title="Quitar de la cotización (el cliente no lo ocupa)" style="width:auto;margin:0;border:1px solid #e3e3e3;background:#fff;color:#b0b0b0;border-radius:5px;font-size:10px;padding:0 6px;cursor:pointer">✕ quitar</button>` : ''}
+        </div>` : ''}
       </div>
     </div>
   `;
@@ -9228,12 +9252,7 @@ function renderCotizacion(){
       </label>
       <span style="font-size:11.5px;color:#6a6f75">${requiereInstalacion ? fmt(instalacionUSD) : '—'}</span>
     </div>
-    ${_equipo ? `<div class="tr" style="align-items:center">
-      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px">Descuento
-        <input type="number" id="inDesc" min="0" max="100" step="0.5" value="${descPct || ''}" placeholder="0" style="width:58px;font-size:12px;padding:2px 4px;border:1px solid #ddd;border-radius:5px;text-align:right"> %
-      </label>
-      <span style="font-size:11.5px;color:#6a6f75">${descPct > 0 ? '−' + fmt(descUSD) : '—'}</span>
-    </div>` : (descPct > 0 ? `<div class="tr"><span>Descuento ${descPct}%</span><span>−${fmt(descUSD)}</span></div>` : '')}
+    ${descUSD > 0.005 ? `<div class="tr" style="color:#1e8449"><span>Descuento en partidas <span style="font-size:10.5px;color:#9aa0a6">(ya restado)</span></span><span>−${fmt(descUSD)}</span></div>` : ''}
     <div class="tr"><span>Subtotal</span><span>${fmt(subtotalUSD)}</span></div>
     <div class="tr"><span>IVA ${IVA_FIJO}%</span><span>${fmt(ivaUSD)}</span></div>
     <div class="tr gd"><span>Total ${monedaSel}</span><span>${fmt(totalUSD)}</span></div>
@@ -9243,8 +9262,6 @@ function renderCotizacion(){
   document.getElementById('selMon').onchange = e=>{ monedaSel = e.target.value; renderCotizacion(); };
   document.getElementById('chkEnvio').onchange = e=>{ requiereEnvio = e.target.checked; renderCotizacion(); };
   document.getElementById('chkInst').onchange = e=>{ requiereInstalacion = e.target.checked; renderCotizacion(); };
-  const _inD = document.getElementById('inDesc');
-  if(_inD) _inD.onchange = e=>{ descPct = Math.max(0, Math.min(100, Math.round((parseFloat(e.target.value) || 0) * 100) / 100)); renderCotizacion(); };
 }
 
 // ───────── Supabase ─────────
@@ -9968,9 +9985,10 @@ async function generarPDF(datos, opts){
   const tc = monedaSel==='MXN' ? tcCache : 1;
   const sym = monedaSel==='MXN' ? '$' : 'US$';
   const fmt = usd => sym + ' ' + (usd*tc).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  let materialUSD = 0, faltantes = [];
+  let materialUSD = 0, faltantes = [], descUSD = 0;
   bloques.forEach(function(b){
     materialUSD += b.materialUSD;
+    descUSD += b.descUSD || 0;
     faltantes = faltantes.concat(b.faltantes || []);
   });
 
@@ -9979,8 +9997,9 @@ async function generarPDF(datos, opts){
   const _bGon = bloques.filter(function(b){ return b.sis === 'gondola'; })[0];
   if(_bGon) desgloseGondola = _bGon.desglose;
 
-  const fleteUSD = (requiereEnvio && materialUSD > 0) ? calcularFlete(materialUSD).flete : 0;
-  const instalacionUSD = requiereInstalacion ? calcularInstalacion(materialUSD) : 0;
+  const _baseServ = materialUSD + descUSD;   // a precio de lista, igual que en pantalla
+  const fleteUSD = (requiereEnvio && _baseServ > 0) ? calcularFlete(_baseServ).flete : 0;
+  const instalacionUSD = requiereInstalacion ? calcularInstalacion(_baseServ) : 0;
   const servicios = [];
   if(requiereEnvio){
     servicios.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
@@ -9992,8 +10011,7 @@ async function generarPDF(datos, opts){
   bloques.forEach(function(b){ lineasParaPDF = lineasParaPDF.concat(b.lineas); });
   lineasParaPDF = lineasParaPDF.concat(servicios);
 
-  const descUSD = materialUSD * (descPct/100);
-  const subtotalUSD = materialUSD - descUSD + fleteUSD + instalacionUSD;
+  const subtotalUSD = materialUSD + fleteUSD + instalacionUSD;
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
   const folioPrefix = sistemaActual==='piezas' ? 'PZ-' : (sistemaActual==='selectivo' ? 'RW-' : (sistemaActual==='picking' ? 'PW-' : 'GW-'));
@@ -10112,7 +10130,7 @@ async function generarPDF(datos, opts){
   // Con plano combinado se mete un renglon de encabezado y uno de subtotal por
   // sistema. Con un solo sistema sale exactamente la misma tabla de siempre.
   const _filaPDF = l => [
-    l.producto,
+    l.producto + (l.descPct > 0 ? '\nDescuento ' + l.descPct + '%' : ''),
     l.cantidad + ' Unidades',
     fmt(l.precioUSD),
     'IVA('+IVA_FIJO+'%)',
@@ -10198,13 +10216,13 @@ async function generarPDF(datos, opts){
   if(img3D){ try{ doc.addImage(img3D, 'PNG', M, fy, imgW, imgH); } catch(e){} }
 
   let ty = fy;
-  if(descUSD > 0){
+  if(descUSD > 0.005){
     doc.setFillColor(...GREY_BG);
     doc.rect(totX, ty, totW, 32, 'F');
     doc.setFont('helvetica','normal');
-    doc.setFontSize(11);
-    doc.setTextColor(...DARK);
-    doc.text('Descuento ' + descPct + '% (material)', totX + 14, ty + 20);
+    doc.setFontSize(10);
+    doc.setTextColor(30,132,73);
+    doc.text('Descuento ya aplicado', totX + 14, ty + 20);
     doc.text('-' + fmt(descUSD), totX + totW - 14, ty + 20, {align:'right'});
     ty += 32;
   }
@@ -10300,7 +10318,7 @@ async function generarPDF(datos, opts){
     precio: parseFloat((l.precioUSD * tc).toFixed(4)),
     impuesto: IVA_FIJO,
     // ISA-OS lee el descuento por partida en %. Flete e instalacion no llevan.
-    descuento: (PZ_SERVICIOS.indexOf(l.sku) >= 0) ? 0 : descPct,
+    descuento: l.descPct || 0,
     desc: ''
   }));
 
@@ -10799,7 +10817,7 @@ function estadoConfigurador(){
   else if(sistemaActual === 'aplick'){ st.l.apl = lineasAplick; st.l.bloqApl = bloquesAplick; }
   else if(sistemaActual === 'piezas')     st.pz = piezasCarrito.map(c => [c.sku, c.cant]);
   if(Object.keys(bomQuitados).length) st.q = bomQuitados;
-  if(descPct > 0) st.dto = descPct;
+  if(Object.keys(bomDescs).length) st.dto = bomDescs;
   try{ st.nb = {n: (typeof nivelesPorBahia !== 'undefined' ? nivelesPorBahia : null),
                 a: (typeof alturasPorBahia !== 'undefined' ? alturasPorBahia : null)}; }catch(e){}
   // Bodega y unidad de cota (no tienen prefijo de sistema, se guardan aparte)
@@ -10857,7 +10875,8 @@ function aplicarEstado(st){
     document.querySelectorAll('#tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.sys === st.s));
   }
   bomQuitados = (st.q && typeof st.q === 'object') ? st.q : {};
-  descPct = Math.max(0, Math.min(100, Number(st.dto) || 0));
+  // st.dto numero = % global de la v2026.10.07.12 (duro unas horas): se ignora
+  bomDescs = (st.dto && typeof st.dto === 'object') ? st.dto : {};
   if(Array.isArray(st.pz)){
     // El link del cliente trae el carrito: se muestra la pestaña aunque no esté abierta en este equipo
     piezasCarrito = st.pz.filter(x => Array.isArray(x) && x[0]).map(x => ({sku:String(x[0]), cant:Math.max(0, Math.round(Number(x[1])||0))})).filter(c => c.cant > 0);
