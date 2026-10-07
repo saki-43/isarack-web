@@ -24,9 +24,11 @@
   #ctrl h1{font-size:13px;color:#D85A30;margin-bottom:6px;letter-spacing:.3px}
   .row{margin-bottom:6px}
   /* Bodega compacta: etiqueta al lado del campo, todo en un renglon */
-  .bodCampo{flex:1;min-width:0;display:flex;align-items:center;gap:3px}
-  .bodLbl{font-size:8.5px;color:#777;white-space:nowrap;letter-spacing:0}
-  .bodInp{width:100%;min-width:0;padding:2px 3px;font-size:11.5px;border-radius:4px;text-align:center}
+  /* Etiqueta ARRIBA y los tres recuadros del mismo ancho: con la etiqueta al lado,
+     "Largo" se comia espacio y en pulgadas no cabia "787.4" (Isaac, 7 oct 2026). */
+  .bodCampo{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .bodLbl{font-size:9.5px;color:#777;white-space:nowrap;letter-spacing:0}
+  .bodInp{width:100%;min-width:0;box-sizing:border-box;padding:3px 3px;font-size:12px;border-radius:4px;text-align:center}
   /* Sin las flechitas del campo numerico: en 3 campos de un renglon se comen
      el ancho y cortaban el numero ("12" se veia "1"). Se siguen escribiendo
      a mano igual. (Isaac, 21 sep 2026) */
@@ -267,11 +269,11 @@ gtag('config', 'G-XXXXXXXXXX');
     <div class="row" style="margin-bottom:8px">
       <label class="chk" style="margin:0"><input type="checkbox" id="bodChk" onchange="bodegaOn=this.checked; document.getElementById('bodBox').style.display=this.checked?'':'none'; build();"> Mostrar bodega</label>
       <div id="bodBox" style="display:none;background:#f7f4ef;border:1px solid #e3ddd2;border-radius:6px;padding:4px 5px;margin-top:2px">
-        <div style="display:flex;align-items:center;gap:5px">
+        <div style="display:flex;align-items:flex-end;gap:6px">
           <div class="bodCampo"><span class="bodLbl">Ancho</span><input type="number" id="bodAncho" class="bodInp" value="12" min="1" step="0.5" oninput="build()" title="Ancho de la bodega, en metros"></div>
           <div class="bodCampo"><span class="bodLbl">Largo</span><input type="number" id="bodLargo" class="bodInp" value="20" min="1" step="0.5" oninput="build()" title="Largo de la bodega, en metros"></div>
           <div class="bodCampo"><span class="bodLbl">Alto</span><input type="number" id="bodAlto" class="bodInp" value="7" min="1" step="0.5" oninput="build()" title="Alto libre de la bodega, en metros"></div>
-          <span class="bodLbl" id="bodUnidad" style="flex:0 0 auto;color:#8a8f95;font-weight:700">m</span>
+          <span class="bodLbl" id="bodUnidad" style="flex:0 0 auto;color:#8a8f95;font-weight:700;padding-bottom:5px">m</span>
         </div>
         <!-- "Separar de pared" se quito el 25 sep 2026. Hacia lo mismo que el
              Pared X / Pared Y de cada bloque y ADEMAS se sumaba con el, pero
@@ -760,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.07';
+const CFG_VERSION = '2026.10.07.08';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1341,7 +1343,8 @@ function _colEsc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&
 function renderColumnasBod(){
   const box = document.getElementById('colBodBox'); if(!box) return;
   const u = _uniSufijo();
-  const inp = function(val, onch, w){ return '<input type="number" step="any" value="'+_uniDeM(val)+'" onchange="'+onch+'" style="flex:0 0 '+(w||44)+'px;min-width:0;width:'+(w||44)+'px;padding:2px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:4px;text-align:center">'; };
+  // w = 'flex': el recuadro crece hasta llenar el renglon (X / Y de cada columna)
+  const inp = function(val, onch, w){ const fx = (w === 'flex') ? 'flex:1 1 0;min-width:40px;width:auto;' : 'flex:0 0 '+(w||44)+'px;min-width:0;width:'+(w||44)+'px;'; return '<input type="number" step="any" value="'+_uniDeM(val)+'" onchange="'+onch+'" style="'+fx+'padding:2px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:4px;text-align:center">'; };
   const fl = function(i, dir, t){ return '<button type="button" onclick="colBodVecina('+i+',\''+dir+'\')" title="Nueva columna '+t+' a la separacion" style="flex:0 0 20px;width:20px;min-width:0;height:20px;padding:0;font-size:11px;line-height:1;border:1px solid #b9c6d6;background:#eef4fb;color:#185FA5;border-radius:4px;cursor:pointer">'+dir+'</button>'; };
   let h = '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'
     + '<span style="font-size:9.5px;color:#8a8579;letter-spacing:.05em;font-weight:700">COLUMNAS DE LA BODEGA</span><span style="flex:1"></span>'
@@ -1365,9 +1368,10 @@ function renderColumnasBod(){
       + '<span style="flex:1"></span>'
       + '<button type="button" onclick="colBodQuitar('+i+')" title="Quitar columna" style="flex:0 0 22px;width:22px;min-width:0;height:20px;border:1px solid #e6b3b3;color:#A32D2D;background:#fff;border-radius:4px;font-size:10px;padding:0;cursor:pointer">✕</button></div>'
       + '<div style="display:flex;align-items:center;gap:3px;margin-top:3px;font-size:10px;color:#555">'
-      + '<span>X</span>' + inp(c.x, 'colBodSet('+i+',\'x\',this.value)', 44)
-      + '<span>Y</span>' + inp(c.z, 'colBodSet('+i+',\'z\',this.value)', 44)
-      + '<span style="flex:1"></span>'
+      + '<span>X</span>' + inp(c.x, 'colBodSet('+i+',\'x\',this.value)', 'flex')
+      + '<span>Y</span>' + inp(c.z, 'colBodSet('+i+',\'z\',this.value)', 'flex') + '</div>'
+      + '<div style="display:flex;align-items:center;gap:3px;margin-top:3px;font-size:9.5px;color:#8a8579">'
+      + '<span style="flex:1">Agregar la siguiente:</span>'
       + fl(i,'←','a la izquierda') + fl(i,'↑','arriba') + fl(i,'↓','abajo') + fl(i,'→','a la derecha') + '</div></div>';
   });
   h += '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:10px;color:#555;margin-top:2px">'
