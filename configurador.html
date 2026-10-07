@@ -759,7 +759,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.01';
+const CFG_VERSION = '2026.10.07.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -7104,9 +7104,23 @@ function _cotaBloques(){
     // es mas largo —lleva la letra del bloque— y crearTextoSprite le baja el
     // tamano a la letra hasta que quepa: con el ancho de siempre se leia chiquita.
     cotaDim(grupo, [c.min.x, y, c.max.z + 0.55], [c.max.x, y, c.max.z + 0.55],
-            letra + fmtCota(largo), {labelOffset:[0, -0.26, 0], escala:[0.85, 0.18]});
+            letra + fmtCota(largo), {labelOffset:[0, -0.10, 0.22], escala:[0.85, 0.18]});
     cotaDim(grupo, [c.max.x + 0.55, y, c.min.z], [c.max.x + 0.55, y, c.max.z],
             letra + fmtCota(fondo), {labelOffset:[0.52, 0, 0], escala:[0.85, 0.18]});
+    // Marcas X / Y de CADA isla: de la pared izquierda (x=0) y de la de atras
+    // (z=0) hasta la isla — lo mismo que se captura en su Pared X / Pared Y.
+    // Con varias islas la cadena de la orilla solo daba los extremos del
+    // conjunto y no se sabia donde quedaba cada bloque (Isaac, 7 oct 2026).
+    // Van a media isla para que se vea de cual hablan.
+    if(bodegaOn){
+      const zMed = (c.min.z + c.max.z) / 2, xMed = (c.min.x + c.max.x) / 2;
+      if(c.min.x > 0.02)
+        cotaDim(grupo, [0, y, zMed], [c.min.x, y, zMed],
+                letra + 'X ' + fmtCota(c.min.x), {labelOffset:[0, 0, -0.22], escala:[0.85, 0.18]});
+      if(c.min.z > 0.02)
+        cotaDim(grupo, [xMed, y, 0], [xMed, y, c.min.z],
+                letra + 'Y ' + fmtCota(c.min.z), {labelOffset:[0.52, 0, 0], escala:[0.85, 0.18]});
+    }
   });
 }
 
