@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.17';
+const CFG_VERSION = '2026.10.07.18';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -4924,6 +4924,15 @@ function renderLineasAlmacen(){
             return ck ? '<div style="grid-column:1/3;color:#da6635;font-weight:600;font-size:9.5px">Capacidad: '+ck.toLocaleString()+' kg / '+cl.toLocaleString()+' lb por nivel'+(deb ? ' <span style="color:#999;font-weight:400">(la viga más débil)</span>' : '')+'</div>' : '';
           })()
         + filasAB
+        // Rejillas por claro: normal son 2 (3 en viga de 144"). Hay obras que van con
+        // 1 por claro. Solo sale si la rejilla esta prendida. (Isaac, 7 oct 2026)
+        + (((document.getElementById('selChkRej') || {}).checked)
+            ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+'"><span style="font-weight:600;white-space:nowrap">Rejillas por claro</span>'
+              + '<select onchange="lnSet('+i+',\'rejXClaro\',parseInt(this.value)||null)" style="width:auto;flex:none;font-size:10px;padding:1px 14px 1px 3px">'
+              + '<option value=""'+(!l.rejXClaro?' selected':'')+'>Normal ('+(REJILLAS_POR_VIGA_SEL[(VIGAS_INFO[l.vigaSku]||{}).largoIn]||2)+')</option>'
+              + [1,2,3].map(function(n){ return '<option value="'+n+'"'+(l.rejXClaro===n?' selected':'')+'>'+n+'</option>'; }).join('')
+              + '</select><span style="color:#999;font-size:9px;white-space:nowrap">por nivel</span></div>'
+            : '')
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + _secHead(l, i, 'niv', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lnNivMod('+i+',this.checked)"> Niveles por módulo</label>', !!l.nivMod)
           + ((l.nivMod && !_plegado(l,'niv')) ? _nivModEditor(l, i, esD, cA, cB) : '')
@@ -5274,6 +5283,7 @@ function getConfigSel(){
     if(vigasSku) vigasSku.forEach(function(sk){ const v = VIGAS_INFO[sk]; if(v && v.capKg < capKg){ capKg = v.capKg; capLb = v.capLb; } });
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB, altoIn: l.altoIn, fondoIn: l.fondoIn,
       vigaSku: l.vigaSku, vigaIn: vi.largoIn, vigaAltIn: vi.altIn, capKg: capKg, capLb: capLb,
+      rejXClaro: (parseInt(l.rejXClaro) > 0 ? parseInt(l.rejXClaro) : null),
       vigaMod: _vmOn, vigasSku: vigasSku, vigasM: vigasM,
       niveles: l.niveles, nivMod: !!l.nivMod, nivelesA: l.nivelesA||null, nivelesB: l.nivelesB||null,
       // tunelOn viaja aparte: _nivCargaSel lo exige para descontar las vigas del
@@ -6026,7 +6036,14 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         u2.position.set(xU, y, -fondoM/2 + postD/2); parent.add(u2);
       });
       if(tieneRejilla){
-        const rejW = vigaC - postW;
+        // tieneRejilla numero = rejillas por claro elegidas a mano: se dibuja solo
+        // lo que cubren (centradas), no el claro completo.
+        let rejW = vigaC - postW;
+        if(typeof tieneRejilla === 'number'){
+          const _vIn = Math.round(vigaC / 0.0254 / 12) * 12;
+          const _anch = (REJILLA_ANCHO_POR_VIGA[_vIn] || 46) * 0.0254;
+          rejW = Math.min(rejW, tieneRejilla * _anch);
+        }
         const rejD = fondoM - postD*1.5;
         const rej = crearRejillaReal(rejW, rejD);
         rej.position.set(cxV, y + vigaH/2 + 0.01, 0); parent.add(rej);
@@ -7006,10 +7023,10 @@ function buildSelectivo(){
       const vA = l.vigasM ? l.vigasM.slice(0, l.cuerposA) : l.vigaM;
       const vB = l.vigasM ? l.vigasM.slice(0, l.cuerposB).reverse() : l.vigaM;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, vA, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA, 'A'), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasPorCuerpoM(l, 'A', l.cuerposA), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, vA, _nivFila(l,'A',l.cuerposA), l.cuerposA, (cfg.rejilla ? (l.rejXClaro || true) : false), cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA, 'A'), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasPorCuerpoM(l, 'A', l.cuerposA), _ladoSinPunt(l, 'A'));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, vB, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn, 'B'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB, 'B'), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, vB, _nivFila(l,'B',l.cuerposB), l.cuerposB, (cfg.rejilla ? (l.rejXClaro || true) : false), cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn, 'B'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB, 'B'), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = cfg.unionM > 0.01 ? Math.min(l.cuerposA, l.cuerposB) + 1 : 0;
@@ -7024,7 +7041,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, (l.vigasM ? l.vigasM.slice(0, l.cuerpos) : l.vigaM), _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos, 'A'), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasPorCuerpoM(l, 'A', l.cuerpos), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, (l.vigasM ? l.vigasM.slice(0, l.cuerpos) : l.vigaM), _nivFila(l,'A',l.cuerpos), l.cuerpos, (cfg.rejilla ? (l.rejXClaro || true) : false), cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos, 'A'), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasPorCuerpoM(l, 'A', l.cuerpos), _ladoSinPunt(l, 'A'));
     }
     _barrasDeLinea(gLin, cfg, l);
     _mallaDeLinea(gLin, cfg, l);
@@ -8540,7 +8557,7 @@ function calcularBomSelectivo(){
         const vIn = (VIGAS_INFO[sk] || {}).largoIn || l.vigaIn;
         const anchoRej = REJILLA_ANCHO_POR_VIGA[vIn] || 46;
         const rejSku = (REJILLAS_SEL[l.fondoIn] || {})[anchoRej];
-        const rejPorViga = REJILLAS_POR_VIGA_SEL[vIn] || 2;
+        const rejPorViga = l.rejXClaro || REJILLAS_POR_VIGA_SEL[vIn] || 2;
         add(rejSku || ('REJILLA ELECTROSOLDADA ' + l.fondoIn + '"X' + anchoRej + '"'), rejPorViga * _porV[sk]);
       });
     }
@@ -10742,6 +10759,7 @@ function addEvents(){
     });
   }
   grupoExclusivo(['selChkRej','selChkPanel']);                  // Selectivo: rejilla ↔ panel beige
+  ['selChkRej','selChkPanel'].forEach(function(id){ const e = document.getElementById(id); if(e) e.addEventListener('change', function(){ try{ renderLineasAlmacen(); }catch(_e){} }); });
   grupoExclusivo(['picChkRej','picChkPanel','picChkMadera']);   // Picking:   rejilla ↔ panel beige ↔ madera
   // Tabs: cambiar de sistema
   document.querySelectorAll('#tabs .tab').forEach(tab=>{
