@@ -243,6 +243,7 @@ gtag('config', 'G-XXXXXXXXXX');
       <option value="m">Metros (m)</option>
       <option value="cm">Centímetros (cm)</option>
       <option value="in">Pulgadas (in)</option>
+      <option value="ft">Pies (ft)</option>
     </select>
   </div>
 
@@ -759,7 +760,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.02';
+const CFG_VERSION = '2026.10.07.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1242,13 +1243,13 @@ let pisoBase = null;
 // pero con la bodega el rack se recorre a su esquina y la camara sigue al cuarto.
 let targetX=0, targetZ=0;
 let rotY=0.7, rotX=0.32, isDrag=false, lpX, lpY;
-// Unidad de las cotas: 'm' (metros), 'cm' o 'in' (pulgadas)
+// Unidad de las cotas: 'm' (metros), 'cm', 'in' (pulgadas) o 'ft' (pies)
 let unidadCota = 'm';
 // La unidad elegida ya no es solo para las cotas del dibujo: TODOS los campos de
 // medida que se escriben a mano (bodega y pasillos) se capturan y se muestran en
 // esa unidad. Antes decian "(m)" siempre, asi que con pulgadas seleccionadas un
 // "120" se leia como 120 METROS. (Isaac, 22 sep 2026)
-const _UNI_F = {m: 1, cm: 0.01, in: 0.0254};   // cuantos metros vale 1 de cada una
+const _UNI_F = {m: 1, cm: 0.01, in: 0.0254, ft: 0.3048};   // cuantos metros vale 1 de cada una
 let _uniPrev = 'm';
 // Campos que se capturan en la unidad elegida
 const _UNI_CAMPOS = ['bodAncho','bodLargo','bodAlto',
@@ -1443,6 +1444,11 @@ let _rackCen = null;
 function fmtCota(m){
   if(unidadCota === 'cm') return Math.round(m*100) + ' CM';
   if(unidadCota === 'in') return Math.round(m/0.0254) + '"';
+  // Pies como se acota en obra: 12' 6" (pies y pulgadas). Pies exactos sin 0".
+  if(unidadCota === 'ft'){
+    const tot = Math.round(m/0.0254), pies = Math.floor(tot/12), pul = tot - pies*12;
+    return pies + "'" + (pul ? ' ' + pul + '"' : '');
+  }
   return m.toFixed(2) + ' M';
 }
 
