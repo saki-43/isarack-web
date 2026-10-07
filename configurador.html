@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.11';
+const CFG_VERSION = '2026.10.07.12';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -8661,6 +8661,44 @@ function calcularBomSelectivo(){
 // carrito queda en zona muerta y estadoConfigurador() truena. Mismo bug que nos costo
 // un dia en ISA-OS con _CFG_BAJAS. Con var se iza y nunca queda a medias.
 var PZ_OCULTAR_SIN_PRECIO = true;   // ← pendiente de revisar con Isaac
+// Piezas que el equipo QUITO de la cotizacion de un sistema ({selectivo:['SEL-0001'], ...}).
+// Si en Piezas quitas el anclaje, al regresar a Selectivo no debe volver a salir:
+// el cliente no lo ocupa. (Isaac, 7 oct 2026)
+var bomQuitados = {};
+var _pzUltimoSis = null, _pzUltimoBomRaw = null;
+// Descuento % sobre el MATERIAL (flete e instalacion no). Solo el equipo lo pone;
+// el cliente lo ve ya aplicado en su link y en el PDF. (Isaac, 7 oct 2026)
+var descPct = 0;
+function _skuItemBom(item){
+  if(Array.isArray(item)){ const inv = preciosCache ? preciosCache[item[0]] : null; return (inv && inv.sku) || String(item[0]); }
+  return item ? item.sku : null;
+}
+function _quitadosDe(sis){ return Array.isArray(bomQuitados[sis]) ? bomQuitados[sis] : []; }
+// Saca del BOM lo quitado; lo que se saco lo deja en `fuera` (para mostrarlo).
+function _filtrarQuitados(sis, bom, fuera){
+  const q = _quitadosDe(sis);
+  if(!q.length || sis === 'piezas') return bom || [];
+  return (bom || []).filter(function(it){
+    const sk = _skuItemBom(it);
+    if(q.indexOf(sk) < 0) return true;
+    if(fuera){
+      const inv = Array.isArray(it) && preciosCache ? preciosCache[it[0]] : null;
+      fuera.push({ sis:sis, sku:sk, cantidad:(Array.isArray(it) ? it[1] : it.cantidad), producto:(inv ? inv.producto : (it.producto || it[0])) });
+    }
+    return false;
+  });
+}
+function bomQuitar(sis, sku){
+  const a = _quitadosDe(sis).slice();
+  if(a.indexOf(sku) < 0) a.push(sku);
+  bomQuitados[sis] = a;
+  renderCotizacion();
+}
+function bomRegresar(sis, sku){
+  const a = _quitadosDe(sis).filter(function(x){ return x !== sku; });
+  if(a.length) bomQuitados[sis] = a; else delete bomQuitados[sis];
+  renderCotizacion();
+}
 var piezasCarrito = [];             // [{sku, cant}] en el orden en que se agregaron
 var _pzUltimoBom = null;            // BOM del rack del que se llegó, para poder re-traerlo
 var PZ_SERVICIOS = ['SEL-0305','SRV-INST','REC-AZUL'];   // no son piezas de almacén
@@ -8735,7 +8773,9 @@ function pzDesdeBom(bom){
 // Botón "traer las piezas del rack": pisa el carrito con lo que traía el diseño.
 function pzTraerDelRack(){
   if(!_pzUltimoBom) return;
-  piezasCarrito = pzDesdeBom(_pzUltimoBom);
+  // "Traer otra vez" = todo lo del rack, tambien lo que se habia quitado
+  if(_pzUltimoSis) delete bomQuitados[_pzUltimoSis];
+  piezasCarrito = pzDesdeBom(_pzUltimoBomRaw || _pzUltimoBom);
   pzRefrescar();
 }
 
@@ -8755,6 +8795,12 @@ function pzCantDe(sku){
 function pzFijar(sku, n){
   n = Math.max(0, Math.min(9999, Math.round(Number(n)||0)));
   const i = piezasCarrito.findIndex(x => x.sku === sku);
+  // Si la pieza venia del rack, quitarla aqui tambien la quita de su sistema
+  if(_pzUltimoSis && _pzUltimoBomRaw && _pzUltimoBomRaw.some(function(it){ return _skuItemBom(it) === sku; })){
+    const q = _quitadosDe(_pzUltimoSis).filter(function(x){ return x !== sku; });
+    if(n === 0) q.push(sku);
+    if(q.length) bomQuitados[_pzUltimoSis] = q; else delete bomQuitados[_pzUltimoSis];
+  }
   if(n === 0){ if(i >= 0) piezasCarrito.splice(i,1); }
   else if(i >= 0) piezasCarrito[i].cant = n;
   else piezasCarrito.push({sku:sku, cant:n});
@@ -8954,8 +9000,12 @@ function _bloquesCotiza(){
       sistemaActual = sis;
       let bom = [];
       try{ bom = calcularBOM() || []; }catch(e){ console.warn('BOM de '+sis+':', e); }
+      const quitados = [];
+      bom = _filtrarQuitados(sis, bom, quitados);
       const acc = {};
       let lineas = _lineasDeBom(bom, acc);
+      // Las de material se pueden quitar (✕) — no gondola, que se agrupa
+      if(sis !== 'piezas' && sis !== 'gondola') lineas.forEach(function(l){ l._sis = sis; });
       // PICKING de color azul: el 15% va SOLO sobre el material del picking.
       if(sis === 'picking'){
         const colorPic = (document.getElementById('colorRack') || {}).value || 'verde';
@@ -8973,7 +9023,7 @@ function _bloquesCotiza(){
       try{ cfgTxt = (configResumen() || {}).txt || ''; }catch(e){ console.warn('configResumen de '+sis+':', e); }
       out.push({ sis:sis, nombre:(SIS_NOMBRE[sis] || sis), lineas:lineas,
                  materialUSD:acc.materialUSD, piezas:acc.piezas, faltantes:acc.faltantes,
-                 desglose:desglose, cfgTxt:cfgTxt });
+                 desglose:desglose, cfgTxt:cfgTxt, quitados:quitados });
     });
   } finally { sistemaActual = prev; }
   return out;
@@ -9028,9 +9078,11 @@ function renderCotizacion(){
   bloques.forEach(function(b){ lineas = lineas.concat(b.lineas); });
   lineas = lineas.concat(servicios);
 
-  const subtotalUSD = materialUSD + fleteUSD + instalacionUSD;
+  const descUSD = materialUSD * (descPct/100);
+  const subtotalUSD = materialUSD - descUSD + fleteUSD + instalacionUSD;
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
+  const _equipo = pzVisible();
 
   // Existencias a la vista (decisión de Isaac: mostrar a todos).
   const badgeStock = (l) => {
@@ -9053,6 +9105,7 @@ function renderCotizacion(){
       <div>
         <div class="qy">${l.cantidad}</div>
         <div class="im">${fmt(l.importeUSD)}</div>
+        ${(_equipo && l._sis) ? `<div style="text-align:right;margin-top:3px"><button type="button" onclick="bomQuitar('${l._sis}','${l.sku}')" title="Quitar de la cotización (el cliente no lo ocupa)" style="border:1px solid #e3e3e3;background:#fff;color:#b0b0b0;border-radius:5px;font-size:10px;padding:0 6px;cursor:pointer">✕ quitar</button></div>` : ''}
       </div>
     </div>
   `;
@@ -9084,6 +9137,17 @@ function renderCotizacion(){
       + 'El total NO las incluye; hay que confirmar su precio con ISARACK antes de cerrar la venta.'
       + '<div style="margin-top:4px;color:#8a5a10">' + _sinPrecio.map(function(n){ return String(n).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }).join(' · ') + '</div></div>'
       + _html;
+  }
+  // Lo que el equipo quito: se ve aparte y se puede regresar
+  const _fuera = [];
+  bloques.forEach(function(b){ (b.quitados || []).forEach(function(q){ _fuera.push(q); }); });
+  if(_equipo && _fuera.length){
+    _html += '<div style="margin:10px 0 4px;padding:7px 9px;border:1px dashed #d9d4ca;border-radius:8px;background:#faf8f4;font-size:11.5px;color:#6a6f75">'
+      + '<b style="color:#2a2d31">Quitado de la cotización</b> <span style="font-size:10.5px">(no se cobra)</span>'
+      + _fuera.map(function(q){
+          return '<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><div style="flex:1 1 auto;min-width:0;line-height:1.3"><b style="display:inline;color:#D85A30">' + q.sku + '</b> ' + String(q.producto || '').replace(/[&<>"]/g, '') + ' · <b style="display:inline">' + q.cantidad + '</b></div>'
+            + '<button type="button" onclick="bomRegresar(\'' + q.sis + '\',\'' + q.sku + '\')" style="flex:0 0 auto;width:auto;margin:0;border:1px solid #b5d4f4;background:#eef4fb;color:#185FA5;border-radius:5px;font-size:10.5px;padding:1px 7px;cursor:pointer;white-space:nowrap">↺ Regresar</button></div>';
+        }).join('') + '</div>';
   }
   document.getElementById('lista').innerHTML = _html;
 
@@ -9164,6 +9228,12 @@ function renderCotizacion(){
       </label>
       <span style="font-size:11.5px;color:#6a6f75">${requiereInstalacion ? fmt(instalacionUSD) : '—'}</span>
     </div>
+    ${_equipo ? `<div class="tr" style="align-items:center">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px">Descuento
+        <input type="number" id="inDesc" min="0" max="100" step="0.5" value="${descPct || ''}" placeholder="0" style="width:58px;font-size:12px;padding:2px 4px;border:1px solid #ddd;border-radius:5px;text-align:right"> %
+      </label>
+      <span style="font-size:11.5px;color:#6a6f75">${descPct > 0 ? '−' + fmt(descUSD) : '—'}</span>
+    </div>` : (descPct > 0 ? `<div class="tr"><span>Descuento ${descPct}%</span><span>−${fmt(descUSD)}</span></div>` : '')}
     <div class="tr"><span>Subtotal</span><span>${fmt(subtotalUSD)}</span></div>
     <div class="tr"><span>IVA ${IVA_FIJO}%</span><span>${fmt(ivaUSD)}</span></div>
     <div class="tr gd"><span>Total ${monedaSel}</span><span>${fmt(totalUSD)}</span></div>
@@ -9173,6 +9243,8 @@ function renderCotizacion(){
   document.getElementById('selMon').onchange = e=>{ monedaSel = e.target.value; renderCotizacion(); };
   document.getElementById('chkEnvio').onchange = e=>{ requiereEnvio = e.target.checked; renderCotizacion(); };
   document.getElementById('chkInst').onchange = e=>{ requiereInstalacion = e.target.checked; renderCotizacion(); };
+  const _inD = document.getElementById('inDesc');
+  if(_inD) _inD.onchange = e=>{ descPct = Math.max(0, Math.min(100, Math.round((parseFloat(e.target.value) || 0) * 100) / 100)); renderCotizacion(); };
 }
 
 // ───────── Supabase ─────────
@@ -9920,7 +9992,8 @@ async function generarPDF(datos, opts){
   bloques.forEach(function(b){ lineasParaPDF = lineasParaPDF.concat(b.lineas); });
   lineasParaPDF = lineasParaPDF.concat(servicios);
 
-  const subtotalUSD = materialUSD + fleteUSD + instalacionUSD;
+  const descUSD = materialUSD * (descPct/100);
+  const subtotalUSD = materialUSD - descUSD + fleteUSD + instalacionUSD;
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
   const folioPrefix = sistemaActual==='piezas' ? 'PZ-' : (sistemaActual==='selectivo' ? 'RW-' : (sistemaActual==='picking' ? 'PW-' : 'GW-'));
@@ -10125,6 +10198,16 @@ async function generarPDF(datos, opts){
   if(img3D){ try{ doc.addImage(img3D, 'PNG', M, fy, imgW, imgH); } catch(e){} }
 
   let ty = fy;
+  if(descUSD > 0){
+    doc.setFillColor(...GREY_BG);
+    doc.rect(totX, ty, totW, 32, 'F');
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(11);
+    doc.setTextColor(...DARK);
+    doc.text('Descuento ' + descPct + '% (material)', totX + 14, ty + 20);
+    doc.text('-' + fmt(descUSD), totX + totW - 14, ty + 20, {align:'right'});
+    ty += 32;
+  }
   doc.setFillColor(...GREY_BG);
   doc.rect(totX, ty, totW, 32, 'F');
   doc.setFont('helvetica','normal');
@@ -10216,7 +10299,8 @@ async function generarPDF(datos, opts){
     cantidad: l.cantidad,
     precio: parseFloat((l.precioUSD * tc).toFixed(4)),
     impuesto: IVA_FIJO,
-    descuento: 0,
+    // ISA-OS lee el descuento por partida en %. Flete e instalacion no llevan.
+    descuento: (PZ_SERVICIOS.indexOf(l.sku) >= 0) ? 0 : descPct,
     desc: ''
   }));
 
@@ -10598,7 +10682,11 @@ function addEvents(){
       // poder sumarle o quitarle. Hay que leer el BOM ANTES de cambiar de sistema.
       const _sisPrevio = sistemaActual;
       if(tab.dataset.sys === 'piezas' && _sisPrevio !== 'piezas'){
-        try{ _pzUltimoBom = calcularBOM(); }catch(e){ _pzUltimoBom = null; console.warn('piezas/bom del rack', e); }
+        try{
+          _pzUltimoSis = _sisPrevio;
+          _pzUltimoBomRaw = calcularBOM();
+          _pzUltimoBom = _filtrarQuitados(_sisPrevio, _pzUltimoBomRaw);
+        }catch(e){ _pzUltimoBom = _pzUltimoBomRaw = null; console.warn('piezas/bom del rack', e); }
       }
       document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.remove('active'));
       tab.classList.add('active');
@@ -10710,6 +10798,8 @@ function estadoConfigurador(){
   else if(sistemaActual === 'cantilever'){ st.l.can = lineasCantilever; st.l.bloqCan = bloquesCantilever; }
   else if(sistemaActual === 'aplick'){ st.l.apl = lineasAplick; st.l.bloqApl = bloquesAplick; }
   else if(sistemaActual === 'piezas')     st.pz = piezasCarrito.map(c => [c.sku, c.cant]);
+  if(Object.keys(bomQuitados).length) st.q = bomQuitados;
+  if(descPct > 0) st.dto = descPct;
   try{ st.nb = {n: (typeof nivelesPorBahia !== 'undefined' ? nivelesPorBahia : null),
                 a: (typeof alturasPorBahia !== 'undefined' ? alturasPorBahia : null)}; }catch(e){}
   // Bodega y unidad de cota (no tienen prefijo de sistema, se guardan aparte)
@@ -10766,6 +10856,8 @@ function aplicarEstado(st){
     sistemaActual = st.s;
     document.querySelectorAll('#tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.sys === st.s));
   }
+  bomQuitados = (st.q && typeof st.q === 'object') ? st.q : {};
+  descPct = Math.max(0, Math.min(100, Number(st.dto) || 0));
   if(Array.isArray(st.pz)){
     // El link del cliente trae el carrito: se muestra la pestaña aunque no esté abierta en este equipo
     piezasCarrito = st.pz.filter(x => Array.isArray(x) && x[0]).map(x => ({sku:String(x[0]), cant:Math.max(0, Math.round(Number(x[1])||0))})).filter(c => c.cant > 0);
@@ -10926,12 +11018,22 @@ document.addEventListener('keydown', function(e){
 // Leer ?sistema= de la URL y activar ese tab al iniciar
 // Link de cliente: aplicar la configuración codificada antes de construir
 let _visorPendiente = null;
+let _reanudarSt = null;   // diseno guardado justo antes de una actualizacion automatica
 (function(){
   const params = new URLSearchParams(location.search);
   if(params.get('v') === '1' && params.get('d')){
     const st = decodificarEstado(params.get('d'));
     if(st){ aplicarEstado(st); _visorPendiente = params.get('f') || '—'; }
+    return;
   }
+  try{
+    const g = sessionStorage.getItem('isarack_reanudar');
+    if(g){
+      sessionStorage.removeItem('isarack_reanudar');
+      const st = decodificarEstado(g);
+      if(st){ aplicarEstado(st); _reanudarSt = st; }
+    }
+  }catch(e){ console.warn('reanudar', e); }
 })();
 (function(){
   const params = new URLSearchParams(location.search);
@@ -10954,7 +11056,7 @@ let _visorPendiente = null;
 })();
 init();
 try{ renderColumnasBod(); }catch(e){}
-if(_visorPendiente !== null){
+if(_visorPendiente !== null || _reanudarSt){
   document.getElementById('opGondola').style.display   = sistemaActual==='gondola'   ? '' : 'none';
   document.getElementById('opPicking').style.display   = sistemaActual==='picking'   ? '' : 'none';
   document.getElementById('opSelectivo').style.display = sistemaActual==='selectivo' ? '' : 'none';
@@ -10970,7 +11072,7 @@ if(_visorPendiente !== null){
   // Lo que aplicarEstado no puede reponer antes de init(): la vista en planta
   // necesita la camara ortografica, y las alturas de Picking sus campos.
   try{
-    const _stV = decodificarEstado(new URLSearchParams(location.search).get('d')) || {};
+    const _stV = _reanudarSt || decodificarEstado(new URLSearchParams(location.search).get('d')) || {};
     if(Array.isArray(_stV.alPic) && _stV.alPic.length){
       actualizarInputsAlturasNivel('picking');
       const _conA = document.getElementById('picAlturasContainer');
@@ -10984,10 +11086,67 @@ if(_visorPendiente !== null){
     if(_cp && !!_cp.checked !== !!vistaPlanta) toggleVistaPlanta(_cp.checked);
     else if(_cp && _cp.checked && vistaPlanta && camera !== camOrto){ vistaPlanta = false; toggleVistaPlanta(true); }
   }catch(e){ console.warn('reponer link', e); }
+  try{ if(sistemaActual === 'piezas') aplicarModoPiezas(true); }catch(e){}
   build();
-  activarModoVisor(_visorPendiente);
-  setTimeout(resumenVisor, 400);
+  if(_visorPendiente !== null){
+    activarModoVisor(_visorPendiente);
+    setTimeout(resumenVisor, 400);
+  }
 }
+
+// ── Actualizacion automatica ──
+// Vercel publica en cuanto se hace merge, pero quien deja la pestaña abierta
+// sigue con la version vieja (Daniel, 7 oct 2026). Cada 5 min (y al regresar a
+// la pestaña) se lee el CFG_VERSION publicado. Si hay uno mas nuevo:
+//  - nadie esta usando la pestaña (oculta o 10 min sin tocar) -> se actualiza sola;
+//  - la estan usando -> aviso naranja con boton "Actualizar ahora".
+// En los dos casos el diseno se guarda antes y se vuelve a poner al recargar.
+(function(){
+  if(location.protocol === 'file:') return;
+  let ultimoChequeo = 0, ultimaAccion = Date.now(), avisado = false;
+  ['pointerdown','keydown','wheel'].forEach(function(ev){
+    document.addEventListener(ev, function(){ ultimaAccion = Date.now(); }, {passive:true, capture:true});
+  });
+  function cmpVer(a, b){
+    const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+    for(let i = 0; i < Math.max(x.length, y.length); i++){ const d = (x[i] || 0) - (y[i] || 0); if(d) return d; }
+    return 0;
+  }
+  function actualizarYa(){
+    try{
+      if(_visorPendiente === null) sessionStorage.setItem('isarack_reanudar', codificarEstado(estadoConfigurador()));
+    }catch(e){}
+    location.reload();
+  }
+  window._cfgActualizarYa = actualizarYa;
+  function mostrarAviso(ver){
+    if(avisado) return; avisado = true;
+    const d = document.createElement('div');
+    d.id = 'avisoVersion';
+    d.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:99999;background:#DA6635;color:#fff;'
+      + 'border-radius:10px;padding:8px 10px 8px 14px;font:600 13px system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.25);'
+      + 'display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px)';
+    d.innerHTML = '<span>Hay una versión nueva del configurador (v' + ver + '). Tu diseño no se pierde.</span>'
+      + '<button type="button" onclick="_cfgActualizarYa()" style="background:#fff;color:#DA6635;border:0;border-radius:7px;padding:5px 10px;font:700 12.5px system-ui,sans-serif;cursor:pointer;white-space:nowrap">Actualizar ahora</button>';
+    document.body.appendChild(d);
+  }
+  async function chequear(){
+    if(Date.now() - ultimoChequeo < 120000) return;
+    ultimoChequeo = Date.now();
+    try{
+      // Solo el principio del archivo: ahi vive CFG_VERSION
+      const r = await fetch(location.pathname + '?_cv=' + Date.now(), {cache:'no-store', headers:{Range:'bytes=0-65535'}});
+      const t = await r.text();
+      const m = t.match(/CFG_VERSION = '([\d.]+)'/);
+      if(!m || cmpVer(m[1], CFG_VERSION) <= 0) return;
+      if(document.hidden || Date.now() - ultimaAccion > 600000) return actualizarYa();
+      mostrarAviso(m[1]);
+    }catch(e){}
+  }
+  setInterval(chequear, 300000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) chequear(); });
+  setTimeout(chequear, 20000);
+})();
 // Safari iOS calcula el layout tarde — reforzar el resize cuando todo esté listo
 addEventListener('load', ()=>{ setTimeout(resize3D, 50); setTimeout(resize3D, 300); });
 </script>
