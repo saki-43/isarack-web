@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.09';
+const CFG_VERSION = '2026.10.07.10';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1442,36 +1442,55 @@ function _dibujarColumnasBod(parent, H, A, L){
   mat.userData.desechable = true;
   const matChoque = new THREE.MeshLambertMaterial({color:0xd64541});
   matChoque.userData.desechable = true;
-  // Huella de cada isla de rack (sin cotas), en coordenadas del mundo
-  const islas = [];
+  // Columna CHOCA solo si toca una PIEZA del rack (poste, viga, diagonal, union,
+  // rejilla...). Si queda dentro de una fila sin tocar nada es una columna
+  // AHOGADA, que es una forma normal de acomodar racks en naves con columnas:
+  // antes se medía contra la caja de toda la isla y salía en rojo aunque no
+  // pegara (Isaac, 7 oct 2026). Todo en coordenadas del mundo.
+  const filas = [];   // {caja, piezas: [Box3]}
   try{
     grupo.updateMatrixWorld(true);
+    const esCota = function(m, tope){ for(let pa = m; pa && pa !== tope; pa = pa.parent){ if(pa.userData && pa.userData.cota) return true; } return false; };
     grupo.children.forEach(function(o){
       if(!o.isGroup || !(o.userData && o.userData.bloque)) return;
-      const bb = new THREE.Box3(); let hay = false;
-      o.traverse(function(m){
-        if(!m.isMesh) return;
-        for(let pa = m; pa && pa !== o; pa = pa.parent){ if(pa.userData && pa.userData.cota) return; }
-        const b = new THREE.Box3().setFromObject(m);
-        if(b.isEmpty() || !isFinite(b.min.x)) return;
-        bb.union(b); hay = true;
+      // cada hijo de la isla es una fila (o la pasarela); si no hay hijos, la isla entera
+      const hijos = o.children.filter(function(h){ return !(h.userData && h.userData.cota); });
+      (hijos.length ? hijos : [o]).forEach(function(f){
+        const caja = new THREE.Box3(); const piezas = [];
+        f.traverse(function(m){
+          if(!m.isMesh || esCota(m, o.parent)) return;
+          const b = new THREE.Box3().setFromObject(m);
+          if(b.isEmpty() || !isFinite(b.min.x)) return;
+          caja.union(b); piezas.push(b);
+        });
+        if(piezas.length) filas.push({caja: caja, piezas: piezas});
       });
-      if(hay) islas.push(bb);
     });
   }catch(e){}
-  const choques = [];
+  const ENC = 0.005;   // tiene que meterse mas de 5 mm para contar
+  const cruza = function(b, x0, x1, z0, z1){ return x0 < b.max.x - ENC && x1 > b.min.x + ENC && z0 < b.max.z - ENC && z1 > b.min.z + ENC; };
+  const choques = [], ahogadas = [];
   const _nom = _nombresColumnas();
+  const matAhog = new THREE.MeshLambertMaterial({color:0x2f6fb5});
+  matAhog.userData.desechable = true;
   columnasBod.forEach(function(c, i){
     const x0 = c.x - c.w/2, x1 = c.x + c.w/2, z0 = c.z - c.d/2, z1 = c.z + c.d/2;
-    const choca = islas.some(function(b){ return x0 < b.max.x - 0.005 && x1 > b.min.x + 0.005 && z0 < b.max.z - 0.005 && z1 > b.min.z + 0.005; });
+    let choca = false, dentro = false;
+    filas.forEach(function(f){
+      if(choca || !cruza(f.caja, x0, x1, z0, z1)) return;
+      dentro = true;
+      if(f.piezas.some(function(b){ return cruza(b, x0, x1, z0, z1); })) choca = true;
+    });
+    const ahogada = dentro && !choca;
     if(choca) choques.push(_nom[i].nombre);
-    const col = box(c.w, H, c.d, choca ? matChoque : mat);
+    if(ahogada) ahogadas.push(_nom[i].nombre);
+    const col = box(c.w, H, c.d, choca ? matChoque : (ahogada ? matAhog : mat));
     col.position.set(c.x, H/2, c.z);
     g.add(col);
     if(!colEtiquetas && !choca) return;
     try{
-      const etq = _nom[i].nombre + ' · ' + _uniDeM(c.w) + '×' + _uniDeM(c.d) + ' ' + _uniSufijo();
-      const sp = crearTextoSprite(etq, choca ? '#c0392b' : '#4a4f55');
+      const etq = _nom[i].nombre + (ahogada ? ' · ahogada' : '') + ' · ' + _uniDeM(c.w) + '×' + _uniDeM(c.d) + ' ' + _uniSufijo();
+      const sp = crearTextoSprite(etq, choca ? '#c0392b' : (ahogada ? '#2f6fb5' : '#4a4f55'));
       // Proporcional a la bodega: en una nave de 20 m la etiqueta de 0.9 m no se leia
       const _sw = Math.min(6, Math.max(0.9, Math.max(A || 0, L || 0) * 0.09));
       sp.scale.set(_sw, _sw * 0.31, 1);
@@ -1481,6 +1500,7 @@ function _dibujarColumnasBod(parent, H, A, L){
       g.add(sp);
     }catch(e){}
   });
+  choques.ahogadas = ahogadas;
   parent.add(g);
   return choques;
 }
@@ -6538,6 +6558,10 @@ function agregarBodega(parent){
     if(st && choques.length){
       st.innerHTML += '<div style="margin-top:3px;padding:4px 6px;background:#fdecea;border:1px solid #e57373;color:#b71c1c;border-radius:5px;font-weight:800">⚠ El rack choca con la columna '
         + choques.join(', ') + '</div>';
+    }
+    if(st && choques.ahogadas && choques.ahogadas.length){
+      st.innerHTML += '<div style="margin-top:3px;padding:4px 6px;background:#eaf2fb;border:1px solid #9cc0e6;color:#1f4f86;border-radius:5px;font-weight:700">ℹ Columnas ahogadas (dentro del rack, sin tocarlo): '
+        + choques.ahogadas.join(', ') + '</div>';
     }
   }catch(e){ console.warn('columnas bodega', e); }
 }
