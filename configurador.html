@@ -759,7 +759,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.06.03';
+const CFG_VERSION = '2026.10.07.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -7607,7 +7607,7 @@ const APL = {
   REJILLA: 'APL-0009'    // REJILLA APLIC 24"X48"
 };
 const APL_ANCHO_IN = 48, APL_FONDO_IN = 24, APL_ALTO_IN = 84;
-const APL_NIV_MIN = 2, APL_NIV_MAX = 6;
+const APL_NIV_MIN = 2, APL_NIV_MAX = 11;   // hasta 11 niveles (Isaac, 7 oct 2026)
 // Separacion entre anaqueles vecinos: son individuales, cada uno con sus postes.
 const APL_SEP_M = 0.01;
 
