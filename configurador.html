@@ -760,7 +760,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.03';
+const CFG_VERSION = '2026.10.07.04';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -6366,7 +6366,9 @@ function agregarBodega(parent){
   // una orilla y el rack quedaba en la de enfrente, asi que habia que brincar de
   // un extremo del dibujo al otro para leerlo.
   const zC1 = zAd + 0.60, zC2 = zAd + 2.10;   // banda de cotas al frente
-  const xC1 = xDe + 0.60, xC2 = xDe + 2.10;   // banda de cotas al costado
+  // El total del costado va mas lejos que el del frente: ahi las etiquetas de la
+  // cadena van a un lado de la linea y son anchas ("9.71 M").
+  const xC1 = xDe + 0.60, xC2 = xDe + 2.90;   // banda de cotas al costado
   const yC = -0.45;
   // Lo INSTALADO sobre cada eje: con pasarela incluye el corredor de afuera y
   // las escaleras, no nada mas el racking.
@@ -6383,8 +6385,19 @@ function agregarBodega(parent){
   const tramo = (a, b, p, eje) => {
     const d = b - a;
     if(d < 0.15) return;   // un tramo mas chico que esto no alcanza a leerse
-    if(eje === 'x') cotaDim(parent, [a, yC, p], [b, yC, p], fmtCota(d), {labelOffset:[0,-0.24,0], escala:[0.55,0.18]});
-    else            cotaDim(parent, [p, yC, a], [p, yC, b], fmtCota(d), {labelOffset:[0.34,0,0], escala:[0.55,0.18]});
+    // La etiqueta va POR FUERA de la linea (frente / costado), apartada segun lo
+    // que mide el letrero: centrada encima se leia tachada y en los tramos
+    // cortos ("0.29 M") tapaba los remates. (Isaac, 7 oct 2026)
+    const n0 = parent.children.length;
+    if(eje === 'x'){
+      const k = [[a, yC, p], [b, yC, p], fmtCota(d), {labelOffset:[0, -0.24, 0.24], escala:[0.55,0.18]}];
+      cotaDim(parent, k[0], k[1], k[2], k[3]);
+      _despegarEtiqueta(parent.children.slice(n0), k);
+    } else {
+      const k = [[p, yC, a], [p, yC, b], fmtCota(d), {labelOffset:[0.34, 0, 0], escala:[0.55,0.18]}];
+      cotaDim(parent, k[0], k[1], k[2], k[3]);
+      _despegarEtiqueta(parent.children.slice(n0), k);
+    }
   };
   tramo(xIz, rx0, zC1, 'x'); tramo(rx0, rx1, zC1, 'x'); tramo(rx1, xDe, zC1, 'x');
   tramo(zAt, rz0, xC1, 'z'); tramo(rz0, rz1, xC1, 'z'); tramo(rz1, zAd, xC1, 'z');
@@ -7076,7 +7089,9 @@ function _cotaBloques(){
     return o.isGroup && !(o.userData && (o.userData.cota || o.userData.fijo));
   });
   if(islas.length < 2) return;   // con una sola, la cota global ya la da
-  islas.forEach(function(g, i){
+  // Caja (en planta) de cada isla, medida de lo que se dibujo
+  const cajas = [];
+  islas.forEach(function(g){
     const c = new THREE.Box3(); let hay = false;
     g.traverse(function(o){
       if(!o.isMesh) return;
@@ -7088,7 +7103,101 @@ function _cotaBloques(){
       if(bb.isEmpty() || !isFinite(bb.min.x)) return;
       c.union(bb); hay = true;
     });
-    if(!hay) return;
+    if(hay) cajas.push({g: g, c: c});
+  });
+  // ── Que no se encimen (Isaac, 7 oct 2026) ──
+  // Cada cota prueba varios lugares y se queda con el primero donde no pisa una
+  // isla, otra cota ni la banda de cotas de la bodega. Si ninguno esta libre,
+  // el que menos pisa. Rectangulos en planta: [x0, z0, x1, z1].
+  // Lo que estorba de cada isla son sus FILAS, no la caja que las envuelve: por
+  // los pasillos si puede pasar una cota. obst[i].isla = de que isla es.
+  const obst = [];
+  function _cajaMallas(raiz){
+    const c = new THREE.Box3(); let hay = false;
+    raiz.traverse(function(o){
+      if(!o.isMesh) return;
+      if(o.geometry && (o.geometry.type === 'PlaneGeometry' || o.geometry.type === 'ConeGeometry')) return;
+      for(let pa = o; pa && pa !== raiz.parent; pa = pa.parent){
+        if(pa.userData && (pa.userData.cota || pa.userData.fijo)) return;
+      }
+      const bb = new THREE.Box3().setFromObject(o);
+      if(bb.isEmpty() || !isFinite(bb.min.x)) return;
+      c.union(bb); hay = true;
+    });
+    return hay ? c : null;
+  }
+  cajas.forEach(function(k, ik){
+    let filas = 0;
+    k.g.children.forEach(function(h){
+      if(!h.isGroup || (h.userData && h.userData.cota)) return;
+      const c = _cajaMallas(h); if(!c) return;
+      const r = [c.min.x - 0.05, c.min.z - 0.05, c.max.x + 0.05, c.max.z + 0.05]; r.isla = ik;
+      obst.push(r); filas++;
+    });
+    if(!filas){ const r = [k.c.min.x - 0.05, k.c.min.z - 0.05, k.c.max.x + 0.05, k.c.max.z + 0.05]; r.isla = ik; obst.push(r); }
+  });
+  // Etiquetas que ya hay (pasillos, etc.)
+  grupo.traverse(function(o){ if(o.isSprite) obst.push(_rectSprite(o)); });
+  if(bodegaOn){
+    const gv = function(id){ return parseFloat((document.getElementById(id)||{}).value) || 0; };
+    const A = _uniAM(gv('bodAncho')), L = _uniAM(gv('bodLargo'));
+    if(A > 0 && L > 0){   // bandas de la cadena pared -> rack -> pared (frente y costado)
+      obst.push([-50, L + 0.15, 50, L + 3.5]);
+      obst.push([A + 0.15, -50, A + 3.5, 50]);
+    }
+  }
+  function choque(r, ign){
+    let a = 0;
+    obst.forEach(function(o){
+      if(ign !== undefined && o.isla === ign) return;   // la marca X/Y llega justo a SU isla: esa no cuenta
+      const w = Math.min(r[2], o[2]) - Math.max(r[0], o[0]);
+      const h = Math.min(r[3], o[3]) - Math.max(r[1], o[1]);
+      if(w > 0 && h > 0) a += w * h;
+    });
+    return a;
+  }
+  function rectDe(objs){
+    let r = null;
+    objs.forEach(function(o){
+      let q;
+      if(o.isSprite) q = _rectSprite(o);
+      else {
+        const bb = new THREE.Box3().setFromObject(o);
+        if(bb.isEmpty()) return;
+        q = [bb.min.x, bb.min.z, bb.max.x, bb.max.z];
+      }
+      r = r ? [Math.min(r[0], q[0]), Math.min(r[1], q[1]), Math.max(r[2], q[2]), Math.max(r[3], q[3])] : q;
+    });
+    return r;
+  }
+  // cands: [[a, b, texto, opts], ...] en orden de preferencia
+  function ponerLibre(cands, ign){
+    let mejor = null;
+    for(let i = 0; i < cands.length; i++){
+      const k = cands[i];
+      const n0 = grupo.children.length, p0 = _COTA_PEND.length;
+      cotaDim(grupo, k[0], k[1], k[2], k[3]);
+      const nuevos = grupo.children.slice(n0);
+      _despegarEtiqueta(nuevos, k);
+      grupo.updateMatrixWorld(true);
+      const r = rectDe(nuevos);
+      const a = r ? choque(r, ign) : 0;
+      if(a < 0.0005){ if(r) obst.push(r); return; }
+      if(!mejor || a < mejor.a) mejor = {a: a, i: i};
+      nuevos.forEach(function(o){ grupo.remove(o); });
+      _COTA_PEND.length = p0;
+    }
+    if(mejor){
+      const k = cands[mejor.i];
+      const n0 = grupo.children.length;
+      cotaDim(grupo, k[0], k[1], k[2], k[3]);
+      _despegarEtiqueta(grupo.children.slice(n0), k);
+      grupo.updateMatrixWorld(true);
+      const r = rectDe(grupo.children.slice(n0)); if(r) obst.push(r);
+    }
+  }
+  cajas.forEach(function(k, iCaja){
+    const g = k.g, c = k.c;
     const largo = c.max.x - c.min.x, fondo = c.max.z - c.min.z;
     if(largo < 0.2 && fondo < 0.2) return;
     // La letra sale de SU bloque, no del orden en la escena: con dos sistemas en
@@ -7101,33 +7210,83 @@ function _cotaBloques(){
          + String.fromCharCode(65 + (marca.i || 0)) + ' ')
       : '';
     const y = -0.18;
-    // Pegadas a SU isla, no en la orilla del plano: si se van lejos ya no se
-    // sabe de cual isla hablan. El fondo va del lado +X, o sea el CONTRARIO al
-    // de las cotas del rack y las de pasillo, que todas viven en -X: probado a
-    // 1.15 y a 2.60 de ese lado y en las dos la etiqueta caia encima de la del
-    // pasillo ("A 5.78" sobre "3.50"). De este lado no hay nada con que pelear.
-    // El sprite va mas ancho (0.85) que el de una cota normal porque el texto
-    // es mas largo —lleva la letra del bloque— y crearTextoSprite le baja el
-    // tamano a la letra hasta que quepa: con el ancho de siempre se leia chiquita.
-    cotaDim(grupo, [c.min.x, y, c.max.z + 0.55], [c.max.x, y, c.max.z + 0.55],
-            letra + fmtCota(largo), {labelOffset:[0, -0.10, 0.22], escala:[0.85, 0.18]});
-    cotaDim(grupo, [c.max.x + 0.55, y, c.min.z], [c.max.x + 0.55, y, c.max.z],
-            letra + fmtCota(fondo), {labelOffset:[0.52, 0, 0], escala:[0.85, 0.18]});
+    const E = [0.85, 0.18];
+    // Fondo: a la derecha de la isla; si no cabe, a la izquierda; luego mas separada.
+    const tF = letra + fmtCota(fondo);
+    ponerLibre([
+      [[c.max.x + 0.55, y, c.min.z], [c.max.x + 0.55, y, c.max.z], tF, {labelOffset:[ 0.52, 0, 0], escala:E}],
+      [[c.min.x - 0.55, y, c.min.z], [c.min.x - 0.55, y, c.max.z], tF, {labelOffset:[-0.52, 0, 0], escala:E}],
+      // Sin lugar a los lados (pared de un lado, otra isla del otro): la etiqueta
+      // va al PIE de la linea, debajo de la isla.
+      [[c.max.x + 0.25, y, c.min.z], [c.max.x + 0.25, y, c.max.z], tF, {labelOffset:[0, 0, 0], escala:E, alPie:1}],
+      [[c.min.x - 0.25, y, c.min.z], [c.min.x - 0.25, y, c.max.z], tF, {labelOffset:[0, 0, 0], escala:E, alPie:1}],
+      [[c.max.x + 0.25, y, c.min.z], [c.max.x + 0.25, y, c.max.z], tF, {labelOffset:[0, 0, 0], escala:E, alPie:-1}],
+      [[c.max.x + 1.25, y, c.min.z], [c.max.x + 1.25, y, c.max.z], tF, {labelOffset:[ 0.52, 0, 0], escala:E}],
+      [[c.min.x - 1.25, y, c.min.z], [c.min.x - 1.25, y, c.max.z], tF, {labelOffset:[-0.52, 0, 0], escala:E}]
+    ]);
+    // Largo: abajo de la isla; si no cabe, arriba; luego mas separada.
+    const tL = letra + fmtCota(largo);
+    ponerLibre([
+      [[c.min.x, y, c.max.z + 0.55], [c.max.x, y, c.max.z + 0.55], tL, {labelOffset:[0, -0.10,  0.22], escala:E}],
+      [[c.min.x, y, c.min.z - 0.55], [c.max.x, y, c.min.z - 0.55], tL, {labelOffset:[0, -0.10, -0.22], escala:E}],
+      [[c.min.x, y, c.max.z + 1.15], [c.max.x, y, c.max.z + 1.15], tL, {labelOffset:[0, -0.10,  0.22], escala:E}],
+      [[c.min.x, y, c.min.z - 1.15], [c.max.x, y, c.min.z - 1.15], tL, {labelOffset:[0, -0.10, -0.22], escala:E}]
+    ]);
     // Marcas X / Y de CADA isla: de la pared izquierda (x=0) y de la de atras
     // (z=0) hasta la isla — lo mismo que se captura en su Pared X / Pared Y.
-    // Con varias islas la cadena de la orilla solo daba los extremos del
-    // conjunto y no se sabia donde quedaba cada bloque (Isaac, 7 oct 2026).
-    // Van a media isla para que se vea de cual hablan.
+    // Se busca una altura de la isla donde la linea no cruce otra isla.
     if(bodegaOn){
-      const zMed = (c.min.z + c.max.z) / 2, xMed = (c.min.x + c.max.x) / 2;
-      if(c.min.x > 0.02)
-        cotaDim(grupo, [0, y, zMed], [c.min.x, y, zMed],
-                letra + 'X ' + fmtCota(c.min.x), {labelOffset:[0, 0, -0.22], escala:[0.85, 0.18]});
-      if(c.min.z > 0.02)
-        cotaDim(grupo, [xMed, y, 0], [xMed, y, c.min.z],
-                letra + 'Y ' + fmtCota(c.min.z), {labelOffset:[0.52, 0, 0], escala:[0.85, 0.18]});
+      const fr = [0.5, 0.15, 0.85, 0.3, 0.7, 0.05, 0.95];
+      if(c.min.x > 0.02){
+        const tX = letra + 'X ' + fmtCota(c.min.x), cs = [];
+        fr.forEach(function(f){
+          const z = c.min.z + fondo * f;
+          cs.push([[0, y, z], [c.min.x, y, z], tX, {labelOffset:[0, 0, -0.22], escala:E}]);
+          cs.push([[0, y, z], [c.min.x, y, z], tX, {labelOffset:[0, 0,  0.22], escala:E}]);
+        });
+        ponerLibre(cs, iCaja);
+      }
+      if(c.min.z > 0.02){
+        const tY = letra + 'Y ' + fmtCota(c.min.z), cs = [];
+        fr.forEach(function(f){
+          const x = c.min.x + largo * f;
+          cs.push([[x, y, 0], [x, y, c.min.z], tY, {labelOffset:[ 0.52, 0, 0], escala:E}]);
+          cs.push([[x, y, 0], [x, y, c.min.z], tY, {labelOffset:[-0.52, 0, 0], escala:E}]);
+        });
+        ponerLibre(cs, iCaja);
+      }
     }
   });
+}
+// La etiqueta de una cota se aparta de su linea segun lo que MIDE el letrero: con
+// el desplazamiento fijo, un texto largo ("B 7.37 M") quedaba encima de la linea
+// y se metia al rack. Lado = signo del desplazamiento que traia.
+function _despegarEtiqueta(objs, k){
+  const sp = objs.filter(function(o){ return o.isSprite; })[0];
+  if(!sp) return;
+  const a = k[0], b = k[1], off = (k[3] && k[3].labelOffset) || [0, 0, 0];
+  const vertical = Math.abs(b[2] - a[2]) > Math.abs(b[0] - a[0]);   // corre a lo largo de Z
+  const pie = k[3] && k[3].alPie;
+  if(vertical && pie){
+    const zFin = pie > 0 ? Math.max(a[2], b[2]) : Math.min(a[2], b[2]);
+    sp.position.x = a[0];
+    sp.position.z = zFin + pie * (Math.abs(sp.scale.y) / 2 + 0.12);
+    return;
+  }
+  if(vertical){
+    const lado = off[0] < 0 ? -1 : 1;
+    sp.position.x = a[0] + lado * (Math.abs(sp.scale.x) / 2 + 0.10);
+  } else {
+    const lado = off[2] < 0 ? -1 : 1;
+    sp.position.z = a[2] + lado * (Math.abs(sp.scale.y) / 2 + 0.06);
+  }
+}
+// Rectangulo en planta que ocupa una etiqueta (sprite): centro ± media escala.
+function _rectSprite(o){
+  const p = new THREE.Vector3(); o.getWorldPosition(p);
+  const ws = new THREE.Vector3(); o.getWorldScale(ws);
+  const hx = Math.abs(ws.x) / 2, hz = Math.abs(ws.y) / 2;
+  return [p.x - hx, p.z - hz, p.x + hx, p.z + hz];
 }
 
 function _cotaPlano(){
