@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.10';
+const CFG_VERSION = '2026.10.07.11';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2045,7 +2045,11 @@ function init(){
 function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tieneRejilla, tienePanel, tieneMadera, tienePie, skipCuerpo, bandasLibres, marcosGhost, alturasNivelM){
   const postW = 0.05, postD = 0.05, placaH = 0.012;
   const nMarcos = cuerpos + 1;
-  const totalLen = largoM * cuerpos;
+  // largoM puede ser numero (todos iguales) o arreglo por cuerpo (vigas por modulo)
+  const _lArr = Array.isArray(largoM) ? largoM : null;
+  const lDe = function(c){ return _lArr ? (_lArr[c] || _lArr[_lArr.length - 1]) : largoM; };
+  const xDe = function(k){ if(!_lArr) return k * largoM; let s = 0; for(let j = 0; j < k; j++) s += lDe(j); return s; };
+  const totalLen = xDe(cuerpos);
   const x0 = -totalLen / 2;
   // Marcos que el cliente ya tiene: se dibujan translucidos y no se cotizan,
   // igual que en Selectivo. (Isaac, 24 sep 2026)
@@ -2097,14 +2101,15 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
       parent.add(m);
     }
   }
-  for(let k=0; k<nMarcos; k++) marco(x0 + k * largoM, k);
+  for(let k=0; k<nMarcos; k++) marco(x0 + xDe(k), k);
   // Posición Y de cada nivel: manual (si está activo) o uniforme.
   // `niveles` puede ser número (parejo) o arreglo por cuerpo (niveles por módulo).
   const _nivArrPic = Array.isArray(niveles);
   const alturasManPic = _nivArrPic ? null : getAlturasManualesM('picking');   // alturas manuales solo en modo parejo
   const bandasPic = bandasLibres || [];
   for(let c=0; c<cuerpos; c++){
-    const cx = x0 + c * largoM + largoM/2;
+    const largoC = lDe(c);
+    const cx = x0 + xDe(c) + largoC/2;
     // El 0 es un modulo recortado a proposito: con "parseInt(x)||y" se caia al
     // valor de al lado y el modulo volvia a salir entero. Mismo arreglo que en
     // buildRackSelectivo. (Isaac, 24 sep 2026)
@@ -2139,7 +2144,7 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
       const usaPanel  = tienePanel && !tieneRejilla;
       const usaMadera = tieneMadera && !tieneRejilla && !tienePanel;
       if(usaRej || usaPanel || usaMadera){
-        const cargaW = largoM - postW*1.1;
+        const cargaW = largoC - postW*1.1;
         const cargaD = fondoM - postD*1.2;
         if(usaRej){
           const rej = crearRejillaReal(cargaW, cargaD);
@@ -2159,16 +2164,16 @@ function buildPickingScene(parent, altoM, fondoM, largoM, niveles, cuerpos, tien
       }
       // Vigas/travesaños naranjas (frente y atrás del cuerpo)
       const vigaH = 0.05, vigaD = 0.035;
-      const vF = box(largoM - postW, vigaH, vigaD, matVigaPic);
+      const vF = box(largoC - postW, vigaH, vigaD, matVigaPic);
       vF.position.set(cx, y - vigaH/2 - 0.005, fondoM/2 - postD/2);
       parent.add(vF);
-      const vB = box(largoM - postW, vigaH, vigaD, matVigaPic);
+      const vB = box(largoC - postW, vigaH, vigaD, matVigaPic);
       vB.position.set(cx, y - vigaH/2 - 0.005, -fondoM/2 + postD/2);
       parent.add(vB);
       // Uniones color marco pegadas al poste
       const uniWp = 0.024, uniHp = vigaH + 0.06, uniDp = vigaD * 1.7;
-      const xIzqP = cx - (largoM - postW)/2 - uniWp/2;
-      const xDerP = cx + (largoM - postW)/2 + uniWp/2;
+      const xIzqP = cx - (largoC - postW)/2 - uniWp/2;
+      const xDerP = cx + (largoC - postW)/2 + uniWp/2;
       [xIzqP, xDerP].forEach(xU => {
         const u1 = box(uniWp, uniHp, uniDp, matMarcoPic);
         u1.position.set(xU, y - vigaH/2, fondoM/2 - postD/2); parent.add(u1);
@@ -2186,11 +2191,16 @@ function getConfigPic(){
   const niveles = parseInt(document.getElementById('picNiveles').value);
   const cuerpos = parseInt(document.getElementById('picCuerpos').value);
   const pasilloM = _pasilloDe(document.getElementById('picPasillo'), 2.0);
+  // Vigas por modulo no aplica con pasarela (la pasarela pide claros parejos)
+  const _pasOnPic = lineasPicking.length > 1 && !!(document.getElementById('picChkPasarela') || {}).checked;
   const lineas = lineasPicking.map(l => {
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, largoM = l.largoCm/100;
     const cuerposA = l.cuerpos;
     const cuerposB = l.tipo==='doble' ? (l.cuerposB==null ? l.cuerpos : l.cuerposB) : l.cuerpos;
     const cuerposMaxLn = Math.max(cuerposA, cuerposB);
+    const _vmOn = !!l.vigaMod && !_pasOnPic;
+    const vigasCm = _vmOn ? _vigasModRawPic(l, cuerposMaxLn) : null;
+    const vigasM = vigasCm ? vigasCm.map(function(cm){ return cm / 100; }) : null;
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB,
       altoIn: l.altoIn, fondoIn: l.fondoIn, largoCm: l.largoCm, niveles: l.niveles,
       nivMod: !!l.nivMod, nivelesA: l.nivelesA || null, nivelesB: l.nivelesB || null,
@@ -2202,7 +2212,8 @@ function getConfigPic(){
       escH: (l.escHOn ? (l.escH || []) : []),
       escHNivs: (l.escHOn ? (l.escHNivs || []) : []),
       altoM, fondoM, largoM,
-      largoTotM: largoM * cuerposMaxLn,
+      vigaMod: _vmOn, vigasCm: vigasCm, vigasM: vigasM, vigaM: largoM,
+      largoTotM: vigasM ? vigasM.reduce(function(a, v){ return a + v; }, 0) : largoM * cuerposMaxLn,
       pasM: l.pasM,
       profM: l.tipo==='doble' ? fondoM*2 : fondoM};
   });
@@ -3415,6 +3426,10 @@ function renderLineasPicking(){
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lpNivMod('+i+',this.checked)"> Niveles por módulo</label>'
           + (l.nivMod ? _nivModEditor(l, i, esD, cA, cB, 'lpNivSet') : '')
         + '</div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + _secHead(l, i, 'vigas', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.vigaMod?'checked':'')+' onchange="lpVigaMod('+i+',this.checked)"> 📐 Vigas por módulo</label>', !!l.vigaMod)
+          + ((l.vigaMod && !_plegado(l,'vigas')) ? _vigaModEditorPic(l, i) : '')
+        + '</div>'
         + (bloquesPicking.length > 1
             ? '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
               + '<span style="font-size:10px;color:'+tx+';font-weight:600">📦 Bloque</span>'
@@ -4347,6 +4362,102 @@ function _nivArrRaw(l, fila, n){
   return a;
 }
 // Devuelve escalar (modo parejo) o arreglo por cuerpo (modo por módulo) para el build.
+// ── VIGAS POR MODULO (Isaac, 7 oct 2026) ──
+// Una fila puede llevar vigas de distinto largo: cada claro (modulo) con la suya.
+// Sirve para acomodar la fila entre columnas del edificio. El arreglo va de
+// IZQUIERDA a derecha en el mundo; en una doble las dos caras comparten la medida
+// de cada posicion (sus marcos tienen que quedar frente a frente para las uniones).
+// Con PASARELA no aplica: la pasarela necesita claros parejos y manda la viga de
+// la fila. raw = fila del panel (lineasAlmacen); derivada = la de getConfigSel.
+function _vigasModRaw(l, n){
+  const arr = (Array.isArray(l.vigasMod) ? l.vigasMod : []).slice(0, n);
+  while(arr.length < n) arr.push(l.vigaSku);
+  return arr;
+}
+function _nMaxFila(l){ return Math.max(l.cuerpos, (l.tipo === 'doble' && l.cuerposB != null) ? l.cuerposB : l.cuerpos); }
+function lnVigaMod(i, on){
+  const l = lineasAlmacen[i]; if(!l) return;
+  l.vigaMod = !!on;
+  if(on) l.vigasMod = _vigasModRaw(l, _nMaxFila(l));
+  renderLineasAlmacen(); build();
+}
+function lnVigaModSet(i, c, sku){
+  const l = lineasAlmacen[i]; if(!l) return;
+  l.vigasMod = _vigasModRaw(l, _nMaxFila(l));
+  l.vigasMod[c] = sku;
+  renderLineasAlmacen(); build();
+}
+function _vigaModEditor(l, i){
+  const n = _nMaxFila(l);
+  const arr = _vigasModRaw(l, n);
+  let h = '<div style="font-size:9px;color:#888;margin:2px 0 4px">Módulos de izquierda a derecha.'
+    + (l.tipo === 'doble' ? ' En doble, las dos caras llevan la misma medida en cada posición.' : '') + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">';
+  arr.forEach(function(sku, c){
+    h += '<div style="display:flex;align-items:center;gap:3px"><span style="font-size:9.5px;color:#666;min-width:20px">M' + (c + 1) + '</span>'
+      + '<select onchange="lnVigaModSet(' + i + ',' + c + ',this.value)" style="flex:1;min-width:0;font-size:10px;padding:2px 12px 2px 2px">'
+      + _optsDe('selViga', SEL_VIGAS, sku) + '</select></div>';
+  });
+  return h + '</div>';
+}
+// Sobre la fila DERIVADA: largo del claro c y donde empieza el claro k (desde la izquierda)
+function _vM(l, c){ return (l.vigasM && l.vigasM[c]) || l.vigaM; }
+function _xK(l, k){
+  if(!l.vigasM) return k * l.vigaM;
+  let s = 0; for(let j = 0; j < k; j++) s += _vM(l, j);
+  return s;
+}
+// Cuantos niveles de carga lleva cada SKU de viga en la fila (para el BOM).
+function _cargaPorViga(l, cA, cB, esD, cfg, iLn){
+  const det = {A: [], B: []};
+  const tot = _nivCargaSel(l, cA, cB, esD, cfg, iLn, undefined, det);
+  if(!l.vigaMod || !l.vigasSku) { const o = {}; o[l.vigaSku] = tot; return o; }
+  const o = {};
+  det.A.forEach(function(n, c){ const s = l.vigasSku[c] || l.vigaSku; o[s] = (o[s] || 0) + n; });
+  // la cara B va girada 180°: su modulo local c es la posicion cB-1-c desde la izquierda
+  det.B.forEach(function(n, c){ const s = l.vigasSku[cB - 1 - c] || l.vigaSku; o[s] = (o[s] || 0) + n; });
+  return o;
+}
+// Picking: lo mismo pero la medida es el largo en cm (PIC_LARGOS).
+function _vigasModRawPic(l, n){
+  const arr = (Array.isArray(l.vigasMod) ? l.vigasMod : []).slice(0, n).map(function(v){ return parseInt(v) || l.largoCm; });
+  while(arr.length < n) arr.push(l.largoCm);
+  return arr;
+}
+function lpVigaMod(i, on){
+  const l = lineasPicking[i]; if(!l) return;
+  l.vigaMod = !!on;
+  if(on) l.vigasMod = _vigasModRawPic(l, _nMaxFila(l));
+  renderLineasPicking(); build();
+}
+function lpVigaModSet(i, c, cm){
+  const l = lineasPicking[i]; if(!l) return;
+  l.vigasMod = _vigasModRawPic(l, _nMaxFila(l));
+  l.vigasMod[c] = parseInt(cm) || l.largoCm;
+  renderLineasPicking(); build();
+}
+function _vigaModEditorPic(l, i){
+  const arr = _vigasModRawPic(l, _nMaxFila(l));
+  let h = '<div style="font-size:9px;color:#888;margin:2px 0 4px">Módulos de izquierda a derecha.'
+    + (l.tipo === 'doble' ? ' En doble, las dos caras llevan la misma medida en cada posición.' : '') + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">';
+  arr.forEach(function(cm, c){
+    h += '<div style="display:flex;align-items:center;gap:3px"><span style="font-size:9.5px;color:#666;min-width:20px">M' + (c + 1) + '</span>'
+      + '<select onchange="lpVigaModSet(' + i + ',' + c + ',this.value)" style="flex:1;min-width:0;font-size:10px;padding:2px 12px 2px 2px">'
+      + _optsDe('picLargo', PIC_LARGOS, cm) + '</select></div>';
+  });
+  return h + '</div>';
+}
+// Niveles de carga por largo (cm) de la fila de picking (para el BOM).
+function _cargaPorVigaPic(l, cA, cB, esD, cfg, iLn){
+  const det = {A: [], B: []};
+  const tot = _nivCargaSel(l, cA, cB, esD, cfg, iLn, l.largoM, det);
+  const o = {};
+  if(!l.vigaMod || !l.vigasCm){ o[l.largoCm] = tot; return o; }
+  det.A.forEach(function(n, c){ const k = l.vigasCm[c] || l.largoCm; o[k] = (o[k] || 0) + n; });
+  det.B.forEach(function(n, c){ const k = l.vigasCm[cB - 1 - c] || l.largoCm; o[k] = (o[k] || 0) + n; });
+  return o;
+}
 function _nivFila(l, fila, cuerpos){
   if(!l.nivMod) return l.niveles;
   return _nivArrRaw(l, fila, cuerpos);
@@ -4375,10 +4486,14 @@ function _posicionesTarima(cfg){
   return cfg.lineas.reduce((tot, l, iLn) => {
     const esD = l.tipo === 'doble';
     const cA = l.cuerposA, cB = esD ? l.cuerposB : 0;
+    if(l.vigaMod && l.vigasSku){
+      const pv = _cargaPorViga(l, cA, cB, esD, cfg, iLn);
+      return tot + Object.keys(pv).reduce(function(a, sk){ return a + pv[sk] * _tarimasPorClaro((VIGAS_INFO[sk] || {}).largoIn || l.vigaIn); }, 0);
+    }
     return tot + _nivCargaSel(l, cA, cB, esD, cfg, iLn) * _tarimasPorClaro(l.vigaIn);
   }, 0);
 }
-function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
+function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo, det){
   const tun  = (l.tunelOn && Array.isArray(l.tunel) && l.tunel.length) ? l.tunel : [];
   const tunN = tun.length ? _tunelNiveles(l) : [];
   // Escalera PS-2: {k, niveles} por cuerpo (base 0). Solo aplica a la fila iBaja/iAlta.
@@ -4440,6 +4555,7 @@ function _nivCargaSel(l, cA, cB, esD, cfg, iLn, anchoCuerpo){
       const nivEsc = escMap.get(c);
       if(nivEsc) nivEsc.forEach(n => { if(n < nivC) nivosCortados.add(n); });
       s += (nivC - nivosCortados.size);
+      if(det) det[fila].push(nivC - nivosCortados.size);
     }
     return s;
   };
@@ -4581,10 +4697,11 @@ function _clarosTabSel(l){
 // la opcion: la casilla sigue marcada y lo cotizado no cambia.
 function _plegado(l, k){ return !!(l.fold && l.fold[k]); }
 function lnFold(i, k){
-  const l = lineasAlmacen[i];
+  const pic = sistemaActual === 'picking';
+  const l = (pic ? lineasPicking : lineasAlmacen)[i]; if(!l) return;
   if(!l.fold) l.fold = {};
   l.fold[k] = !l.fold[k];
-  renderLineasAlmacen();
+  if(pic) renderLineasPicking(); else renderLineasAlmacen();
 }
 // Renglon de encabezado: la casilla a la izquierda y la flecha de plegar a la
 // derecha. La flecha solo sale si hay algo que mostrar.
@@ -4792,11 +4909,20 @@ function renderLineasAlmacen(){
         +'<div><div style="color:#666;margin-bottom:1px">Fondo</div><select onchange="lnSet('+i+',\'fondoIn\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_optsDe('selFondo', SEL_FONDOS, l.fondoIn)+'</select></div>'
         +'<div><div style="color:#666;margin-bottom:1px">Viga</div><select onchange="lnSet('+i+',\'vigaSku\',this.value)" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_optsDe('selViga', SEL_VIGAS, l.vigaSku)+'</select></div>'
         +'<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lnSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>'
-        +(info.capKg ? '<div style="grid-column:1/3;color:#da6635;font-weight:600;font-size:9.5px">Capacidad: '+info.capKg.toLocaleString()+' kg / '+info.capLb.toLocaleString()+' lb por nivel</div>' : '')
+        +(function(){
+            // Con vigas por modulo la capacidad es la de la viga MAS DEBIL de la fila
+            let ck = info.capKg, cl = info.capLb, deb = false;
+            if(l.vigaMod) _vigasModRaw(l, _nMaxFila(l)).forEach(function(sk){ const v = VIGAS_INFO[sk]; if(v && ck && v.capKg < ck){ ck = v.capKg; cl = v.capLb; deb = true; } });
+            return ck ? '<div style="grid-column:1/3;color:#da6635;font-weight:600;font-size:9.5px">Capacidad: '+ck.toLocaleString()+' kg / '+cl.toLocaleString()+' lb por nivel'+(deb ? ' <span style="color:#999;font-weight:400">(la viga más débil)</span>' : '')+'</div>' : '';
+          })()
         + filasAB
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + _secHead(l, i, 'niv', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lnNivMod('+i+',this.checked)"> Niveles por módulo</label>', !!l.nivMod)
           + ((l.nivMod && !_plegado(l,'niv')) ? _nivModEditor(l, i, esD, cA, cB) : '')
+        + '</div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + _secHead(l, i, 'vigas', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.vigaMod?'checked':'')+' onchange="lnVigaMod('+i+',this.checked)"> 📐 Vigas por módulo</label>', !!l.vigaMod)
+          + ((l.vigaMod && !_plegado(l,'vigas')) ? _vigaModEditor(l, i) : '')
         + '</div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + _secHead(l, i, 'claros', '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.clarosOn?'checked':'')+' onchange="lnClarosOn('+i+',this.checked)"> 📏 Claros de viga a la medida</label>', !!l.clarosOn)
@@ -5124,14 +5250,23 @@ function getConfigSel(){
   const cuerpos = parseInt(document.getElementById('selCuerpos').value);
   const filas = tipoFila==='doble' ? 2 : 1;
   const pasilloM = _pasilloDe(document.getElementById('selPasillo'), 3.5);
+  // Vigas por modulo no aplica con pasarela (ver _vigasModRaw)
+  const _pasOnSel = lineasAlmacen.length > 1 && !!(document.getElementById('selChkPasarela') || {}).checked;
   const lineas = lineasAlmacen.map(l => {
     const vi = VIGAS_INFO[l.vigaSku] || VIGAS_INFO['SEL-0362'];
     const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, vigaM = vi.largoIn * IN_TO_M;
     const cuerposA = l.cuerpos;
     const cuerposB = l.tipo==='doble' ? (l.cuerposB==null ? l.cuerpos : l.cuerposB) : l.cuerpos;
     const cuerposMaxLn = Math.max(cuerposA, cuerposB);
+    const _vmOn = !!l.vigaMod && !_pasOnSel;
+    const vigasSku = _vmOn ? _vigasModRaw(l, cuerposMaxLn) : null;
+    const vigasM = vigasSku ? vigasSku.map(function(sk){ return ((VIGAS_INFO[sk] || vi).largoIn) * IN_TO_M; }) : null;
+    // Capacidad por nivel: la de la viga MAS DEBIL de la fila
+    let capKg = vi.capKg, capLb = vi.capLb;
+    if(vigasSku) vigasSku.forEach(function(sk){ const v = VIGAS_INFO[sk]; if(v && v.capKg < capKg){ capKg = v.capKg; capLb = v.capLb; } });
     return {tipo: l.tipo, cuerpos: cuerposMaxLn, cuerposA, cuerposB, altoIn: l.altoIn, fondoIn: l.fondoIn,
-      vigaSku: l.vigaSku, vigaIn: vi.largoIn, vigaAltIn: vi.altIn, capKg: vi.capKg, capLb: vi.capLb,
+      vigaSku: l.vigaSku, vigaIn: vi.largoIn, vigaAltIn: vi.altIn, capKg: capKg, capLb: capLb,
+      vigaMod: _vmOn, vigasSku: vigasSku, vigasM: vigasM,
       niveles: l.niveles, nivMod: !!l.nivMod, nivelesA: l.nivelesA||null, nivelesB: l.nivelesB||null,
       // tunelOn viaja aparte: _nivCargaSel lo exige para descontar las vigas del
       // tunel, y sin el la cotizacion cobraba vigas que el 3D ni dibuja.
@@ -5152,7 +5287,7 @@ function getConfigSel(){
       clarosModB: (l.clarosOn && l.nivMod ? (l.clarosModB || []).map(function(a){return (a||[]).slice();}) : []),
       clarosTab: l.clarosTab || null,
       altoM, fondoM, vigaM,
-      largoM: vigaM * cuerposMaxLn,
+      largoM: vigasM ? vigasM.reduce(function(a, v){ return a + v; }, 0) : vigaM * cuerposMaxLn,
       pasM: l.pasM,
       profM: l.tipo==='doble' ? fondoM*2 + unionM : fondoM};
   });
@@ -5539,7 +5674,7 @@ function _barrasDeLinea(gLin, cfg, l){
   if(l.tipo !== 'doble'){
     _orillasDe(l).forEach(function(o){
       var hacia = (o === 'izq') ? -1 : 1;
-      _barraOrilla(gLin, hacia < 0 ? xIzq : xIzq + l.vigaM*l.cuerpos, -semi, semi, hacia, yBar);
+      _barraOrilla(gLin, hacia < 0 ? xIzq : xIzq + _xK(l, l.cuerpos), -semi, semi, hacia, yBar);
     });
     return;
   }
@@ -5549,10 +5684,10 @@ function _barrasDeLinea(gLin, cfg, l){
     if(o === 'izq'){                           // las dos filas arrancan parejas
       _barraOrilla(gLin, xIzq, -zOut, zOut, -1, yBar);
     } else if(_doblePareja(l)){
-      _barraOrilla(gLin, xIzq + l.vigaM*l.cuerposA, -zOut, zOut, 1, yBar);
+      _barraOrilla(gLin, xIzq + _xK(l, l.cuerposA), -zOut, zOut, 1, yBar);
     } else {                                   // filas desparejas: una barra corta por fila
-      _barraOrilla(gLin, xIzq + l.vigaM*l.cuerposA,  cf - semi,  cf + semi, 1, yBar);
-      _barraOrilla(gLin, xIzq + l.vigaM*l.cuerposB, -cf - semi, -cf + semi, 1, yBar);
+      _barraOrilla(gLin, xIzq + _xK(l, l.cuerposA),  cf - semi,  cf + semi, 1, yBar);
+      _barraOrilla(gLin, xIzq + _xK(l, l.cuerposB), -cf - semi, -cf + semi, 1, yBar);
     }
   });
 }
@@ -5595,8 +5730,8 @@ function _topeDeLinea(gLin, cfg, l){
   const zTubo = zCara + dir * sale;
   for(let c = 0; c < nCl; c++){
     const ys = ysDe(c);
-    const xc = xIzq + (c + 0.5) * l.vigaM;
-    const largo = Math.max(0.1, l.vigaM - postD);
+    const xc = xIzq + _xK(l, c) + _vM(l, c) / 2;
+    const largo = Math.max(0.1, _vM(l, c) - postD);
     ys.forEach(yV => {
       const y = yV + sube + hTubo/2;
       if(y > l.altoM - 0.02) return;
@@ -5612,7 +5747,7 @@ function _topeDeLinea(gLin, cfg, l){
     const izq = (k > 0)   ? ysDe(k - 1) : [];
     const der = (k < nCl) ? ysDe(k)     : [];
     const ys = (izq.length >= der.length) ? izq : der;
-    const xk = xIzq + k * l.vigaM;
+    const xk = xIzq + _xK(l, k);
     ys.forEach(yV => {
       const y = yV + sube + hTubo/2;
       if(y > l.altoM - 0.02) return;
@@ -5657,8 +5792,8 @@ function _mallaDeLinea(gLin, cfg, l){
   const xIzq = -l.largoM/2;
   const nClaros = _mallaClaros(l);
   for(let c=0; c<nClaros; c++){
-    const m = crearMallaAnticaida(l.vigaM - postD, altoStack, MALLA_ALTO_IN * IN_TO_M);
-    m.position.set(xIzq + (c + 0.5) * l.vigaM, yIni + altoStack / 2, zM);
+    const m = crearMallaAnticaida(_vM(l, c) - postD, altoStack, MALLA_ALTO_IN * IN_TO_M);
+    m.position.set(xIzq + _xK(l, c) + _vM(l, c) / 2, yIni + altoStack / 2, zM);
     gLin.add(m);
   }
   // Sujeciones: una en cada cruce de poste con junta de panel — los mismos nodos
@@ -5669,7 +5804,7 @@ function _mallaDeLinea(gLin, cfg, l){
     ? [ (cfg.unionM/2 + postD/2), -(cfg.unionM/2 + postD/2) ]
     : [ zPoste ];
   for(let c=0; c<=nClaros; c++){
-    const xN = xIzq + c * l.vigaM;
+    const xN = xIzq + _xK(l, c);
     ysJ.forEach(function(y){
       zPostes.forEach(function(zP){
         const prof = Math.abs(zP - zM);
@@ -5690,7 +5825,12 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
   altoPuntM = altoPuntM || 0.61;   // 24" por omision
   const postW = 0.076, postD = 0.076, vigaH = 0.10, vigaD = 0.06;
   const nMarcos = cuerpos + 1;
-  const totalLen = vigaM * cuerpos;
+  // vigaM puede venir como numero (todos los claros iguales) o como arreglo con
+  // el largo de cada claro (vigas por modulo).
+  const _vArr = Array.isArray(vigaM) ? vigaM : null;
+  const vigaDe = function(c){ return _vArr ? (_vArr[c] || _vArr[_vArr.length - 1]) : vigaM; };
+  const xDe = function(k){ if(!_vArr) return k * vigaM; let t = 0; for(let j = 0; j < k; j++) t += vigaDe(j); return t; };
+  const totalLen = xDe(cuerpos);
   const x0 = -totalLen / 2;
   // Marcos con hueco de paso (salida de escalera en PS-2)
   const _huecos = huecosMarco || [];
@@ -5823,7 +5963,7 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
       parent.add(m);
     }
   }
-  for(let k=0; k<nMarcos; k++) marco(x0 + k * vigaM, k);
+  for(let k=0; k<nMarcos; k++) marco(x0 + xDe(k), k);
   // Posición Y de cada nivel: manual (si está activo) o uniforme.
   // `niveles` puede ser un número (parejo) o un arreglo por cuerpo (niveles por módulo).
   const _nivArr = Array.isArray(niveles);
@@ -5833,7 +5973,8 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
   const alturasManSel = Array.isArray(alturasNivelM) ? alturasNivelM : null;
   const bandas = bandasLibres || [];
   for(let c=0; c<cuerpos; c++){
-    const xL = x0 + c * vigaM, xR = xL + vigaM;
+    const vigaC = vigaDe(c);
+    const xL = x0 + xDe(c), xR = xL + vigaC;
     const cxV = (xL + xR) / 2;
     // Ojo con el 0: es un modulo recortado a proposito y hay que respetarlo.
     // Con "parseInt(x)||y" el 0 se caia al valor de al lado y el modulo volvia a
@@ -5862,14 +6003,14 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         if(_nivelesC){ if(_nivelesC.includes(n)) continue; }
         else if((_bandasC || bandas).some(b => y >= b[0] && y <= b[1])) continue;
       }
-      const vF = box(vigaM - postW, vigaH, vigaD, matVigaSel);
+      const vF = box(vigaC - postW, vigaH, vigaD, matVigaSel);
       vF.position.set(cxV, y, fondoM/2 - postD/2); parent.add(vF);
-      const vB = box(vigaM - postW, vigaH, vigaD, matVigaSel);
+      const vB = box(vigaC - postW, vigaH, vigaD, matVigaSel);
       vB.position.set(cxV, y, -fondoM/2 + postD/2); parent.add(vB);
       // Uniones (conectores color marco pegados al poste)
       const uniW = 0.032, uniH = vigaH + 0.08, uniD = vigaD * 1.7;
-      const xIzq = cxV - (vigaM - postW)/2 - uniW/2;
-      const xDer = cxV + (vigaM - postW)/2 + uniW/2;
+      const xIzq = cxV - (vigaC - postW)/2 - uniW/2;
+      const xDer = cxV + (vigaC - postW)/2 + uniW/2;
       [xIzq, xDer].forEach(xU => {
         const u1 = box(uniW, uniH, uniD, matMarcoSel);
         u1.position.set(xU, y, fondoM/2 - postD/2); parent.add(u1);
@@ -5877,12 +6018,12 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         u2.position.set(xU, y, -fondoM/2 + postD/2); parent.add(u2);
       });
       if(tieneRejilla){
-        const rejW = vigaM - postW;
+        const rejW = vigaC - postW;
         const rejD = fondoM - postD*1.5;
         const rej = crearRejillaReal(rejW, rejD);
         rej.position.set(cxV, y + vigaH/2 + 0.01, 0); parent.add(rej);
       } else if(tienePanelSel){
-        const pan = box(vigaM - postW, 0.014, fondoM - postD*1.5, matPanelG);
+        const pan = box(vigaC - postW, 0.014, fondoM - postD*1.5, matPanelG);
         pan.position.set(cxV, y + vigaH/2 + 0.010, 0); parent.add(pan);
       }
     }
@@ -6616,18 +6757,21 @@ function buildPicking(){
     if(l.marcoIzqExistente) ghostPB.push(0);
     if(l.marcoDerExistente) ghostPB.push(l.cuerposB);
     if(l.tipo === 'doble'){
-      const lenA = l.largoM * l.cuerposA, lenB = l.largoM * l.cuerposB;
+      const lenA = _xK(l, l.cuerposA), lenB = _xK(l, l.cuerposB);
+      // vigas por modulo: la cara B va girada 180°, su modulo 0 es la ultima posicion
+      const vA = l.vigasM ? l.vigasM.slice(0, l.cuerposA) : l.largoM;
+      const vB = l.vigasM ? l.vigasM.slice(0, l.cuerposB).reverse() : l.largoM;
       const filaA = new THREE.Group();
-      buildPickingScene(filaA, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA, alturasPorCuerpoM(l, 'A', l.cuerposA));
+      buildPickingScene(filaA, l.altoM, l.fondoM, vA, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA, alturasPorCuerpoM(l, 'A', l.cuerposA));
       filaA.position.set(-l.largoTotM/2 + lenA/2, 0, l.fondoM/2);
       gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildPickingScene(filaB, l.altoM, l.fondoM, l.largoM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposB,true,iLn), bandasPasarela(cfg), ghostPB, alturasPorCuerpoM(l, 'B', l.cuerposB));
+      buildPickingScene(filaB, l.altoM, l.fondoM, vB, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposB,true,iLn), bandasPasarela(cfg), ghostPB, alturasPorCuerpoM(l, 'B', l.cuerposB));
       filaB.rotation.y = Math.PI;   // espalda con espalda: la fila B mira al otro lado
       filaB.position.set(-l.largoTotM/2 + lenB/2, 0, -l.fondoM/2);
       gLin.add(filaB);
     } else {
-      buildPickingScene(gLin, l.altoM, l.fondoM, l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA, alturasPorCuerpoM(l, 'A', l.cuerposA));
+      buildPickingScene(gLin, l.altoM, l.fondoM, l.vigasM ? l.vigasM.slice(0, l.cuerposA) : l.largoM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.madera, cfg.pie, skipDe(l.cuerposA,false,iLn), bandasPasarela(cfg), ghostPA, alturasPorCuerpoM(l, 'A', l.cuerposA));
     }
     gLin.position.x = xInicio + l.largoTotM/2;
     gLin.position.z = zAtras + l.profM/2;
@@ -6719,7 +6863,7 @@ function buildPicking(){
   const lineasHtml = lineas.length > 1
     ? lineas.map((l,i)=>{
         const cposTxt = l.tipo==='doble' && l.cuerposA!==l.cuerposB ? l.cuerposA+'+'+l.cuerposB : l.cuerpos;
-        return '<span style="color:#666">'+(i+1)+'·</span> '+(l.tipo==='doble'?'Doble':'Sencilla')+' · '+cposTxt+' cpos · '+l.altoIn+'"×'+l.fondoIn+'" · cuerpo '+l.largoCm+' cm · '+l.niveles+' niv';
+        return '<span style="color:#666">'+(i+1)+'·</span> '+(l.tipo==='doble'?'Doble':'Sencilla')+' · '+cposTxt+' cpos · '+l.altoIn+'"×'+l.fondoIn+'" · cuerpo '+(l.vigasCm ? l.vigasCm.join('/') : l.largoCm)+' cm · '+l.niveles+' niv';
       }).join('<br>')
     : 'Cuerpos de <b>'+lineas[0].largoCm+' cm</b> · '+lineas[0].niveles+' niveles · '+(lineas[0].tipo==='doble' && lineas[0].cuerposA!==lineas[0].cuerposB ? lineas[0].cuerposA+'+'+lineas[0].cuerposB : cfg.cuerposTot)+' cuerpo'+(cfg.cuerposTot>1?'s':'');
   document.getElementById('medidasResumen').innerHTML =
@@ -6849,19 +6993,22 @@ function buildSelectivo(){
     if(l.marcoDerExistente) ghostSen.push(l.cuerpos);
     if(l.tipo === 'doble'){
       const centroFila = l.fondoM/2 + cfg.unionM/2;
-      const lenA = l.vigaM * l.cuerposA, lenB = l.vigaM * l.cuerposB;
+      const lenA = _xK(l, l.cuerposA), lenB = _xK(l, l.cuerposB);
+      // Vigas por modulo: la cara B va girada 180°, asi que su arreglo va al reves
+      const vA = l.vigasM ? l.vigasM.slice(0, l.cuerposA) : l.vigaM;
+      const vB = l.vigasM ? l.vigasM.slice(0, l.cuerposB).reverse() : l.vigaM;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA, 'A'), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasPorCuerpoM(l, 'A', l.cuerposA), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, vA, _nivFila(l,'A',l.cuerposA), l.cuerposA, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA, 'A'), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasPorCuerpoM(l, 'A', l.cuerposA), _ladoSinPunt(l, 'A'));
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn, 'B'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB, 'B'), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, vB, _nivFila(l,'B',l.cuerposB), l.cuerposB, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn, 'B'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB, 'B'), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'));
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = cfg.unionM > 0.01 ? Math.min(l.cuerposA, l.cuerposB) + 1 : 0;
       const x0U = -l.largoM/2;
       const yPositions = [l.altoM * 0.15, l.altoM * 0.5, l.altoM * 0.90];
       for(let k=0; k<nMarcosU; k++){
-        const xM = x0U + k * l.vigaM;
+        const xM = x0U + _xK(l, k);
         yPositions.forEach(yU => {
           const union = box(0.035, 0.035, cfg.unionM, matMarcoSel);
           union.position.set(xM, yU, 0);
@@ -6869,7 +7016,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, l.vigaM, _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos, 'A'), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasPorCuerpoM(l, 'A', l.cuerpos), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, (l.vigasM ? l.vigasM.slice(0, l.cuerpos) : l.vigaM), _nivFila(l,'A',l.cuerpos), l.cuerpos, cfg.rejilla, cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos, 'A'), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasPorCuerpoM(l, 'A', l.cuerpos), _ladoSinPunt(l, 'A'));
     }
     _barrasDeLinea(gLin, cfg, l);
     _mallaDeLinea(gLin, cfg, l);
@@ -8278,25 +8425,31 @@ function calcularBomPicking(){
     //    dibujaban pero no se cobraban.
     if(nMarcos > 0) add(ANCLA_STD_SEL, 2 * nMarcos);
     // 3) Vigas/travesaños: 2 por nivel por cuerpo (frente + atrás)
-    add(VIGAS_PIC[l.largoCm], 2 * nivCargaFinal);
+    // Con vigas por modulo, cada largo se cuenta por separado (_pv = {cm: niveles}).
+    const _pv = l.vigaMod ? _cargaPorVigaPic(l, cA, cB, esD, cfg, iLn) : (function(){ const o = {}; o[l.largoCm] = nivCargaFinal; return o; })();
+    const _pvCm = Object.keys(_pv).map(Number);
+    _pvCm.forEach(function(cm){ add(VIGAS_PIC[cm] || ('VIGA PICKING ' + cm + 'CM'), 2 * _pv[cm]); });
     // 4) Carga del nivel (rejilla/panel/madera se ponen SOLO en los cuerpos×nivel con viga)
     // Se cobra SOLO lo que se eligio: rejilla lleva rejilla, panel lleva panel
     // (Isaac, 30 sep 2026). Antes la rejilla de 150/180 cm caia callada a panel
     // beige. Si la medida no existe en inventario, se pide por su NOMBRE y la
     // cotizacion la marca "sin precio" en vez de desaparecerla.
-    if(cfg.rejilla){
-      const combo = REJILLAS_COMBO_PIC[l.largoCm];
-      const skuRej = combo && REJILLAS_PIC[combo.tipo] && REJILLAS_PIC[combo.tipo][l.fondoIn];
-      if(skuRej) add(skuRej, combo.cantidad * nivCarga);
-      else add('REJILLA PICKING ' + l.largoCm + 'CMX' + l.fondoIn + '"', nivCarga);
-    } else if(cfg.panel){
-      const skuPanel = PANELES_BEIGE_PIC[l.fondoIn];
-      const piezasPorNivel = Math.ceil(l.largoCm / (8 * 2.54));
-      add(skuPanel, piezasPorNivel * nivCarga);
-    } else if(cfg.madera){
-      const skuTam = TAM_PIC[l.largoCm] && TAM_PIC[l.largoCm][l.fondoIn];
-      add(skuTam || ('TAM ' + l.largoCm + 'CMX' + l.fondoIn + '"'), nivCarga);
-    }
+    _pvCm.forEach(function(cm){
+      const nC = _pv[cm];
+      if(cfg.rejilla){
+        const combo = REJILLAS_COMBO_PIC[cm];
+        const skuRej = combo && REJILLAS_PIC[combo.tipo] && REJILLAS_PIC[combo.tipo][l.fondoIn];
+        if(skuRej) add(skuRej, combo.cantidad * nC);
+        else add('REJILLA PICKING ' + cm + 'CMX' + l.fondoIn + '"', nC);
+      } else if(cfg.panel){
+        const skuPanel = PANELES_BEIGE_PIC[l.fondoIn];
+        const piezasPorNivel = Math.ceil(cm / (8 * 2.54));
+        add(skuPanel, piezasPorNivel * nC);
+      } else if(cfg.madera){
+        const skuTam = TAM_PIC[cm] && TAM_PIC[cm][l.fondoIn];
+        add(skuTam || ('TAM ' + cm + 'CMX' + l.fondoIn + '"'), nC);
+      }
+    });
   });
   // La pasarela se cuenta POR BLOQUE. Son los pasillos ENTRE filas vecinas, y
   // dos filas de bloques distintos no comparten pasillo: llamando una sola vez
@@ -8362,26 +8515,33 @@ function calcularBomSelectivo(){
         vigasPasarelaEspecial = cA * pasillosAdy * nNivP;
       }
     }
+    // Vigas por modulo: cada SKU con los niveles de SUS claros
+    const _pv = l.vigaMod ? _cargaPorViga(l, cA, cB, esD, cfg, iLn) : null;
     const vigasNormales = 2 * nivCarga - vigasPasarelaEspecial;
-    if(vigasNormales > 0) add(l.vigaSku, vigasNormales);
+    if(_pv) Object.keys(_pv).forEach(function(sk){ add(sk, 2 * _pv[sk]); });
+    else if(vigasNormales > 0) add(l.vigaSku, vigasNormales);
     if(vigasPasarelaEspecial > 0) add(VIGA_PASARELA_LADO, vigasPasarelaEspecial);
     add(ANCLA_STD_SEL, 4 * nMarcos);
     if(cfg.rejilla){
       // La rejilla se elige por (fondo del marco, ancho de rejilla que exige la viga).
       // Ver comentario "REGLA DE OBRA (ISARACK)" arriba, junto a REJILLAS_SEL.
-      const anchoRej = REJILLA_ANCHO_POR_VIGA[l.vigaIn] || 46;
-      const rejSku = (REJILLAS_SEL[l.fondoIn] || {})[anchoRej];
-      const rejPorViga = REJILLAS_POR_VIGA_SEL[l.vigaIn] || 2;
       // Fondo 24" no tiene rejilla en inventario: antes desaparecia callada de la
       // cotizacion (el 3D si la dibujaba). Ahora va por nombre y sale "sin precio".
-      add(rejSku || ('REJILLA ELECTROSOLDADA ' + l.fondoIn + '"X' + anchoRej + '"'), rejPorViga * nivCarga);
+      const _porV = _pv || (function(){ const o = {}; o[l.vigaSku] = nivCarga; return o; })();
+      Object.keys(_porV).forEach(function(sk){
+        const vIn = (VIGAS_INFO[sk] || {}).largoIn || l.vigaIn;
+        const anchoRej = REJILLA_ANCHO_POR_VIGA[vIn] || 46;
+        const rejSku = (REJILLAS_SEL[l.fondoIn] || {})[anchoRej];
+        const rejPorViga = REJILLAS_POR_VIGA_SEL[vIn] || 2;
+        add(rejSku || ('REJILLA ELECTROSOLDADA ' + l.fondoIn + '"X' + anchoRej + '"'), rejPorViga * _porV[sk]);
+      });
     }
     if(cfg.panel){
       // Panel Beige por fondo (in): cada pieza es fondoIn × 8", cubre 8" de alto de viga
       const skuPanelSel = PANEL_BEIGE_SEL[l.fondoIn];
       if(skuPanelSel){
-        const piezasPorNivel = Math.ceil(l.vigaIn / 8);
-        add(skuPanelSel, piezasPorNivel * nivCarga);
+        if(_pv) Object.keys(_pv).forEach(function(sk){ add(skuPanelSel, Math.ceil(((VIGAS_INFO[sk] || {}).largoIn || l.vigaIn) / 8) * _pv[sk]); });
+        else add(skuPanelSel, Math.ceil(l.vigaIn / 8) * nivCarga);
       }
     }
     // Fila doble: 1 bota por marco (solo el poste de pasillo). Sencilla: 2, porque
@@ -8434,21 +8594,33 @@ function calcularBomSelectivo(){
     // Malla anticaida: un panel del ancho del claro por cada 42" de alto que hay
     // que cubrir, por cada claro, mas sus sujeciones (2 por poste).
     if(l.mallaOn){
-      const skuMalla = _mallaSku(l.vigaIn);
-      const nPanTot = _mallaPaneles(l) * _mallaClaros(l);
-      if(skuMalla && nPanTot > 0){
-        add(skuMalla, nPanTot);
-        add(cfg.sujSku || SUJECION_SEL, _mallaSujeciones(l));
+      const _nCl = _mallaClaros(l), _nPan = _mallaPaneles(l);
+      let _hay = false;
+      for(let c = 0; c < _nCl; c++){
+        const sk = _mallaSku(l.vigaMod && l.vigasSku ? ((VIGAS_INFO[l.vigasSku[c]] || {}).largoIn || l.vigaIn) : l.vigaIn);
+        if(sk && _nPan > 0){ add(sk, _nPan); _hay = true; }
       }
+      if(_hay) add(cfg.sujSku || SUJECION_SEL, _mallaSujeciones(l));
     }
     // Tope tarima: uno por claro y por nivel de viga, del largo de la viga, mas
     // una union por POSTE y por nivel. Excluyente con la malla anticaida.
     if(l.topeOn && !l.mallaOn){
-      const skuTope = _topeSku(l.vigaIn);
-      const nTope = _topeCuenta(l);
-      if(skuTope && nTope > 0){
-        add(skuTope, nTope);
-        add(TOPE_UNION, _topeUniones(l));
+      if(l.vigaMod && l.vigasSku){
+        let _hayT = false;
+        const nClT = _topeClaros(l);
+        for(let c = 0; c < nClT; c++){
+          const sk = _topeSku((VIGAS_INFO[l.vigasSku[c]] || {}).largoIn || l.vigaIn);
+          const n = _topeNivelesDe(l, c);
+          if(sk && n > 0){ add(sk, n); _hayT = true; }
+        }
+        if(_hayT) add(TOPE_UNION, _topeUniones(l));
+      } else {
+        const skuTope = _topeSku(l.vigaIn);
+        const nTope = _topeCuenta(l);
+        if(skuTope && nTope > 0){
+          add(skuTope, nTope);
+          add(TOPE_UNION, _topeUniones(l));
+        }
       }
     }
     if(esD){
@@ -9373,7 +9545,7 @@ function configResumen(){
         ? (cfg.lineas[0].tipo==='doble'?'Doble':'Sencilla')+' · '+cfg.lineas[0].altoIn+'"×'+cfg.lineas[0].fondoIn+'" · cuerpo '+cfg.lineas[0].largoCm+'cm · '+cfg.lineas[0].niveles+' niv · '
         : cfg.lineas.map((l,i)=>{
             const cp = l.tipo==='doble' && l.cuerposA!==l.cuerposB ? l.cuerposA+'+'+l.cuerposB : l.cuerpos;
-            return 'L'+(i+1)+': '+(l.tipo==='doble'?'D':'S')+' '+cp+'c '+l.altoIn+'"×'+l.fondoIn+'" '+l.largoCm+'cm '+l.niveles+'n';
+            return 'L'+(i+1)+': '+(l.tipo==='doble'?'D':'S')+' '+cp+'c '+l.altoIn+'"×'+l.fondoIn+'" '+(l.vigasCm ? l.vigasCm.join('/') : l.largoCm)+'cm '+l.niveles+'n';
           }).join(' | ')+' · ')
         +cfg.cuerposTot+' cuerpo'+(cfg.cuerposTot>1?'s':'')+' tot'+ex
     };
