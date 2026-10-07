@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.08';
+const CFG_VERSION = '2026.10.07.09';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -2183,12 +2183,12 @@ function getConfigPic(){
       escHNivs: (l.escHOn ? (l.escHNivs || []) : []),
       altoM, fondoM, largoM,
       largoTotM: largoM * cuerposMaxLn,
+      pasM: l.pasM,
       profM: l.tipo==='doble' ? fondoM*2 : fondoM};
   });
   const cuerposTot = lineas.reduce((a,l)=>a+l.cuerpos,0);
   const maxLenM = Math.max(...lineas.map(l=>l.largoTotM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
-  const profTotalM = lineas.reduce((a,l)=>a+l.profM,0) + pasilloM*(lineas.length-1);
   const pasarela = {
     on: lineas.length > 1 && document.getElementById('picChkPasarela').checked,
     alturaIn: parseInt(document.getElementById('picPasarelaAltura').value) || 108,
@@ -2198,6 +2198,7 @@ function getConfigPic(){
     modelo: (document.getElementById('picPasarelaModelo')||{}).value || MODELO_PASARELA_DEF
   };
   pasarela.alturaM = pasarela.alturaIn * IN_TO_M;
+  const profTotalM = lineas.reduce((a,l)=>a+l.profM,0) + _sumaPasillos(lineas, {pasilloM, pasarela});
   return {altoIn, fondoIn, largoCm, niveles, cuerpos,
     lineas, pasilloM, cuerposTot, maxLenM, maxAltoM, profTotalM, pasarela,
     rejilla: document.getElementById('picChkRej').checked,
@@ -3661,6 +3662,7 @@ function _cardLinea(pfx, i, l, extra){
       +'<b style="min-width:16px;text-align:center;color:'+tx+'">'+conteo+'</b>'
       +'<span onclick="'+pfx+'Cuerpos('+i+',1)" style="cursor:pointer;border:1px solid '+bd+';border-radius:4px;padding:1px 8px;background:#fff;user-select:none">＋</span>'
     +'</div>'
+    + _campoPasFila(pfx, i, l)
     + chip
     + detalle
     +'</div>';
@@ -3901,6 +3903,51 @@ function _pasilloDeBloque(cfg, bloque){
   if(p === null || p === undefined || !isFinite(Number(p)) || Number(p) <= 0) return base;
   return Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, Number(p)));
 }
+// ── Pasillo POR FILA (Isaac, 7 oct 2026) ──
+// Cada fila puede traer su propio pasillo: la distancia libre entre ella y la
+// fila de atras (l.pasM, metros). Sin dato usa el del bloque / sistema. Sirve
+// para acomodar las filas entre las columnas del edificio (columnas ahogadas)
+// sin que todas tengan que llevar el mismo pasillo. Con PASARELA no aplica: la
+// pasarela necesita pasillos parejos, asi que ahi manda el general.
+const _PAS_FILA_SIS = {ln:'lineasAlmacen', lp:'lineasPicking', lm:'lineasMecano', la:'lineasAplick'};
+function _pasAntesDe(l, cfg){
+  const base = Number(cfg && cfg.pasilloM) || 0;
+  if(cfg && cfg.pasarela && cfg.pasarela.on) return base;
+  const v = Number(l && l.pasM);
+  return (isFinite(v) && v > 0) ? Math.max(PASILLO_MIN_M, Math.min(PASILLO_MAX_M, v)) : base;
+}
+function _sumaPasillos(filas, cfg){
+  let t = 0;
+  for(let i = 1; i < (filas || []).length; i++) t += _pasAntesDe(filas[i], cfg);
+  return t;
+}
+function _arrFilas(pfx){
+  return ({ln: lineasAlmacen, lp: lineasPicking, lm: lineasMecano, la: lineasAplick})[pfx] || null;
+}
+function _setPasFila(pfx, i, v){
+  const arr = _arrFilas(pfx); if(!arr || !arr[i]) return;
+  const t = String(v).trim();
+  const m = _uniAM(t);
+  arr[i].pasM = (t === '' || !(m > 0)) ? null : m;
+  const r = window[_RENDER_SIS[pfx]]; if(typeof r === 'function') r();
+  build();
+}
+// Campo "Pasillo antes de esta fila" (solo si NO es la primera de su bloque)
+function _campoPasFila(pfx, i, l){
+  const arr = _arrFilas(pfx); if(!arr) return '';
+  const delB = _filasDeBloque(arr, _bloqueDe(l));
+  if(delB.indexOf(l) <= 0) return '';
+  const idSis = {ln:'selPasillo', lp:'picPasillo', lm:'mecPasillo', la:'aplPasillo'}[pfx];
+  const el = document.getElementById(idSis);
+  const u = _uniSufijo();
+  const val = (l.pasM > 0) ? _uniDeM(l.pasM) : '';
+  return '<div style="display:flex;align-items:center;gap:5px;padding:0 6px 5px;font-size:10px;color:#8a8f95">'
+    + '<span style="flex:1" title="Espacio libre entre esta fila y la de atrás. Vacío = el pasillo general.">↕ Pasillo antes de esta fila</span>'
+    + '<input type="number" step="any" min="0" value="' + val + '" placeholder="' + (el ? el.value : '') + '"'
+    + ' onchange="_setPasFila(\'' + pfx + '\',' + i + ',this.value)"'
+    + ' style="width:62px;font-size:11px;padding:2px 3px;border:1px solid ' + (val ? '#DA6635' : '#d9d4c5') + ';border-radius:4px;text-align:center">'
+    + '<span>' + u + '</span></div>';
+}
 function _filasDeBloque(lineas, iB){ return (lineas || []).filter(l => _bloqueDe(l) === iB); }
 // cfg recortado a las filas de UN bloque: las medidas totales se recalculan con
 // esas filas, asi la escalera, la pasarela y las cotas funcionan igual sin
@@ -3916,7 +3963,7 @@ function _cfgDeBloqueGen(cfg, filas, campoLargo, bloque){
     pasilloM: pas,
     maxLenM: Math.max(...filas.map(l => l[k])),
     maxAltoM: Math.max(...filas.map(l => l.altoM)),
-    profTotalM: filas.reduce((a, l) => a + l.profM, 0) + pas * (filas.length - 1),
+    profTotalM: filas.reduce((a, l) => a + l.profM, 0) + _sumaPasillos(filas, {pasilloM: pas, pasarela: _pasarelaDeBloque(cfg, bloque)}),
     pasarela: _pasarelaDeBloque(cfg, bloque)
   });
 }
@@ -5086,13 +5133,13 @@ function getConfigSel(){
       clarosTab: l.clarosTab || null,
       altoM, fondoM, vigaM,
       largoM: vigaM * cuerposMaxLn,
+      pasM: l.pasM,
       profM: l.tipo==='doble' ? fondoM*2 + unionM : fondoM};
   });
   const cuerposMax = Math.max(...lineas.map(l=>l.cuerpos));
   const cuerposTot = lineas.reduce((a,l)=>a+l.cuerpos,0);
   const maxLenM = Math.max(...lineas.map(l=>l.largoM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
-  const profTotalM = lineas.reduce((a,l)=>a+l.profM,0) + pasilloM*(lineas.length-1);
   const pasarela = {
     on: lineas.length > 1 && document.getElementById('selChkPasarela').checked,
     alturaIn: parseInt(document.getElementById('selPasarelaAltura').value) || 108,
@@ -5102,6 +5149,7 @@ function getConfigSel(){
     modelo: (document.getElementById('selPasarelaModelo')||{}).value || MODELO_PASARELA_DEF
   };
   pasarela.alturaM = pasarela.alturaIn * IN_TO_M;
+  const profTotalM = lineas.reduce((a,l)=>a+l.profM,0) + _sumaPasillos(lineas, {pasilloM, pasarela});
   return {tipoFila, filas, unionIn, unionM, altoIn, fondoIn, vigaSku, vigaIn, vigaAltIn, vigaCapKg, vigaCapLb, niveles, cuerpos,
     lineas, pasilloM, cuerposMax, cuerposTot, maxLenM, maxAltoM, profTotalM, pasarela,
     rejilla: document.getElementById('selChkRej').checked,
@@ -5124,13 +5172,14 @@ function getConfigMec(){
     altoM: l.altoCm/100,
     largoTotM: anchoM * l.cuerpos,
     bloque: _bloqueDe(l),
+    pasM: l.pasM,
     profM: fondoM * (l.tipo === 'doble' ? 2 : 1)
   }));
   const pasilloM = _pasilloDe(document.getElementById('mecPasillo'), 1.2);
   const cuerposTot = lineas.reduce((a,l)=>a + l.cuerpos * (l.tipo==='doble'?2:1), 0);
   const maxLenM = Math.max(...lineas.map(l=>l.largoTotM));
   const maxAltoM = Math.max(...lineas.map(l=>l.altoM));
-  const profTotalM = lineas.reduce((a,l)=>a+l.profM,0) + pasilloM*(lineas.length-1);
+  const profTotalM = lineas.reduce((a,l)=>a+l.profM,0) + _sumaPasillos(lineas, {pasilloM});
   const l0 = lineas[0];
   return { altoCm: l0.altoCm, anchoCm, fondoCm, cuerpos: l0.cuerpos, niveles: l0.niveles,
            altoM: l0.altoM, anchoM, fondoM,
@@ -6560,20 +6609,22 @@ function buildPicking(){
     gLin.position.z = zAtras + l.profM/2;
     grupo.add(gLin);
     // Registrar el pasillo que sigue a esta línea (si no es la última)
+    const pasSig = (iLn < lineas.length - 1) ? _pasAntesDe(lineas[iLn+1], cfg) : 0;
     if(iLn < lineas.length - 1){
       const sig = lineas[iLn+1];
       pasillosInfo.push({
-        zCentro: zAtras + l.profM + cfg.pasilloM/2,
+        zCentro: zAtras + l.profM + pasSig/2,
+        ancho: pasSig,
         largoM: Math.min(l.largoTotM, sig.largoTotM),
         cuerposAdj: Math.max(l.cuerpos, sig.cuerpos)
       });
     }
-    zAtras += l.profM + cfg.pasilloM;
+    zAtras += l.profM + pasSig;
   });
   // Cotas de los PASILLOS entre lineas, por fuera del costado izquierdo
   if(cfg.pasilloM && pasillosInfo.length){
     const xPas = -maxLen/2 - 1.6;
-    pasillosInfo.forEach(p => cotaPasillo(grupo, p.zCentro, cfg.pasilloM, xPas, 'z'));
+    pasillosInfo.forEach(p => cotaPasillo(grupo, p.zCentro, p.ancho || cfg.pasilloM, xPas, 'z'));
   }
   // ── Pasarela (compartida) ──
   if(cfg.pasarela.on && pasillosInfo.length){
@@ -6803,15 +6854,17 @@ function buildSelectivo(){
     gLin.position.x = xInicio + l.largoM/2;
     gLin.position.z = zAtras + l.profM/2;
     grupo.add(gLin);
+    const pasSig = (iLn < lineas.length - 1) ? _pasAntesDe(lineas[iLn+1], cfg) : 0;
     if(iLn < lineas.length - 1){
       const sig = lineas[iLn+1];
       pasillosInfoSel.push({
-        zCentro: zAtras + l.profM + cfg.pasilloM/2,
+        zCentro: zAtras + l.profM + pasSig/2,
+        ancho: pasSig,
         largoM: Math.min(l.largoM, sig.largoM),
         cuerposAdj: Math.max(l.cuerpos, sig.cuerpos)
       });
     }
-    zAtras += l.profM + cfg.pasilloM;
+    zAtras += l.profM + pasSig;
   });
   if(cfg.pasarela.on && pasillosInfoSel.length){
     const l0 = lineas[0];
@@ -6826,7 +6879,7 @@ function buildSelectivo(){
   // cada isla tiene sus propios pasillos y su propia pasarela.
   if(cfg.pasilloM && pasillosInfoSel.length){
     const xPas = -maxLen/2 - 1.6;
-    pasillosInfoSel.forEach(function(p){ cotaPasillo(grupo, p.zCentro, cfg.pasilloM, xPas, 'z'); });
+    pasillosInfoSel.forEach(function(p){ cotaPasillo(grupo, p.zCentro, p.ancho || cfg.pasilloM, xPas, 'z'); });
   }
   if(cfg.pasarela.on) agregarCotasPasarela(grupo, cfg.pasarela.alturaM, cfg.pasarela.niveles, -maxLen/2 - 2.3, profTotal/2 + 0.10);
   }
@@ -7753,13 +7806,14 @@ function buildMecano(){
     gLin.position.x = xInicio + l.largoTotM/2;
     gLin.position.z = zAtras + l.profM/2;
     grupo.add(gLin);
-    if(iMec < lineas.length - 1) pasillosInfoMec.push(zAtras + l.profM + cfg.pasilloM/2);
-    zAtras += l.profM + cfg.pasilloM;
+    const pasSig = (iMec < lineas.length - 1) ? _pasAntesDe(lineas[iMec+1], cfg) : 0;
+    if(iMec < lineas.length - 1) pasillosInfoMec.push({zc: zAtras + l.profM + pasSig/2, w: pasSig});
+    zAtras += l.profM + pasSig;
   });
   // Cotas de los PASILLOS entre lineas, por fuera del costado izquierdo
   if(cfg.pasilloM && pasillosInfoMec.length){
     const xPasM = -maxLen/2 - 1.2;
-    pasillosInfoMec.forEach(zc => cotaPasillo(grupo, zc, cfg.pasilloM, xPasM, 'z'));
+    pasillosInfoMec.forEach(p => cotaPasillo(grupo, p.zc, p.w, xPasM, 'z'));
   }
   }
   const lineas = cfg.lineas;
@@ -7938,12 +7992,13 @@ function getConfigApl(){
     altoM: altoM,
     largoTotM: paso * l.cuerpos - APL_SEP_M,
     bloque: _bloqueDe(l),
+    pasM: l.pasM,
     profM: fondoM * (l.tipo === 'doble' ? 2 : 1) + (l.tipo === 'doble' ? APL_SEP_M : 0)
   }));
   const pasilloM = _pasilloDe(document.getElementById('aplPasillo'), 1.2);
   const cuerposTot = lineas.reduce((a,l)=>a + l.cuerpos * (l.tipo==='doble'?2:1), 0);
   const maxLenM = Math.max(...lineas.map(l=>l.largoTotM));
-  const profTotalM = lineas.reduce((a,l)=>a+l.profM,0) + pasilloM*(lineas.length-1);
+  const profTotalM = lineas.reduce((a,l)=>a+l.profM,0) + _sumaPasillos(lineas, {pasilloM});
   return { anchoM, fondoM, altoM, paso, lineas, pasilloM, cuerposTot, maxLenM, maxAltoM: altoM, profTotalM,
            detalle: cuerposTot <= 12 };
 }
@@ -8042,12 +8097,13 @@ function buildAplick(){
       gLin.position.x = xInicio + l.largoTotM/2;
       gLin.position.z = zAtras + l.profM/2;
       grupo.add(gLin);
-      if(iL < lineas.length - 1) pasillos.push(zAtras + l.profM + cfg.pasilloM/2);
-      zAtras += l.profM + cfg.pasilloM;
+      const pasSig = (iL < lineas.length - 1) ? _pasAntesDe(lineas[iL+1], cfg) : 0;
+      if(iL < lineas.length - 1) pasillos.push({zc: zAtras + l.profM + pasSig/2, w: pasSig});
+      zAtras += l.profM + pasSig;
     });
     if(cfg.pasilloM && pasillos.length){
       const xP = -cfg.maxLenM/2 - 1.2;
-      pasillos.forEach(zc => cotaPasillo(grupo, zc, cfg.pasilloM, xP, 'z'));
+      pasillos.forEach(p => cotaPasillo(grupo, p.zc, p.w, xP, 'z'));
     }
   }
   _bloquesNormApl();
