@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.16';
+const CFG_VERSION = '2026.10.07.17';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1211,13 +1211,21 @@ let requiereEnvio = true;          // flete/envío
 const IVA_FIJO = 8;        // BC frontera, no editable
 
 // Flete con tabla de 5 bloques (igual que ISA-OS, sobre subtotal sin IVA)
-// Calcula el costo de instalación: 5% del valor de ventas, mínimo $80 USD
+// Instalación: 5% del material, SIN minimo. Igual que ISA-OS
+// (sincronizarInstalacionVenta). Antes llevaba minimo de $80 USD y en pedidos
+// chicos salia carisima. (Isaac, 7 oct 2026: "que quede como el ISA-OS")
 function calcularInstalacion(materialUSD){
-  // Sin material (todo sin precio o carrito vacio) no se cobra el minimo de $80
-  // solo: el flete ya se comportaba asi.
   if(!(materialUSD > 0)) return 0;
-  const pct = materialUSD * 0.05;
-  return Math.max(pct, 80);
+  return materialUSD * 0.05;
+}
+// Flete e instalacion como los cobra ISA-OS: sobre el material ya con descuento
+// y con la tabla del flete aplicada al importe EN LA MONEDA de la cotizacion
+// (ISA-OS mete los pesos directo a la tabla). Devuelve todo en USD.
+function _serviciosUSD(materialUSD){
+  const tc = (monedaSel === 'MXN' && tcCache > 0) ? tcCache : 1;
+  const flete = (requiereEnvio && materialUSD > 0) ? calcularFlete(materialUSD * tc).flete / tc : 0;
+  const inst = requiereInstalacion ? calcularInstalacion(materialUSD) : 0;
+  return { flete: flete, inst: inst };
 }
 
 function calcularFlete(sub){
@@ -9095,9 +9103,9 @@ function renderCotizacion(){
 
   // Flete e instalación: UNA sola vez, sobre el material de todo el plano
   // (a precio de lista: el descuento no les pega).
-  const _baseServ = materialUSD + descUSD;
-  const fleteUSD = (requiereEnvio && _baseServ > 0) ? calcularFlete(_baseServ).flete : 0;
-  const instalacionUSD = requiereInstalacion ? calcularInstalacion(_baseServ) : 0;
+  const _serv = _serviciosUSD(materialUSD);
+  const fleteUSD = _serv.flete;
+  const instalacionUSD = _serv.inst;
   const servicios = [];
   if(requiereEnvio){
     servicios.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
@@ -9266,7 +9274,7 @@ function renderCotizacion(){
     <div class="tr"><span>IVA ${IVA_FIJO}%</span><span>${fmt(ivaUSD)}</span></div>
     <div class="tr gd"><span>Total ${monedaSel}</span><span>${fmt(totalUSD)}</span></div>
     ${monedaSel==='MXN' ? '<div style="font-size:10px;color:#9aa0a6;margin-top:6px;text-align:right">TC DOF '+tcCache.toFixed(4)+'</div>' : ''}
-    ${requiereInstalacion ? '<div style="font-size:10px;color:#9aa0a6;margin-top:3px;text-align:right">Instalación 5% del subtotal · mínimo $80 USD</div>' : ''}
+    ${requiereInstalacion ? '<div style="font-size:10px;color:#9aa0a6;margin-top:3px;text-align:right">Instalación 5% del material</div>' : ''}
   `;
   document.getElementById('selMon').onchange = e=>{ monedaSel = e.target.value; renderCotizacion(); };
   document.getElementById('chkEnvio').onchange = e=>{ requiereEnvio = e.target.checked; renderCotizacion(); };
@@ -10025,9 +10033,9 @@ async function generarPDF(datos, opts){
   const _bGon = bloques.filter(function(b){ return b.sis === 'gondola'; })[0];
   if(_bGon) desgloseGondola = _bGon.desglose;
 
-  const _baseServ = materialUSD + descUSD;   // a precio de lista, igual que en pantalla
-  const fleteUSD = (requiereEnvio && _baseServ > 0) ? calcularFlete(_baseServ).flete : 0;
-  const instalacionUSD = requiereInstalacion ? calcularInstalacion(_baseServ) : 0;
+  const _serv = _serviciosUSD(materialUSD);   // igual que en pantalla
+  const fleteUSD = _serv.flete;
+  const instalacionUSD = _serv.inst;
   const servicios = [];
   if(requiereEnvio){
     servicios.push({ sku:'SEL-0305', producto:'SERVICIO DE FLETE', cantidad:1, precioUSD:fleteUSD, importeUSD:fleteUSD });
