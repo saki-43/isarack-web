@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.07.20';
+const CFG_VERSION = '2026.10.08.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -5853,8 +5853,13 @@ function _mallaDeLinea(gLin, cfg, l){
         gLin.add(sj);
       });
     };
+    // Cada panel va 4" arriba de su viga. Si se piden mas paneles que niveles de
+    // viga, los que sobran van ABAJO, en el piso (4" arriba). (Isaac, 8 oct 2026)
+    const SOBRE = 4 * IN_TO_M;
     for(let c=0; c<nClaros; c++){
-      const ys = ysDe(c).slice(0, nApil);
+      const vigas = ysDe(c);
+      const extra = Math.max(0, nApil - vigas.length);
+      const ys = (extra > 0 ? [0] : []).concat(vigas).slice(0, nApil).map(function(y){ return y + SOBRE; });
       const xc = xIzq + _xK(l, c) + _vM(l, c) / 2;
       ys.forEach(function(yV){
         const h = Math.min(hP, l.altoM - yV);
