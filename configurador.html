@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.08.01';
+const CFG_VERSION = '2026.10.08.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1000,7 +1000,9 @@ function _mallaSku(vigaIn){ return MALLA_PANEL[vigaIn] || null; }
 // La malla arranca a 2 PIES del piso y de ahi se apila hacia arriba (Isaac,
 // 18 sep 2026). No depende de donde quede la primera viga de carga.
 // La medida cuadra sola en el marco mas comun: 24" + 4 paneles de 42" = 192".
-const MALLA_INICIO_IN = 24;
+// 8 oct 2026: arranca a 4" del piso (antes 24"). Con 24" en un marco de 240"
+// pedia 6 y la ultima sobresalia 36". (Isaac)
+const MALLA_INICIO_IN = 4;
 function _mallaInicioM(){ return MALLA_INICIO_IN * IN_TO_M; }
 // Paneles apilados que pide UN claro. Se cubre TODO el marco: si para llegar al
 // tope hace falta otro panel, se pide (Isaac, 18 sep 2026) — por eso va hacia
@@ -4617,7 +4619,7 @@ function _mallaInfo(l, i, esD, info){
     + '<option value=""'+(nPan===nTodo?' selected':'')+'>Todo el marco ('+nTodo+')</option>'
     + Array.from({length: nTodo - 1}, function(_, k){ return k + 1; }).map(function(n){ return '<option value="'+n+'"'+(nPan===n&&n<nTodo?' selected':'')+'>'+n+'</option>'; }).join('')
     + '</select></div>';
-  return chips + altoSel + '<div style="font-size:9px;color:#888">Va '+donde+(nPan < nTodo ? ': '+nPan+' panel'+(nPan===1?'':'es')+' suelto'+(nPan===1?'':'s')+', cada uno parado sobre su nivel de viga (como el tope tarima)' : ', de 2 pies del piso al tope')+'.<br>'
+  return chips + altoSel + '<div style="font-size:9px;color:#888">Va '+donde+(nPan < nTodo ? ': '+nPan+' panel'+(nPan===1?'':'es')+' suelto'+(nPan===1?'':'s')+', cada uno parado sobre su nivel de viga (como el tope tarima)' : ', de 4" del piso al tope')+'.<br>'
     + '<b>'+(nPan*nCl)+'</b> paneles de '+vigaIn+'"×'+MALLA_ALTO_IN+'" ('+nPan+(_mallaSueltos(l)?' sueltos × ':' apilados × ')+nCl+' claro'+(nCl===1?'':'s')+')<br>'
     + (_mallaSueltos(l)
         ? '<b>'+_mallaSujeciones(l)+'</b> sujeciones: paneles sueltos (1 por nivel de viga), 4 por panel — '+(nPan*2)+' por poste.'
