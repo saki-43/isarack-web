@@ -1875,7 +1875,7 @@ function box(w,h,d,mat){
   return m;
 }
 
-function buildRow(parent, central, alto, ancho, fondo, niv, mods){
+function buildRow(parent, central, alto, ancho, fondo, niv, mods, niv2){
   const pw = 0.045;
   const totalW = ancho*mods;
   const x0 = -totalW/2;
@@ -1956,15 +1956,20 @@ function buildRow(parent, central, alto, ancho, fondo, niv, mods){
     parent.add(topCover);
     // Charolas: la primera horizontal pegada al zócalo, las demás inclinadas distribuidas arriba.
     // niv puede ser arreglo por modulo (niveles por modulo).
+    // En una central la cara 2 (dir -1) puede llevar otros niveles (niv2).
     const nivM = Array.isArray(niv) ? niv[mIdx] : niv;
-    const nSup = Math.max(nivM - 1, 1);
-    const paso = nSup > 1 ? (yTop - yBaseSup)/(nSup - 1) : 0;
-    for(let i=0;i<nivM;i++){
-      const isPrimera = (i === 0);
-      const y = isPrimera ? yPrimera : (yBaseSup + paso*(i-1));
-      charola(cx, y, 1, isPrimera);
-      if(central) charola(cx, y, -1, isPrimera);
-    }
+    const nivM2 = Array.isArray(niv2) ? niv2[mIdx] : nivM;
+    const caraCharolas = function(nC, dir){
+      const nSup = Math.max(nC - 1, 1);
+      const paso = nSup > 1 ? (yTop - yBaseSup)/(nSup - 1) : 0;
+      for(let i=0;i<nC;i++){
+        const isPrimera = (i === 0);
+        const y = isPrimera ? yPrimera : (yBaseSup + paso*(i-1));
+        charola(cx, y, dir, isPrimera);
+      }
+    };
+    caraCharolas(nivM, 1);
+    if(central) caraCharolas(nivM2, -1);
   }
 }
 
@@ -3807,11 +3812,24 @@ function lmNivSet(i, fila, c, val){
   renderLineasMecano(); build();
 }
 // Texto de entrepaños para el chip y el resumen: "5" o "3–7" si varian por modulo.
+// Como _nivArrRaw pero con el nombre del arreglo (nivelesA2/nivelesB2 de la gondola).
+function _nivArrKey(l, key, n){
+  const src = l[key] || [];
+  const a = [];
+  for(let c = 0; c < n; c++){
+    const v = parseInt(src[c]);
+    a.push(Number.isFinite(v) ? Math.max(0, v) : (l.niveles || 3));
+  }
+  return a;
+}
 function _nivTxtMec(l){ return _nivRango(l, l.cuerpos); }
 // Generico: n = modulos de cada cara (Mecano, Gondola, Aplick, Cantilever).
 function _nivRango(l, n){
   if(!l.nivMod) return String(l.niveles);
-  const t = _nivArrRaw(l, 'A', n).concat(l.tipo === 'doble' ? _nivArrRaw(l, 'B', n) : []);
+  let t = _nivArrRaw(l, 'A', n).concat(l.tipo === 'doble' ? _nivArrRaw(l, 'B', n) : []);
+  // Gondola central: la cara 2 de cada fila lleva sus propios niveles
+  if(Array.isArray(l.nivelesA2)) t = t.concat(_nivArrKey(l, 'nivelesA2', n));
+  if(Array.isArray(l.nivelesB2) && l.tipo === 'doble') t = t.concat(_nivArrKey(l, 'nivelesB2', n));
   const mn = Math.min.apply(null, t), mx = Math.max.apply(null, t);
   return mn === mx ? String(mn) : mn+'–'+mx;
 }
@@ -4222,13 +4240,46 @@ function _gonNormaliza(l){
   if(l.cabeceras == null) l.cabeceras = 0;
   if(l.volteada == null) l.volteada = false;
   if(l.nivMod){   // arreglos del tamaño de los modulos actuales
+    const central = l.tipoGon === 'central', dob = l.tipo === 'doble';
+    // La cara 2 nace igual a la cara 1 (al prender la casilla o pasar de pared a central)
+    if(central && !Array.isArray(l.nivelesA2)) l.nivelesA2 = (l.nivelesA || []).slice();
+    if(central && dob && !Array.isArray(l.nivelesB2)) l.nivelesB2 = (l.nivelesB || l.nivelesA || []).slice();
     l.nivelesA = _nivArrRaw(l, 'A', l.modulos);
-    l.nivelesB = l.tipo === 'doble' ? _nivArrRaw(l, 'B', l.modulos) : null;
+    l.nivelesB = dob ? _nivArrRaw(l, 'B', l.modulos) : null;
+    l.nivelesA2 = central ? _nivArrKey(l, 'nivelesA2', l.modulos) : null;
+    l.nivelesB2 = (central && dob) ? _nivArrKey(l, 'nivelesB2', l.modulos) : null;
   }
   return l;
 }
 // Niveles por módulo en Góndola (mismo editor que Selectivo y Picking). En una
-// central el numero aplica a las dos caras del modulo. Cabeceras: niveles de la fila.
+// central cada CARA lleva los suyos (Isaac, 13 oct 2026): cara 1 = frente, cara 2 = atras.
+// Cabeceras: niveles de la fila.
+const _GON_NIV_KEY = {A:'nivelesA', A2:'nivelesA2', B:'nivelesB', B2:'nivelesB2'};
+function _gonNivEditor(l, i){
+  const central = l.tipoGon === 'central', dob = l.tipo === 'doble';
+  const filas = [];
+  if(dob){
+    filas.push(['A', central ? 'Fila A · cara 1 (frente)' : 'Fila A']);
+    if(central) filas.push(['A2', 'Fila A · cara 2 (atrás)']);
+    filas.push(['B', central ? 'Fila B · cara 1 (frente)' : 'Fila B']);
+    if(central) filas.push(['B2', 'Fila B · cara 2 (atrás)']);
+  } else {
+    filas.push(['A', central ? 'Cara 1 (frente)' : '']);
+    if(central) filas.push(['A2', 'Cara 2 (atrás)']);
+  }
+  let h = '<div style="margin-top:4px">';
+  filas.forEach(function(f){
+    const arr = _nivArrKey(l, _GON_NIV_KEY[f[0]], l.modulos);
+    if(f[1]) h += '<div style="font-size:9px;color:#888;margin:4px 0 2px">'+f[1]+'</div>';
+    h += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+    for(let c = 0; c < l.modulos; c++){
+      h += '<div style="text-align:center"><div style="font-size:8.5px;color:#999;margin-bottom:1px">M'+(c+1)+'</div>'
+        + '<input type="number" min="1" max="6" value="'+arr[c]+'" onchange="gonNivSet('+i+',\''+f[0]+'\','+c+',this.value)" style="width:36px;padding:3px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:5px;text-align:center;background:#fff"></div>';
+    }
+    h += '</div>';
+  });
+  return h + '</div>';
+}
 function gonNivMod(i, on){
   const l = lineasGondola[i];
   l.nivMod = !!on;
@@ -4241,7 +4292,7 @@ function gonNivSet(i, fila, c, val){
   const l = lineasGondola[i];
   const _n = parseInt(val);
   const v = Math.max(1, Math.min(6, Number.isFinite(_n) ? _n : l.niveles));
-  const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
+  const key = _GON_NIV_KEY[fila] || 'nivelesA';
   if(!Array.isArray(l[key])) l[key] = [];
   l[key][c] = v;
   renderLineasGondola();
@@ -4351,7 +4402,7 @@ function renderLineasGondola(){
         + '<div><div style="color:#666;margin-bottom:1px">Módulos</div><select onchange="lnSetGon('+i+',\'modulos\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_MODULOS, l.modulos)+'</select></div>'
         + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
           + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="gonNivMod('+i+',this.checked)"> Niveles por módulo</label>'
-          + (l.nivMod ? _nivModEditor(l, i, esD, l.modulos, l.modulos, 'gonNivSet') : '')
+          + (l.nivMod ? _gonNivEditor(l, i) : '')
         + '</div>'
         + '<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Cabeceras (141×100)</div><select onchange="lnSetGon('+i+',\'cabeceras\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_CABECERAS, l.cabeceras)+'</select></div>'
         + (bloquesGondola.length > 1
@@ -6265,12 +6316,18 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
 
 // Dibuja UNA góndola sencilla (con sus cabeceras) dentro de `parent`, centrada en (0,0,0).
 // El fondo de la góndola queda simétrico respecto a Z=0.
-// niv: numero o arreglo por modulo (niveles por modulo); nivCab: niveles de las cabeceras.
-function _gonBuildFila(parent, tipoGon, medidaKey, niv, mods, cabs, nivCab){
+// Niveles de la cara 2 (atras) de una gondola central, por modulo. null = igual a la cara 1.
+function _gonCara2(l, fila){
+  if(!l.nivMod || l.tipoGon !== 'central') return null;
+  return _nivArrKey(l, fila === 'B' ? 'nivelesB2' : 'nivelesA2', l.modulos);
+}
+// niv: numero o arreglo por modulo (niveles por modulo); nivCab: niveles de las cabeceras;
+// niv2: arreglo por modulo de la cara 2 (central), o null si va igual que la cara 1.
+function _gonBuildFila(parent, tipoGon, medidaKey, niv, mods, cabs, nivCab, niv2){
   const m = MED[medidaKey];
   const central = tipoGon === 'central';
   const totalW = m.ancho * mods;
-  buildRow(parent, central, m.alto, m.ancho, m.fondo, niv, mods);
+  buildRow(parent, central, m.alto, m.ancho, m.fondo, niv, mods, niv2);
   for(let cIdx=0; cIdx<cabs; cIdx++){
     const side = cIdx===0 ? 1 : -1;
     const cab = new THREE.Group();
@@ -6331,16 +6388,16 @@ function buildGondola(){
       // Dos góndolas espalda con espalda.
       const off = central ? m.fondo : m.fondo/2;
       const filaA = new THREE.Group();
-      _gonBuildFila(filaA, l.tipoGon, l.medida, _nivFila(l,'A',l.modulos), l.modulos, l.cabeceras, l.niveles);
+      _gonBuildFila(filaA, l.tipoGon, l.medida, _nivFila(l,'A',l.modulos), l.modulos, l.cabeceras, l.niveles, _gonCara2(l,'A'));
       filaA.position.set(0, 0, off);
       gLin.add(filaA);
       const filaB = new THREE.Group();
-      _gonBuildFila(filaB, l.tipoGon, l.medida, _nivFila(l,'B',l.modulos), l.modulos, l.cabeceras, l.niveles);
+      _gonBuildFila(filaB, l.tipoGon, l.medida, _nivFila(l,'B',l.modulos), l.modulos, l.cabeceras, l.niveles, _gonCara2(l,'B'));
       filaB.rotation.y = Math.PI;
       filaB.position.set(0, 0, -off);
       gLin.add(filaB);
     } else {
-      _gonBuildFila(gLin, l.tipoGon, l.medida, _nivFila(l,'A',l.modulos), l.modulos, l.cabeceras, l.niveles);
+      _gonBuildFila(gLin, l.tipoGon, l.medida, _nivFila(l,'A',l.modulos), l.modulos, l.cabeceras, l.niveles, _gonCara2(l,'A'));
     }
     // Solo aplica a pared: voltear 180° para que las charolas queden al otro lado.
     if(l.tipoGon === 'pared' && l.volteada) gLin.rotation.y = Math.PI;
@@ -8597,7 +8654,8 @@ function calcularBomAplick(){
 // Core: BOM de UNA fila con parametros explicitos. Multiplicador aplica a "doble"
 // (2 gondolas espalda con espalda). Retorna [[sku, qty]...].
 // nivMods (opcional): niveles de cada modulo (niveles por modulo). Sin el, todos llevan `niveles`.
-function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult, nivMods){
+// nivMods2 (opcional): los de la cara 2 en una central. Sin el, igual que la cara 1.
+function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult, nivMods, nivMods2){
   const m = MED[medidaKey];
   const items = {}; const orden = [];
   function add(sku, q){
@@ -8608,14 +8666,18 @@ function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult, nivM
   const c = tipoGon==='central', mul = c?2:1, A = m.anchoCm, a211 = m.pilar==='211';
   const postesC = modulos+1;
   // Suma de niveles de todos los modulos (= niveles*modulos si es parejo)
-  const sumNiv = Array.isArray(nivMods) ? nivMods.reduce((a,v)=>a+v, 0) : niveles*modulos;
+  // y sumando las dos caras si es central.
+  const _suma = arr => arr.reduce((a,v)=>a+v, 0);
+  const sumF = Array.isArray(nivMods) ? _suma(nivMods) : niveles*modulos;
+  const sumR = c ? (Array.isArray(nivMods2) ? _suma(nivMods2) : sumF) : 0;
+  const sumNiv = sumF + sumR;   // charolas de todas las caras
   add('PILAR '+m.pilar+'CM', postesC);
-  add('BRAZO', (sumNiv-modulos)*2*mul);
-  add('CHAROLA '+A+'CM X 47CM', sumNiv*mul);
+  add('BRAZO', (sumNiv - modulos*mul)*2);
+  add('CHAROLA '+A+'CM X 47CM', sumNiv);
   add('PANEL TRASERO '+A+'CMX40CM', (a211?5:3)*2*modulos);
   if(!a211) add('PANEL TRASERO '+A+'CMX10CM', 2*modulos);
   add('BASE', (c?2:1)*postesC);
-  add('PORTA PRECIO '+A+'CM', sumNiv*mul);
+  add('PORTA PRECIO '+A+'CM', sumNiv);
   add('CUBRE POLVO '+A+'CM', (c?2:1)*modulos);
   add('CUBIERTA SUPERIOR '+A+'CM', modulos);
   if(cabeceras>0){
@@ -8654,8 +8716,8 @@ function calcularBomGondola(){
       }];
   filas.forEach(l => {
     if(l.nivMod){   // niveles por modulo: cada gondola de la doble con los suyos
-      acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, 1, _nivArrRaw(l, 'A', l.modulos)));
-      if(l.tipo === 'doble') acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, 1, _nivArrRaw(l, 'B', l.modulos)));
+      acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, 1, _nivArrRaw(l, 'A', l.modulos), _gonCara2(l, 'A')));
+      if(l.tipo === 'doble') acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, 1, _nivArrRaw(l, 'B', l.modulos), _gonCara2(l, 'B')));
       return;
     }
     const mult = l.tipo === 'doble' ? 2 : 1;
