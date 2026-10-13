@@ -3877,12 +3877,20 @@ function lcFilaBloque(i, iB){
 function renderLineasCantilever(){
   const cont = document.getElementById('canLineasList');
   const _htmlBloquesC = _bloquesHtml('lc', bloquesCantilever, lineasCantilever, _bloqueActivoCan());
+  lineasCantilever.forEach(_nivNormCan);
   cont.innerHTML = lineasCantilever.map((l, i) => {
     const nivOpts = [3,4,5,6,7].map(n=>[n,String(n)]);
+    const bdC = l.tipo === 'doble' ? '#f0c4ae' : '#b5d4f4', txC = l.tipo === 'doble' ? '#993C1D' : '#185FA5';
     const detalle =
       '<div><div style="color:#666;margin-bottom:1px">Altura col.</div><select onchange="lcSet('+i+',\'altoFt\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(CAN_ALTOS_OPTS, l.altoFt)+'</select></div>'
       +'<div><div style="color:#666;margin-bottom:1px">Brazo</div><select onchange="lcSet('+i+',\'brazoIn\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(CAN_BRAZOS_OPTS, l.brazoIn)+'</select></div>'
-      +'<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Niveles de brazos</div><select onchange="lcSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>';
+      +'<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Niveles de brazos</div><select onchange="lcSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>'
+      // Niveles por módulo: cada columna con sus brazos. En una doble el numero
+      // aplica a los dos lados de la columna, por eso va una sola fila.
+      +'<div style="grid-column:1/3;border-top:1px dashed '+bdC+';padding-top:4px;margin-top:1px">'
+        +'<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+txC+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lcNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+        +(l.nivMod ? _nivModEditor(l, i, false, l.cuerpos, l.cuerpos, 'lcNivSet') : '')
+      +'</div>';
     // Los brazos de una fila DOBLE salen de los dos lados, voltearla no cambia
     // nada; por eso la flecha solo va en las sencillas (igual que en Gondola,
     // donde la fila central tampoco la lleva).
@@ -3897,10 +3905,31 @@ function renderLineasCantilever(){
         + '</select></div>'
       : '';
     return _cardLinea('lc', i, l, {total: lineasCantilever.length, abPermitido:false, flip: flip,
-      chip: letraB+l.altoFt+"' · brazo "+l.brazoIn+'\" · '+l.niveles+' niv', detalle: detalle + selB});
+      chip: letraB+l.altoFt+"' · brazo "+l.brazoIn+'\" · '+_nivRangoCan(l)+' niv', detalle: detalle + selB});
   }).join('');
   cont.innerHTML = _htmlBloquesC + cont.innerHTML;
   lineasSyncCan();
+}
+// Niveles por módulo en Cantilever: brazos por columna (una sola fila, aun en doble)
+function _nivNormCan(l){
+  if(!l || !l.nivMod) return;
+  l.nivelesA = _nivArrRaw(l, 'A', l.cuerpos);
+  l.nivelesB = null;
+}
+function _nivRangoCan(l){ return _nivRango({nivMod: l.nivMod, nivelesA: l.nivelesA, niveles: l.niveles, tipo: 'sencilla'}, l.cuerpos || l.columnas); }
+function lcNivMod(i, on){
+  const l = lineasCantilever[i];
+  l.nivMod = !!on;
+  _nivNormCan(l);
+  renderLineasCantilever(); build();
+}
+function lcNivSet(i, fila, c, val){
+  const l = lineasCantilever[i];
+  const _n = parseInt(val);
+  const v = Math.max(1, Math.min(7, Number.isFinite(_n) ? _n : l.niveles));
+  if(!Array.isArray(l.nivelesA)) l.nivelesA = [];
+  l.nivelesA[c] = v;
+  renderLineasCantilever(); build();
 }
 function lcAdd(tipo, iB){
   if(lineasCantilever.length >= 8) return;
@@ -5480,6 +5509,9 @@ function getConfigCan(){
   const lineas = lineasCantilever.map(l => ({
     tipo: l.tipo, columnas: l.cuerpos, volteada: (l.tipo !== 'doble' && !!l.volteada),
     altoFt: l.altoFt, brazoIn: l.brazoIn, niveles: l.niveles,
+    nivMod: !!l.nivMod, nivelesA: l.nivelesA || null,
+    // brazos de cada columna (niveles por modulo) o null si todas van parejas
+    nivelesCol: l.nivMod ? _nivArrRaw(l, 'A', l.cuerpos) : null,
     altoM: l.altoFt * 0.3048,
     brazoM: l.brazoIn * IN_TO_M,
     separacionM,
@@ -5572,7 +5604,14 @@ function buildCantileverScene(parent, cfg, colorHex){
     const zCol = c * cfg.separacionM;
     drawColumnaPerfilI(0, zCol, cfg.altoM);
     drawBaseVigaI(0, zCol, isDoble ? 'ambos' : 'frente');
-    alturasBrazos.forEach(y => {
+    // Niveles por modulo: esta columna reparte sus propios brazos en el alto util
+    let altC = alturasBrazos;
+    if(Array.isArray(cfg.nivelesCol)){
+      const nC = cfg.nivelesCol[c], clC = espacioUtil / (nC + 1);
+      altC = [];
+      for(let n=0; n<nC; n++) altC.push(baseAltoM + clC * (n + 1));
+    }
+    altC.forEach(y => {
       drawBrazo(y, zCol, 1);
       if(isDoble) drawBrazo(y, zCol, -1);
     });
@@ -5627,7 +5666,8 @@ function buildCantilever(){
   lineas.forEach((l, i) => {
     const gLin = new THREE.Group();
     const pseudo = { tipo: l.tipo, altoFt: l.altoFt, altoM: l.altoM, brazoM: l.brazoM,
-                     niveles: l.niveles, columnas: l.columnas, separacionM: l.separacionM };
+                     niveles: l.niveles, columnas: l.columnas, separacionM: l.separacionM,
+                     nivelesCol: l.nivelesCol };
     const alturas = buildCantileverScene(gLin, pseudo, colorHex);
     if(i === 0) alturasBrazosL0 = alturas;
     // La escena construye columnas en z = 0..largoZM, columna en x~0
@@ -5682,7 +5722,7 @@ function buildCantilever(){
   const xTorre0 = -W/2 - (lineas[0].tipo === 'doble' ? -lineas[0].anchoBaseM/2 : -0.15);
   cotaDim(grupo, [xTorre0, 0, zFrente], [xTorre0, cfg.maxAltoM, zFrente], fmtCota(cfg.maxAltoM), {labelOffset:[0.38,0,0]});
   // Claros entre brazos (solo 1 línea)
-  if(lineas.length === 1 && alturasBrazosL0){
+  if(lineas.length === 1 && alturasBrazosL0 && !lineas[0].nivelesCol){   // con niveles por modulo cada columna va distinta
     agregarCotasClaros(grupo, alturasBrazosL0, xTorre0 + lineas[0].brazoM + 0.55, maxLargoZ/2 + 0.10);
   }
   const filaTxt = lineas.length === 1
@@ -5693,7 +5733,7 @@ function buildCantilever(){
     'Cantilever · '+filaTxt+' · Ancho <b>'+W.toFixed(2)+' m</b> · Alto <b>'+cfg.maxAltoM.toFixed(2)+' m</b> · '+
     colTot+' columna'+(colTot>1?'s':'');
   const lineasHtml = lineas.length > 1
-    ? '<span style="font-size:10px;color:#888">' + lineas.map((l,i)=>'L'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.columnas+' col · '+l.altoFt+"' · "+l.niveles+' niv').join(' | ') + '</span>'
+    ? '<span style="font-size:10px;color:#888">' + lineas.map((l,i)=>'L'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.columnas+' col · '+l.altoFt+"' · "+_nivRangoCan(l)+' niv').join(' | ') + '</span>'
     : '';
   document.getElementById('medidasResumen').innerHTML =
     '<b>Cantilever · '+filaTxt+'</b><br>'+
@@ -5718,7 +5758,9 @@ function calcularBomCantilever(){
     add(skuCol,   l.columnas);
     add(skuBase,  l.columnas);
     add(CAN.ANCLA, 4 * l.columnas);
-    add(skuBrazo, l.columnas * l.niveles * brazoMult);
+    // Brazos: suma de los de cada columna (= columnas*niveles si van parejas)
+    const brazosCol = l.nivelesCol ? l.nivelesCol.reduce((a,v)=>a+v, 0) : l.columnas * l.niveles;
+    add(skuBrazo, brazosCol * brazoMult);
     const reglaAtir = CAN_ATIR[l.altoFt] || { diagonales:3, travesanos:4 };
     const pares = Math.max(0, l.columnas - 1);
     add(CAN.ATIR_HOR, reglaAtir.travesanos * pares);
@@ -9902,7 +9944,7 @@ function configResumen(){
   }
   if(sistemaActual === 'cantilever'){
     const cfg = getConfigCan();
-    const desg = cfg.lineas.map((l,i)=>'L'+(i+1)+': '+l.tipo+' '+l.columnas+' col '+l.altoFt+'ft brazo '+l.brazoIn+'in '+l.niveles+' niv').join(' | ');
+    const desg = cfg.lineas.map((l,i)=>'L'+(i+1)+': '+l.tipo+' '+l.columnas+' col '+l.altoFt+'ft brazo '+l.brazoIn+'in '+_nivRangoCan(l)+' niv').join(' | ');
     return {
       sistema: 'Cantilever',
       txt: 'Cantilever · '+cfg.lineas.length+' línea'+(cfg.lineas.length>1?'s':'')+' · '+desg+(cfg.lineas.length>1?' · pasillo '+cfg.pasilloM.toFixed(1)+'m':'')
