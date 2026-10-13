@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.08.03';
+const CFG_VERSION = '2026.10.13.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -3747,9 +3747,17 @@ function renderLineasMecano(){
   const _htmlBloquesM = _bloquesHtml('lm', bloquesMecano, lineasMecano, _bloqueActivoMec());
   cont.innerHTML = lineasMecano.map((l, i) => {
     const nivOpts = [3,4,5,6,7,8,9,10,11,12].map(n=>[n,String(n)]);   // hasta 12 paneles (Isaac, 6 oct 2026)
+    const esDM = l.tipo === 'doble';
+    const bdM = esDM ? '#f0c4ae' : '#b5d4f4', txM = esDM ? '#993C1D' : '#185FA5';
+    _nivNormaliza(l);
     const detalle =
       '<div><div style="color:#666;margin-bottom:1px">Alto</div><select onchange="lmSet('+i+',\'altoCm\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(MEC_ALTOS, l.altoCm)+'</select></div>'
-      +'<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lmSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>';
+      +'<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lmSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>'
+      // Niveles por módulo: mismo editor que Selectivo y Picking
+      +'<div style="grid-column:1/3;border-top:1px dashed '+bdM+';padding-top:4px;margin-top:1px">'
+        +'<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+txM+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lmNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+        +(l.nivMod ? _nivModEditor(l, i, esDM, l.cuerpos, l.cuerpos, 'lmNivSet') : '')
+      +'</div>';
     const letraB = bloquesMecano.length > 1 ? '📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ' : '';
     const selB = bloquesMecano.length > 1
       ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px;padding-top:3px"><span style="font-size:10px;color:#666;font-weight:600">📦 Bloque</span>'
@@ -3758,7 +3766,7 @@ function renderLineasMecano(){
         + '</select></div>'
       : '';
     return _cardLinea('lm', i, l, {total: lineasMecano.length, abPermitido:false,
-      chip: letraB+l.altoCm+' cm · '+l.niveles+' entrepaños', detalle: detalle + selB});
+      chip: letraB+l.altoCm+' cm · '+_nivTxtMec(l)+' entrepaños', detalle: detalle + selB});
   }).join('');
   cont.innerHTML = _htmlBloquesM + cont.innerHTML;
   lineasSyncMec();
@@ -3779,6 +3787,30 @@ function lmCuerpos(i,d){ const l=lineasMecano[i]; l.cuerpos=Math.max(1,Math.min(
 function lmTipo(i){ lineasMecano[i].tipo = lineasMecano[i].tipo==='doble'?'sencilla':'doble'; renderLineasMecano(); build(); }
 function lmToggle(i){ lineasMecano[i].abierta = !lineasMecano[i].abierta; renderLineasMecano(); }
 function lmSet(i,c,v){ lineasMecano[i][c]=v; renderLineasMecano(); build(); }
+// Niveles por módulo en Mecano (reusa los helpers genéricos _niv* del Selectivo).
+// En Mecano las dos caras de una doble llevan los mismos cuerpos.
+function lmNivMod(i, on){
+  const l = lineasMecano[i];
+  l.nivMod = !!on;
+  if(on) _nivNormaliza(l);
+  renderLineasMecano(); build();
+}
+function lmNivSet(i, fila, c, val){
+  const l = lineasMecano[i];
+  const _n = parseInt(val);
+  const v = Math.max(1, Math.min(12, Number.isFinite(_n) ? _n : l.niveles));   // cada modulo lleva al menos 1 panel
+  const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
+  if(!Array.isArray(l[key])) l[key] = [];
+  l[key][c] = v;
+  renderLineasMecano(); build();
+}
+// Texto de entrepaños para el chip y el resumen: "5" o "3–7" si varian por modulo.
+function _nivTxtMec(l){
+  if(!l.nivMod) return String(l.niveles);
+  const t = _nivArrRaw(l, 'A', l.cuerpos).concat(l.tipo === 'doble' ? _nivArrRaw(l, 'B', l.cuerpos) : []);
+  const mn = Math.min.apply(null, t), mx = Math.max.apply(null, t);
+  return mn === mx ? String(mn) : mn+'–'+mx;
+}
 
 // ── Distribución del almacén (Cantilever): líneas con pasillo ──
 const CAN_ALTOS_OPTS = [[12,"12' (3.66 m)"],[16,"16' (4.88 m)"],[20,"20' (6.10 m)"]];
@@ -5392,6 +5424,7 @@ function getConfigMec(){
   const lineas = lineasMecano.map(l => ({
     tipo: l.tipo, cuerpos: l.cuerpos,
     altoCm: l.altoCm, niveles: l.niveles,
+    nivMod: !!l.nivMod, nivelesA: l.nivelesA || null, nivelesB: l.nivelesB || null,
     altoM: l.altoCm/100,
     largoTotM: anchoM * l.cuerpos,
     bloque: _bloqueDe(l),
@@ -5667,9 +5700,11 @@ function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
   const colPanel = 0x9ea3a8;   // gris más definido para las charolas
   const matBarra = new THREE.MeshStandardMaterial({color:colBarra, roughness:0.65, metalness:0.35});
   const matPanel = new THREE.MeshStandardMaterial({color:colPanel, roughness:0.75, metalness:0.15});
-  // Distribución: nivel 0 abajo (0.02), nivel N-1 arriba (altoM - 0.02)
-  const espacio = niveles > 1 ? (altoM - 0.04) / (niveles - 1) : 0;
+  // niveles: numero (todos los cuerpos iguales) o arreglo por cuerpo (niveles por modulo)
   for(let c=0; c<cuerpos; c++){
+    const nivC = Array.isArray(niveles) ? niveles[c] : niveles;
+    // Distribución: nivel 0 abajo (0.02), nivel N-1 arriba (altoM - 0.02)
+    const espacio = nivC > 1 ? (altoM - 0.04) / (nivC - 1) : 0;
     const x0 = c * anchoM;
     const xL = x0, xR = x0 + anchoM;
     // 4 barras (verticales) por cuerpo
@@ -5685,8 +5720,8 @@ function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
       parent.add(b);
     });
     // N paneles horizontales distribuidos (primero al fondo, último hasta arriba)
-    for(let n=0; n<niveles; n++){
-      const y = niveles > 1 ? (espacio * n + 0.02) : altoM/2;
+    for(let n=0; n<nivC; n++){
+      const y = nivC > 1 ? (espacio * n + 0.02) : altoM/2;
       const p = box(anchoM - postW, 0.012, fondoM - postD*1.5, matPanel);
       p.position.set(x0 + anchoM/2, y, 0);
       parent.add(p);
@@ -8083,17 +8118,17 @@ function buildMecano(){
     const gLin = new THREE.Group();
     if(l.tipo === 'doble'){
       const filaA = new THREE.Group();
-      buildMecanoScene(filaA, l.altoM, cfg.anchoM, cfg.fondoM, l.niveles, l.cuerpos);
+      buildMecanoScene(filaA, l.altoM, cfg.anchoM, cfg.fondoM, _nivFila(l,'A',l.cuerpos), l.cuerpos);
       filaA.position.set(-l.largoTotM/2, 0, cfg.fondoM/2);
       gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildMecanoScene(filaB, l.altoM, cfg.anchoM, cfg.fondoM, l.niveles, l.cuerpos);
+      buildMecanoScene(filaB, l.altoM, cfg.anchoM, cfg.fondoM, _nivFila(l,'B',l.cuerpos), l.cuerpos);
       filaB.rotation.y = Math.PI;   // espalda con espalda
       filaB.position.set(l.largoTotM/2, 0, -cfg.fondoM/2);
       gLin.add(filaB);
     } else {
       const fila = new THREE.Group();
-      buildMecanoScene(fila, l.altoM, cfg.anchoM, cfg.fondoM, l.niveles, l.cuerpos);
+      buildMecanoScene(fila, l.altoM, cfg.anchoM, cfg.fondoM, _nivFila(l,'A',l.cuerpos), l.cuerpos);
       fila.position.set(-l.largoTotM/2, 0, 0);
       gLin.add(fila);
     }
@@ -8165,12 +8200,13 @@ function calcularBomMecano(){
     const F = l.tipo === 'doble' ? 2 : 1;
     const modulos = l.cuerpos * F;
     const skuBarra = l.altoCm === 250 ? MEC.BARRA_250 : MEC.BARRA_200;
-    const tornillosTotal = MEC_COMPO.tornillosBase + MEC_COMPO.tornillosPorNivel * l.niveles;
+    // Paneles: suma de los niveles de cada modulo (= niveles*modulos si es parejo)
+    const paneles = _nivTotBom(l, l.cuerpos, l.cuerpos, F === 2);
     add(skuBarra,     MEC_COMPO.barras    * modulos);
     add(MEC.BASE,     MEC_COMPO.bases     * modulos);
-    add(MEC.PANEL,    l.niveles           * modulos);
+    add(MEC.PANEL,    paneles);
     add(MEC.ESCUADRA, MEC_COMPO.escuadras * modulos);
-    add(MEC.TORNILLO, tornillosTotal      * modulos);
+    add(MEC.TORNILLO, MEC_COMPO.tornillosBase * modulos + MEC_COMPO.tornillosPorNivel * paneles);
   });
   return orden.map(sku => [sku, items[sku]]);
 }
@@ -9778,7 +9814,7 @@ function configResumen(){
       // Todas las filas (antes solo describia la 1) y las dobles cuentan x2.
       txt: 'Mecano · '+cfg.anchoCm+'cm × '+cfg.fondoCm+'cm · '
         + cfg.lineas.map(function(l, i){
-            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.altoCm+'cm alto, '+l.niveles+' entrepaños, '+l.cuerpos+' módulo'+(l.cuerpos>1?'s':'');
+            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.altoCm+'cm alto, '+_nivTxtMec(l)+' entrepaños, '+l.cuerpos+' módulo'+(l.cuerpos>1?'s':'');
           }).join(' | ')
         + ' · '+cfg.cuerposTot+' módulo'+(cfg.cuerposTot>1?'s':'')+' tot'
     };
