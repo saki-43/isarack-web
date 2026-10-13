@@ -1899,8 +1899,6 @@ function buildRow(parent, central, alto, ancho, fondo, niv, mods){
   const yPrimera = zoH + 0.005;              // primera charola pegada arriba del zócalo
   const yBaseSup = zoH + 0.35;               // primera charola inclinada (segundo nivel)
   const yTop = alto - 0.20;
-  const nSup = Math.max(niv - 1, 1);
-  const paso = nSup > 1 ? (yTop - yBaseSup)/(nSup - 1) : 0;
   const tilt = 0.065;              // ~3.7° hacia atrás
   const chW = ancho - 0.05;
   const a211 = alto > 1.5;
@@ -1956,8 +1954,12 @@ function buildRow(parent, central, alto, ancho, fondo, niv, mods){
     const topCover = box(panW, 0.012, topD, matMetal);
     topCover.position.set(cx, alto - 0.006, 0);
     parent.add(topCover);
-    // Charolas: la primera horizontal pegada al zócalo, las demás inclinadas distribuidas arriba
-    for(let i=0;i<niv;i++){
+    // Charolas: la primera horizontal pegada al zócalo, las demás inclinadas distribuidas arriba.
+    // niv puede ser arreglo por modulo (niveles por modulo).
+    const nivM = Array.isArray(niv) ? niv[mIdx] : niv;
+    const nSup = Math.max(nivM - 1, 1);
+    const paso = nSup > 1 ? (yTop - yBaseSup)/(nSup - 1) : 0;
+    for(let i=0;i<nivM;i++){
       const isPrimera = (i === 0);
       const y = isPrimera ? yPrimera : (yBaseSup + paso*(i-1));
       charola(cx, y, 1, isPrimera);
@@ -3805,9 +3807,11 @@ function lmNivSet(i, fila, c, val){
   renderLineasMecano(); build();
 }
 // Texto de entrepaños para el chip y el resumen: "5" o "3–7" si varian por modulo.
-function _nivTxtMec(l){
+function _nivTxtMec(l){ return _nivRango(l, l.cuerpos); }
+// Generico: n = modulos de cada cara (Mecano, Gondola, Aplick, Cantilever).
+function _nivRango(l, n){
   if(!l.nivMod) return String(l.niveles);
-  const t = _nivArrRaw(l, 'A', l.cuerpos).concat(l.tipo === 'doble' ? _nivArrRaw(l, 'B', l.cuerpos) : []);
+  const t = _nivArrRaw(l, 'A', n).concat(l.tipo === 'doble' ? _nivArrRaw(l, 'B', n) : []);
   const mn = Math.min.apply(null, t), mx = Math.max.apply(null, t);
   return mn === mx ? String(mn) : mn+'–'+mx;
 }
@@ -4188,7 +4192,32 @@ function _gonNormaliza(l){
   if(!l.modulos) l.modulos = 1;
   if(l.cabeceras == null) l.cabeceras = 0;
   if(l.volteada == null) l.volteada = false;
+  if(l.nivMod){   // arreglos del tamaño de los modulos actuales
+    l.nivelesA = _nivArrRaw(l, 'A', l.modulos);
+    l.nivelesB = l.tipo === 'doble' ? _nivArrRaw(l, 'B', l.modulos) : null;
+  }
   return l;
+}
+// Niveles por módulo en Góndola (mismo editor que Selectivo y Picking). En una
+// central el numero aplica a las dos caras del modulo. Cabeceras: niveles de la fila.
+function gonNivMod(i, on){
+  const l = lineasGondola[i];
+  l.nivMod = !!on;
+  _gonNormaliza(l);
+  renderLineasGondola();
+  if(typeof build === 'function') build();
+  if(typeof renderCotizacion === 'function') renderCotizacion();
+}
+function gonNivSet(i, fila, c, val){
+  const l = lineasGondola[i];
+  const _n = parseInt(val);
+  const v = Math.max(1, Math.min(6, Number.isFinite(_n) ? _n : l.niveles));
+  const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
+  if(!Array.isArray(l[key])) l[key] = [];
+  l[key][c] = v;
+  renderLineasGondola();
+  if(typeof build === 'function') build();
+  if(typeof renderCotizacion === 'function') renderCotizacion();
 }
 
 // Al arranque: lineasGondola tiene una sola fila con los defaults de siempre.
@@ -4283,7 +4312,7 @@ function renderLineasGondola(){
       ? '<span onclick="event.stopPropagation();lnFlipGon('+i+')" style="cursor:pointer;color:'+tx+';font-size:12px;font-weight:700;padding:1px 4px;line-height:1;flex-shrink:0" title="Voltear: charolas al otro lado">'+(l.volteada?'⇐':'⇒')+'</span>'
       : '';
     const chip = !l.abierta
-      ? '<div onclick="lnToggleGon('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(bloquesGondola.length>1?'📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ':'')+tipoLbl+' · '+l.medida+' · '+l.niveles+' niv · '+l.modulos+' mód'+(l.cabeceras?' + '+l.cabeceras+' cab':'')+'</div>'
+      ? '<div onclick="lnToggleGon('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(bloquesGondola.length>1?'📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ':'')+tipoLbl+' · '+l.medida+' · '+_nivRango(l, l.modulos)+' niv · '+l.modulos+' mód'+(l.cabeceras?' + '+l.cabeceras+' cab':'')+'</div>'
       : '';
     const detalle = l.abierta
       ? '<div style="background:#fff;border-top:1px solid '+bd+';padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:10px">'
@@ -4291,6 +4320,10 @@ function renderLineasGondola(){
         + '<div><div style="color:#666;margin-bottom:1px">Medida</div><select onchange="lnSetGon('+i+',\'medida\',this.value)" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_MEDIDAS, l.medida)+'</select></div>'
         + '<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lnSetGon('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_NIVELES, l.niveles)+'</select></div>'
         + '<div><div style="color:#666;margin-bottom:1px">Módulos</div><select onchange="lnSetGon('+i+',\'modulos\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_MODULOS, l.modulos)+'</select></div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="gonNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+          + (l.nivMod ? _nivModEditor(l, i, esD, l.modulos, l.modulos, 'gonNivSet') : '')
+        + '</div>'
         + '<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Cabeceras (141×100)</div><select onchange="lnSetGon('+i+',\'cabeceras\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_CABECERAS, l.cabeceras)+'</select></div>'
         + (bloquesGondola.length > 1
             ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px"><span style="color:#666;font-weight:600">📦 Bloque</span>'
@@ -4373,7 +4406,7 @@ function _gonLineasAgrupadas(materialUSD){
     const cant = modsDe(l);
     return [{
       sku: '—',
-      producto: 'GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + l.niveles + ' NIVELES',
+      producto: 'GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + _nivRango(l, l.modulos) + ' NIVELES',
       cantidad: cant,
       precioUSD: materialUSD / cant,
       importeUSD: materialUSD,
@@ -4388,7 +4421,7 @@ function _gonLineasAgrupadas(materialUSD){
     const imp = cant * precioPorMod;
     return {
       sku: '—',
-      producto: 'L'+(i+1)+' · GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + l.niveles + ' NIVELES'
+      producto: 'L'+(i+1)+' · GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + _nivRango(l, l.modulos) + ' NIVELES'
               + (l.cabeceras>0 ? ' + '+l.cabeceras+' cab' : '')
               + (l.tipo==='doble' ? ' · DOBLE' : ''),
       cantidad: cant,
@@ -6190,7 +6223,8 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
 
 // Dibuja UNA góndola sencilla (con sus cabeceras) dentro de `parent`, centrada en (0,0,0).
 // El fondo de la góndola queda simétrico respecto a Z=0.
-function _gonBuildFila(parent, tipoGon, medidaKey, niv, mods, cabs){
+// niv: numero o arreglo por modulo (niveles por modulo); nivCab: niveles de las cabeceras.
+function _gonBuildFila(parent, tipoGon, medidaKey, niv, mods, cabs, nivCab){
   const m = MED[medidaKey];
   const central = tipoGon === 'central';
   const totalW = m.ancho * mods;
@@ -6198,7 +6232,7 @@ function _gonBuildFila(parent, tipoGon, medidaKey, niv, mods, cabs){
   for(let cIdx=0; cIdx<cabs; cIdx++){
     const side = cIdx===0 ? 1 : -1;
     const cab = new THREE.Group();
-    buildRow(cab, false, CAB.alto, CAB.ancho, CAB.fondo, niv, 1);
+    buildRow(cab, false, CAB.alto, CAB.ancho, CAB.fondo, Array.isArray(niv) ? (nivCab || niv[0]) : niv, 1);
     cab.rotation.y = side * Math.PI/2;
     cab.position.set(side * totalW/2, 0, 0);
     parent.add(cab);
@@ -6255,16 +6289,16 @@ function buildGondola(){
       // Dos góndolas espalda con espalda.
       const off = central ? m.fondo : m.fondo/2;
       const filaA = new THREE.Group();
-      _gonBuildFila(filaA, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
+      _gonBuildFila(filaA, l.tipoGon, l.medida, _nivFila(l,'A',l.modulos), l.modulos, l.cabeceras, l.niveles);
       filaA.position.set(0, 0, off);
       gLin.add(filaA);
       const filaB = new THREE.Group();
-      _gonBuildFila(filaB, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
+      _gonBuildFila(filaB, l.tipoGon, l.medida, _nivFila(l,'B',l.modulos), l.modulos, l.cabeceras, l.niveles);
       filaB.rotation.y = Math.PI;
       filaB.position.set(0, 0, -off);
       gLin.add(filaB);
     } else {
-      _gonBuildFila(gLin, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
+      _gonBuildFila(gLin, l.tipoGon, l.medida, _nivFila(l,'A',l.modulos), l.modulos, l.cabeceras, l.niveles);
     }
     // Solo aplica a pared: voltear 180° para que las charolas queden al otro lado.
     if(l.tipoGon === 'pared' && l.volteada) gLin.rotation.y = Math.PI;
@@ -6322,7 +6356,7 @@ function buildGondola(){
     const desg = filas.map((l,i)=>{
       const t = l.tipo==='doble' ? 'D' : 'S';
       const tg = l.tipoGon==='central' ? 'C' : 'P';
-      return 'L'+(i+1)+': '+t+' '+tg+' '+l.medida+' · '+l.niveles+'n · '+l.modulos+'m'+(l.cabeceras?' + '+l.cabeceras+'c':'');
+      return 'L'+(i+1)+': '+t+' '+tg+' '+l.medida+' · '+_nivRango(l, l.modulos)+'n · '+l.modulos+'m'+(l.cabeceras?' + '+l.cabeceras+'c':'');
     }).join(' | ');
     if(dimsEl) dimsEl.innerHTML = filas.length+' filas · largo máx <b>'+maxLargo.toFixed(2)+' m</b> · '+desg;
     if(resEl)  resEl.innerHTML  = filas.length+' filas · largo máx <b>'+maxLargo.toFixed(2)+' m</b> · alto máx <b>'+maxAlto.toFixed(2)+' m</b><br>'+desg+'<br>Pasillo entre filas: '+pasilloM.toFixed(1)+' m';
@@ -8492,7 +8526,8 @@ function calcularBomAplick(){
 
 // Core: BOM de UNA fila con parametros explicitos. Multiplicador aplica a "doble"
 // (2 gondolas espalda con espalda). Retorna [[sku, qty]...].
-function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult){
+// nivMods (opcional): niveles de cada modulo (niveles por modulo). Sin el, todos llevan `niveles`.
+function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult, nivMods){
   const m = MED[medidaKey];
   const items = {}; const orden = [];
   function add(sku, q){
@@ -8502,13 +8537,15 @@ function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult){
   }
   const c = tipoGon==='central', mul = c?2:1, A = m.anchoCm, a211 = m.pilar==='211';
   const postesC = modulos+1;
+  // Suma de niveles de todos los modulos (= niveles*modulos si es parejo)
+  const sumNiv = Array.isArray(nivMods) ? nivMods.reduce((a,v)=>a+v, 0) : niveles*modulos;
   add('PILAR '+m.pilar+'CM', postesC);
-  add('BRAZO', (niveles-1)*2*mul*modulos);
-  add('CHAROLA '+A+'CM X 47CM', niveles*mul*modulos);
+  add('BRAZO', (sumNiv-modulos)*2*mul);
+  add('CHAROLA '+A+'CM X 47CM', sumNiv*mul);
   add('PANEL TRASERO '+A+'CMX40CM', (a211?5:3)*2*modulos);
   if(!a211) add('PANEL TRASERO '+A+'CMX10CM', 2*modulos);
   add('BASE', (c?2:1)*postesC);
-  add('PORTA PRECIO '+A+'CM', niveles*mul*modulos);
+  add('PORTA PRECIO '+A+'CM', sumNiv*mul);
   add('CUBRE POLVO '+A+'CM', (c?2:1)*modulos);
   add('CUBIERTA SUPERIOR '+A+'CM', modulos);
   if(cabeceras>0){
@@ -8546,6 +8583,11 @@ function calcularBomGondola(){
         cabeceras: parseInt(document.getElementById('cabeceras').value)
       }];
   filas.forEach(l => {
+    if(l.nivMod){   // niveles por modulo: cada gondola de la doble con los suyos
+      acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, 1, _nivArrRaw(l, 'A', l.modulos)));
+      if(l.tipo === 'doble') acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, 1, _nivArrRaw(l, 'B', l.modulos)));
+      return;
+    }
     const mult = l.tipo === 'doble' ? 2 : 1;
     acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, mult));
   });
@@ -9863,7 +9905,7 @@ function configResumen(){
       niveles: l.niveles,
       modulos: l.modulos,
       cabeceras: cb,
-      txt: 'Góndola · '+(l.tipo==='doble'?'Doble · ':'')+_lblTipoGon(l.tipoGon)+' · '+_lblMedida(l.medida)+' · '+l.niveles+' niveles · '+l.modulos+' módulo'+(l.modulos>1?'s':'')+(cb>0?' + '+cb+' cabecera'+(cb>1?'s':''):'')
+      txt: 'Góndola · '+(l.tipo==='doble'?'Doble · ':'')+_lblTipoGon(l.tipoGon)+' · '+_lblMedida(l.medida)+' · '+_nivRango(l, l.modulos)+' niveles · '+l.modulos+' módulo'+(l.modulos>1?'s':'')+(cb>0?' + '+cb+' cabecera'+(cb>1?'s':''):'')
     };
   }
   const nSen = filas.filter(l=>l.tipo!=='doble').length;
