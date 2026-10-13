@@ -762,7 +762,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.08.03';
+const CFG_VERSION = '2026.10.13.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -1875,7 +1875,7 @@ function box(w,h,d,mat){
   return m;
 }
 
-function buildRow(parent, central, alto, ancho, fondo, niv, mods){
+function buildRow(parent, central, alto, ancho, fondo, niv, mods, niv2){
   const pw = 0.045;
   const totalW = ancho*mods;
   const x0 = -totalW/2;
@@ -1899,8 +1899,6 @@ function buildRow(parent, central, alto, ancho, fondo, niv, mods){
   const yPrimera = zoH + 0.005;              // primera charola pegada arriba del zócalo
   const yBaseSup = zoH + 0.35;               // primera charola inclinada (segundo nivel)
   const yTop = alto - 0.20;
-  const nSup = Math.max(niv - 1, 1);
-  const paso = nSup > 1 ? (yTop - yBaseSup)/(nSup - 1) : 0;
   const tilt = 0.065;              // ~3.7° hacia atrás
   const chW = ancho - 0.05;
   const a211 = alto > 1.5;
@@ -1956,13 +1954,22 @@ function buildRow(parent, central, alto, ancho, fondo, niv, mods){
     const topCover = box(panW, 0.012, topD, matMetal);
     topCover.position.set(cx, alto - 0.006, 0);
     parent.add(topCover);
-    // Charolas: la primera horizontal pegada al zócalo, las demás inclinadas distribuidas arriba
-    for(let i=0;i<niv;i++){
-      const isPrimera = (i === 0);
-      const y = isPrimera ? yPrimera : (yBaseSup + paso*(i-1));
-      charola(cx, y, 1, isPrimera);
-      if(central) charola(cx, y, -1, isPrimera);
-    }
+    // Charolas: la primera horizontal pegada al zócalo, las demás inclinadas distribuidas arriba.
+    // niv puede ser arreglo por modulo (niveles por modulo).
+    // En una central la cara 2 (dir -1) puede llevar otros niveles (niv2).
+    const nivM = Array.isArray(niv) ? niv[mIdx] : niv;
+    const nivM2 = Array.isArray(niv2) ? niv2[mIdx] : nivM;
+    const caraCharolas = function(nC, dir){
+      const nSup = Math.max(nC - 1, 1);
+      const paso = nSup > 1 ? (yTop - yBaseSup)/(nSup - 1) : 0;
+      for(let i=0;i<nC;i++){
+        const isPrimera = (i === 0);
+        const y = isPrimera ? yPrimera : (yBaseSup + paso*(i-1));
+        charola(cx, y, dir, isPrimera);
+      }
+    };
+    caraCharolas(nivM, 1);
+    if(central) caraCharolas(nivM2, -1);
   }
 }
 
@@ -3747,9 +3754,17 @@ function renderLineasMecano(){
   const _htmlBloquesM = _bloquesHtml('lm', bloquesMecano, lineasMecano, _bloqueActivoMec());
   cont.innerHTML = lineasMecano.map((l, i) => {
     const nivOpts = [3,4,5,6,7,8,9,10,11,12].map(n=>[n,String(n)]);   // hasta 12 paneles (Isaac, 6 oct 2026)
+    const esDM = l.tipo === 'doble';
+    const bdM = esDM ? '#f0c4ae' : '#b5d4f4', txM = esDM ? '#993C1D' : '#185FA5';
+    _nivNormaliza(l);
     const detalle =
       '<div><div style="color:#666;margin-bottom:1px">Alto</div><select onchange="lmSet('+i+',\'altoCm\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(MEC_ALTOS, l.altoCm)+'</select></div>'
-      +'<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lmSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>';
+      +'<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lmSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>'
+      // Niveles por módulo: mismo editor que Selectivo y Picking
+      +'<div style="grid-column:1/3;border-top:1px dashed '+bdM+';padding-top:4px;margin-top:1px">'
+        +'<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+txM+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lmNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+        +(l.nivMod ? _nivModEditor(l, i, esDM, l.cuerpos, l.cuerpos, 'lmNivSet') : '')
+      +'</div>';
     const letraB = bloquesMecano.length > 1 ? '📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ' : '';
     const selB = bloquesMecano.length > 1
       ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px;padding-top:3px"><span style="font-size:10px;color:#666;font-weight:600">📦 Bloque</span>'
@@ -3758,7 +3773,7 @@ function renderLineasMecano(){
         + '</select></div>'
       : '';
     return _cardLinea('lm', i, l, {total: lineasMecano.length, abPermitido:false,
-      chip: letraB+l.altoCm+' cm · '+l.niveles+' entrepaños', detalle: detalle + selB});
+      chip: letraB+l.altoCm+' cm · '+_nivTxtMec(l)+' entrepaños', detalle: detalle + selB});
   }).join('');
   cont.innerHTML = _htmlBloquesM + cont.innerHTML;
   lineasSyncMec();
@@ -3779,6 +3794,45 @@ function lmCuerpos(i,d){ const l=lineasMecano[i]; l.cuerpos=Math.max(1,Math.min(
 function lmTipo(i){ lineasMecano[i].tipo = lineasMecano[i].tipo==='doble'?'sencilla':'doble'; renderLineasMecano(); build(); }
 function lmToggle(i){ lineasMecano[i].abierta = !lineasMecano[i].abierta; renderLineasMecano(); }
 function lmSet(i,c,v){ lineasMecano[i][c]=v; renderLineasMecano(); build(); }
+// Niveles por módulo en Mecano (reusa los helpers genéricos _niv* del Selectivo).
+// En Mecano las dos caras de una doble llevan los mismos cuerpos.
+function lmNivMod(i, on){
+  const l = lineasMecano[i];
+  l.nivMod = !!on;
+  if(on) _nivNormaliza(l);
+  renderLineasMecano(); build();
+}
+function lmNivSet(i, fila, c, val){
+  const l = lineasMecano[i];
+  const _n = parseInt(val);
+  const v = Math.max(1, Math.min(12, Number.isFinite(_n) ? _n : l.niveles));   // cada modulo lleva al menos 1 panel
+  const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
+  if(!Array.isArray(l[key])) l[key] = [];
+  l[key][c] = v;
+  renderLineasMecano(); build();
+}
+// Texto de entrepaños para el chip y el resumen: "5" o "3–7" si varian por modulo.
+// Como _nivArrRaw pero con el nombre del arreglo (nivelesA2/nivelesB2 de la gondola).
+function _nivArrKey(l, key, n){
+  const src = l[key] || [];
+  const a = [];
+  for(let c = 0; c < n; c++){
+    const v = parseInt(src[c]);
+    a.push(Number.isFinite(v) ? Math.max(0, v) : (l.niveles || 3));
+  }
+  return a;
+}
+function _nivTxtMec(l){ return _nivRango(l, l.cuerpos); }
+// Generico: n = modulos de cada cara (Mecano, Gondola, Aplick, Cantilever).
+function _nivRango(l, n){
+  if(!l.nivMod) return String(l.niveles);
+  let t = _nivArrRaw(l, 'A', n).concat(l.tipo === 'doble' ? _nivArrRaw(l, 'B', n) : []);
+  // Gondola central: la cara 2 de cada fila lleva sus propios niveles
+  if(Array.isArray(l.nivelesA2)) t = t.concat(_nivArrKey(l, 'nivelesA2', n));
+  if(Array.isArray(l.nivelesB2) && l.tipo === 'doble') t = t.concat(_nivArrKey(l, 'nivelesB2', n));
+  const mn = Math.min.apply(null, t), mx = Math.max.apply(null, t);
+  return mn === mx ? String(mn) : mn+'–'+mx;
+}
 
 // ── Distribución del almacén (Cantilever): líneas con pasillo ──
 const CAN_ALTOS_OPTS = [[12,"12' (3.66 m)"],[16,"16' (4.88 m)"],[20,"20' (6.10 m)"]];
@@ -3841,12 +3895,20 @@ function lcFilaBloque(i, iB){
 function renderLineasCantilever(){
   const cont = document.getElementById('canLineasList');
   const _htmlBloquesC = _bloquesHtml('lc', bloquesCantilever, lineasCantilever, _bloqueActivoCan());
+  lineasCantilever.forEach(_nivNormCan);
   cont.innerHTML = lineasCantilever.map((l, i) => {
     const nivOpts = [3,4,5,6,7].map(n=>[n,String(n)]);
+    const bdC = l.tipo === 'doble' ? '#f0c4ae' : '#b5d4f4', txC = l.tipo === 'doble' ? '#993C1D' : '#185FA5';
     const detalle =
       '<div><div style="color:#666;margin-bottom:1px">Altura col.</div><select onchange="lcSet('+i+',\'altoFt\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(CAN_ALTOS_OPTS, l.altoFt)+'</select></div>'
       +'<div><div style="color:#666;margin-bottom:1px">Brazo</div><select onchange="lcSet('+i+',\'brazoIn\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(CAN_BRAZOS_OPTS, l.brazoIn)+'</select></div>'
-      +'<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Niveles de brazos</div><select onchange="lcSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>';
+      +'<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Niveles de brazos</div><select onchange="lcSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>'
+      // Niveles por módulo: cada columna con sus brazos. En una doble el numero
+      // aplica a los dos lados de la columna, por eso va una sola fila.
+      +'<div style="grid-column:1/3;border-top:1px dashed '+bdC+';padding-top:4px;margin-top:1px">'
+        +'<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+txC+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="lcNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+        +(l.nivMod ? _nivModEditor(l, i, false, l.cuerpos, l.cuerpos, 'lcNivSet') : '')
+      +'</div>';
     // Los brazos de una fila DOBLE salen de los dos lados, voltearla no cambia
     // nada; por eso la flecha solo va en las sencillas (igual que en Gondola,
     // donde la fila central tampoco la lleva).
@@ -3861,10 +3923,31 @@ function renderLineasCantilever(){
         + '</select></div>'
       : '';
     return _cardLinea('lc', i, l, {total: lineasCantilever.length, abPermitido:false, flip: flip,
-      chip: letraB+l.altoFt+"' · brazo "+l.brazoIn+'\" · '+l.niveles+' niv', detalle: detalle + selB});
+      chip: letraB+l.altoFt+"' · brazo "+l.brazoIn+'\" · '+_nivRangoCan(l)+' niv', detalle: detalle + selB});
   }).join('');
   cont.innerHTML = _htmlBloquesC + cont.innerHTML;
   lineasSyncCan();
+}
+// Niveles por módulo en Cantilever: brazos por columna (una sola fila, aun en doble)
+function _nivNormCan(l){
+  if(!l || !l.nivMod) return;
+  l.nivelesA = _nivArrRaw(l, 'A', l.cuerpos);
+  l.nivelesB = null;
+}
+function _nivRangoCan(l){ return _nivRango({nivMod: l.nivMod, nivelesA: l.nivelesA, niveles: l.niveles, tipo: 'sencilla'}, l.cuerpos || l.columnas); }
+function lcNivMod(i, on){
+  const l = lineasCantilever[i];
+  l.nivMod = !!on;
+  _nivNormCan(l);
+  renderLineasCantilever(); build();
+}
+function lcNivSet(i, fila, c, val){
+  const l = lineasCantilever[i];
+  const _n = parseInt(val);
+  const v = Math.max(1, Math.min(7, Number.isFinite(_n) ? _n : l.niveles));
+  if(!Array.isArray(l.nivelesA)) l.nivelesA = [];
+  l.nivelesA[c] = v;
+  renderLineasCantilever(); build();
 }
 function lcAdd(tipo, iB){
   if(lineasCantilever.length >= 8) return;
@@ -4156,7 +4239,65 @@ function _gonNormaliza(l){
   if(!l.modulos) l.modulos = 1;
   if(l.cabeceras == null) l.cabeceras = 0;
   if(l.volteada == null) l.volteada = false;
+  if(l.nivMod){   // arreglos del tamaño de los modulos actuales
+    const central = l.tipoGon === 'central', dob = l.tipo === 'doble';
+    // La cara 2 nace igual a la cara 1 (al prender la casilla o pasar de pared a central)
+    if(central && !Array.isArray(l.nivelesA2)) l.nivelesA2 = (l.nivelesA || []).slice();
+    if(central && dob && !Array.isArray(l.nivelesB2)) l.nivelesB2 = (l.nivelesB || l.nivelesA || []).slice();
+    l.nivelesA = _nivArrRaw(l, 'A', l.modulos);
+    l.nivelesB = dob ? _nivArrRaw(l, 'B', l.modulos) : null;
+    l.nivelesA2 = central ? _nivArrKey(l, 'nivelesA2', l.modulos) : null;
+    l.nivelesB2 = (central && dob) ? _nivArrKey(l, 'nivelesB2', l.modulos) : null;
+  }
   return l;
+}
+// Niveles por módulo en Góndola (mismo editor que Selectivo y Picking). En una
+// central cada CARA lleva los suyos (Isaac, 13 oct 2026): cara 1 = frente, cara 2 = atras.
+// Cabeceras: niveles de la fila.
+const _GON_NIV_KEY = {A:'nivelesA', A2:'nivelesA2', B:'nivelesB', B2:'nivelesB2'};
+function _gonNivEditor(l, i){
+  const central = l.tipoGon === 'central', dob = l.tipo === 'doble';
+  const filas = [];
+  if(dob){
+    filas.push(['A', central ? 'Fila A · cara 1 (frente)' : 'Fila A']);
+    if(central) filas.push(['A2', 'Fila A · cara 2 (atrás)']);
+    filas.push(['B', central ? 'Fila B · cara 1 (frente)' : 'Fila B']);
+    if(central) filas.push(['B2', 'Fila B · cara 2 (atrás)']);
+  } else {
+    filas.push(['A', central ? 'Cara 1 (frente)' : '']);
+    if(central) filas.push(['A2', 'Cara 2 (atrás)']);
+  }
+  let h = '<div style="margin-top:4px">';
+  filas.forEach(function(f){
+    const arr = _nivArrKey(l, _GON_NIV_KEY[f[0]], l.modulos);
+    if(f[1]) h += '<div style="font-size:9px;color:#888;margin:4px 0 2px">'+f[1]+'</div>';
+    h += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+    for(let c = 0; c < l.modulos; c++){
+      h += '<div style="text-align:center"><div style="font-size:8.5px;color:#999;margin-bottom:1px">M'+(c+1)+'</div>'
+        + '<input type="number" min="1" max="6" value="'+arr[c]+'" onchange="gonNivSet('+i+',\''+f[0]+'\','+c+',this.value)" style="width:36px;padding:3px 2px;font-size:11px;border:1px solid #d9d4c5;border-radius:5px;text-align:center;background:#fff"></div>';
+    }
+    h += '</div>';
+  });
+  return h + '</div>';
+}
+function gonNivMod(i, on){
+  const l = lineasGondola[i];
+  l.nivMod = !!on;
+  _gonNormaliza(l);
+  renderLineasGondola();
+  if(typeof build === 'function') build();
+  if(typeof renderCotizacion === 'function') renderCotizacion();
+}
+function gonNivSet(i, fila, c, val){
+  const l = lineasGondola[i];
+  const _n = parseInt(val);
+  const v = Math.max(1, Math.min(6, Number.isFinite(_n) ? _n : l.niveles));
+  const key = _GON_NIV_KEY[fila] || 'nivelesA';
+  if(!Array.isArray(l[key])) l[key] = [];
+  l[key][c] = v;
+  renderLineasGondola();
+  if(typeof build === 'function') build();
+  if(typeof renderCotizacion === 'function') renderCotizacion();
 }
 
 // Al arranque: lineasGondola tiene una sola fila con los defaults de siempre.
@@ -4251,7 +4392,7 @@ function renderLineasGondola(){
       ? '<span onclick="event.stopPropagation();lnFlipGon('+i+')" style="cursor:pointer;color:'+tx+';font-size:12px;font-weight:700;padding:1px 4px;line-height:1;flex-shrink:0" title="Voltear: charolas al otro lado">'+(l.volteada?'⇐':'⇒')+'</span>'
       : '';
     const chip = !l.abierta
-      ? '<div onclick="lnToggleGon('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(bloquesGondola.length>1?'📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ':'')+tipoLbl+' · '+l.medida+' · '+l.niveles+' niv · '+l.modulos+' mód'+(l.cabeceras?' + '+l.cabeceras+' cab':'')+'</div>'
+      ? '<div onclick="lnToggleGon('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(bloquesGondola.length>1?'📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ':'')+tipoLbl+' · '+l.medida+' · '+_nivRango(l, l.modulos)+' niv · '+l.modulos+' mód'+(l.cabeceras?' + '+l.cabeceras+' cab':'')+'</div>'
       : '';
     const detalle = l.abierta
       ? '<div style="background:#fff;border-top:1px solid '+bd+';padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:10px">'
@@ -4259,6 +4400,10 @@ function renderLineasGondola(){
         + '<div><div style="color:#666;margin-bottom:1px">Medida</div><select onchange="lnSetGon('+i+',\'medida\',this.value)" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_MEDIDAS, l.medida)+'</select></div>'
         + '<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lnSetGon('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_NIVELES, l.niveles)+'</select></div>'
         + '<div><div style="color:#666;margin-bottom:1px">Módulos</div><select onchange="lnSetGon('+i+',\'modulos\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_MODULOS, l.modulos)+'</select></div>'
+        + '<div style="grid-column:1/3;border-top:1px dashed '+bd+';padding-top:4px;margin-top:1px">'
+          + '<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+tx+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="gonNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+          + (l.nivMod ? _gonNivEditor(l, i) : '')
+        + '</div>'
         + '<div style="grid-column:1/3"><div style="color:#666;margin-bottom:1px">Cabeceras (141×100)</div><select onchange="lnSetGon('+i+',\'cabeceras\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(GON_CABECERAS, l.cabeceras)+'</select></div>'
         + (bloquesGondola.length > 1
             ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px"><span style="color:#666;font-weight:600">📦 Bloque</span>'
@@ -4341,7 +4486,7 @@ function _gonLineasAgrupadas(materialUSD){
     const cant = modsDe(l);
     return [{
       sku: '—',
-      producto: 'GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + l.niveles + ' NIVELES',
+      producto: 'GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + _nivRango(l, l.modulos) + ' NIVELES',
       cantidad: cant,
       precioUSD: materialUSD / cant,
       importeUSD: materialUSD,
@@ -4356,7 +4501,7 @@ function _gonLineasAgrupadas(materialUSD){
     const imp = cant * precioPorMod;
     return {
       sku: '—',
-      producto: 'L'+(i+1)+' · GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + l.niveles + ' NIVELES'
+      producto: 'L'+(i+1)+' · GÓNDOLA ' + _tg(l.tipoGon) + ' · ' + _med(l.medida) + ' · ' + _nivRango(l, l.modulos) + ' NIVELES'
               + (l.cabeceras>0 ? ' + '+l.cabeceras+' cab' : '')
               + (l.tipo==='doble' ? ' · DOBLE' : ''),
       cantidad: cant,
@@ -5392,6 +5537,7 @@ function getConfigMec(){
   const lineas = lineasMecano.map(l => ({
     tipo: l.tipo, cuerpos: l.cuerpos,
     altoCm: l.altoCm, niveles: l.niveles,
+    nivMod: !!l.nivMod, nivelesA: l.nivelesA || null, nivelesB: l.nivelesB || null,
     altoM: l.altoCm/100,
     largoTotM: anchoM * l.cuerpos,
     bloque: _bloqueDe(l),
@@ -5414,6 +5560,9 @@ function getConfigCan(){
   const lineas = lineasCantilever.map(l => ({
     tipo: l.tipo, columnas: l.cuerpos, volteada: (l.tipo !== 'doble' && !!l.volteada),
     altoFt: l.altoFt, brazoIn: l.brazoIn, niveles: l.niveles,
+    nivMod: !!l.nivMod, nivelesA: l.nivelesA || null,
+    // brazos de cada columna (niveles por modulo) o null si todas van parejas
+    nivelesCol: l.nivMod ? _nivArrRaw(l, 'A', l.cuerpos) : null,
     altoM: l.altoFt * 0.3048,
     brazoM: l.brazoIn * IN_TO_M,
     separacionM,
@@ -5506,7 +5655,14 @@ function buildCantileverScene(parent, cfg, colorHex){
     const zCol = c * cfg.separacionM;
     drawColumnaPerfilI(0, zCol, cfg.altoM);
     drawBaseVigaI(0, zCol, isDoble ? 'ambos' : 'frente');
-    alturasBrazos.forEach(y => {
+    // Niveles por modulo: esta columna reparte sus propios brazos en el alto util
+    let altC = alturasBrazos;
+    if(Array.isArray(cfg.nivelesCol)){
+      const nC = cfg.nivelesCol[c], clC = espacioUtil / (nC + 1);
+      altC = [];
+      for(let n=0; n<nC; n++) altC.push(baseAltoM + clC * (n + 1));
+    }
+    altC.forEach(y => {
       drawBrazo(y, zCol, 1);
       if(isDoble) drawBrazo(y, zCol, -1);
     });
@@ -5561,7 +5717,8 @@ function buildCantilever(){
   lineas.forEach((l, i) => {
     const gLin = new THREE.Group();
     const pseudo = { tipo: l.tipo, altoFt: l.altoFt, altoM: l.altoM, brazoM: l.brazoM,
-                     niveles: l.niveles, columnas: l.columnas, separacionM: l.separacionM };
+                     niveles: l.niveles, columnas: l.columnas, separacionM: l.separacionM,
+                     nivelesCol: l.nivelesCol };
     const alturas = buildCantileverScene(gLin, pseudo, colorHex);
     if(i === 0) alturasBrazosL0 = alturas;
     // La escena construye columnas en z = 0..largoZM, columna en x~0
@@ -5616,7 +5773,7 @@ function buildCantilever(){
   const xTorre0 = -W/2 - (lineas[0].tipo === 'doble' ? -lineas[0].anchoBaseM/2 : -0.15);
   cotaDim(grupo, [xTorre0, 0, zFrente], [xTorre0, cfg.maxAltoM, zFrente], fmtCota(cfg.maxAltoM), {labelOffset:[0.38,0,0]});
   // Claros entre brazos (solo 1 línea)
-  if(lineas.length === 1 && alturasBrazosL0){
+  if(lineas.length === 1 && alturasBrazosL0 && !lineas[0].nivelesCol){   // con niveles por modulo cada columna va distinta
     agregarCotasClaros(grupo, alturasBrazosL0, xTorre0 + lineas[0].brazoM + 0.55, maxLargoZ/2 + 0.10);
   }
   const filaTxt = lineas.length === 1
@@ -5627,7 +5784,7 @@ function buildCantilever(){
     'Cantilever · '+filaTxt+' · Ancho <b>'+W.toFixed(2)+' m</b> · Alto <b>'+cfg.maxAltoM.toFixed(2)+' m</b> · '+
     colTot+' columna'+(colTot>1?'s':'');
   const lineasHtml = lineas.length > 1
-    ? '<span style="font-size:10px;color:#888">' + lineas.map((l,i)=>'L'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.columnas+' col · '+l.altoFt+"' · "+l.niveles+' niv').join(' | ') + '</span>'
+    ? '<span style="font-size:10px;color:#888">' + lineas.map((l,i)=>'L'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.columnas+' col · '+l.altoFt+"' · "+_nivRangoCan(l)+' niv').join(' | ') + '</span>'
     : '';
   document.getElementById('medidasResumen').innerHTML =
     '<b>Cantilever · '+filaTxt+'</b><br>'+
@@ -5652,7 +5809,9 @@ function calcularBomCantilever(){
     add(skuCol,   l.columnas);
     add(skuBase,  l.columnas);
     add(CAN.ANCLA, 4 * l.columnas);
-    add(skuBrazo, l.columnas * l.niveles * brazoMult);
+    // Brazos: suma de los de cada columna (= columnas*niveles si van parejas)
+    const brazosCol = l.nivelesCol ? l.nivelesCol.reduce((a,v)=>a+v, 0) : l.columnas * l.niveles;
+    add(skuBrazo, brazosCol * brazoMult);
     const reglaAtir = CAN_ATIR[l.altoFt] || { diagonales:3, travesanos:4 };
     const pares = Math.max(0, l.columnas - 1);
     add(CAN.ATIR_HOR, reglaAtir.travesanos * pares);
@@ -5667,9 +5826,11 @@ function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
   const colPanel = 0x9ea3a8;   // gris más definido para las charolas
   const matBarra = new THREE.MeshStandardMaterial({color:colBarra, roughness:0.65, metalness:0.35});
   const matPanel = new THREE.MeshStandardMaterial({color:colPanel, roughness:0.75, metalness:0.15});
-  // Distribución: nivel 0 abajo (0.02), nivel N-1 arriba (altoM - 0.02)
-  const espacio = niveles > 1 ? (altoM - 0.04) / (niveles - 1) : 0;
+  // niveles: numero (todos los cuerpos iguales) o arreglo por cuerpo (niveles por modulo)
   for(let c=0; c<cuerpos; c++){
+    const nivC = Array.isArray(niveles) ? niveles[c] : niveles;
+    // Distribución: nivel 0 abajo (0.02), nivel N-1 arriba (altoM - 0.02)
+    const espacio = nivC > 1 ? (altoM - 0.04) / (nivC - 1) : 0;
     const x0 = c * anchoM;
     const xL = x0, xR = x0 + anchoM;
     // 4 barras (verticales) por cuerpo
@@ -5685,8 +5846,8 @@ function buildMecanoScene(parent, altoM, anchoM, fondoM, niveles, cuerpos){
       parent.add(b);
     });
     // N paneles horizontales distribuidos (primero al fondo, último hasta arriba)
-    for(let n=0; n<niveles; n++){
-      const y = niveles > 1 ? (espacio * n + 0.02) : altoM/2;
+    for(let n=0; n<nivC; n++){
+      const y = nivC > 1 ? (espacio * n + 0.02) : altoM/2;
       const p = box(anchoM - postW, 0.012, fondoM - postD*1.5, matPanel);
       p.position.set(x0 + anchoM/2, y, 0);
       parent.add(p);
@@ -6155,15 +6316,22 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
 
 // Dibuja UNA góndola sencilla (con sus cabeceras) dentro de `parent`, centrada en (0,0,0).
 // El fondo de la góndola queda simétrico respecto a Z=0.
-function _gonBuildFila(parent, tipoGon, medidaKey, niv, mods, cabs){
+// Niveles de la cara 2 (atras) de una gondola central, por modulo. null = igual a la cara 1.
+function _gonCara2(l, fila){
+  if(!l.nivMod || l.tipoGon !== 'central') return null;
+  return _nivArrKey(l, fila === 'B' ? 'nivelesB2' : 'nivelesA2', l.modulos);
+}
+// niv: numero o arreglo por modulo (niveles por modulo); nivCab: niveles de las cabeceras;
+// niv2: arreglo por modulo de la cara 2 (central), o null si va igual que la cara 1.
+function _gonBuildFila(parent, tipoGon, medidaKey, niv, mods, cabs, nivCab, niv2){
   const m = MED[medidaKey];
   const central = tipoGon === 'central';
   const totalW = m.ancho * mods;
-  buildRow(parent, central, m.alto, m.ancho, m.fondo, niv, mods);
+  buildRow(parent, central, m.alto, m.ancho, m.fondo, niv, mods, niv2);
   for(let cIdx=0; cIdx<cabs; cIdx++){
     const side = cIdx===0 ? 1 : -1;
     const cab = new THREE.Group();
-    buildRow(cab, false, CAB.alto, CAB.ancho, CAB.fondo, niv, 1);
+    buildRow(cab, false, CAB.alto, CAB.ancho, CAB.fondo, Array.isArray(niv) ? (nivCab || niv[0]) : niv, 1);
     cab.rotation.y = side * Math.PI/2;
     cab.position.set(side * totalW/2, 0, 0);
     parent.add(cab);
@@ -6220,16 +6388,16 @@ function buildGondola(){
       // Dos góndolas espalda con espalda.
       const off = central ? m.fondo : m.fondo/2;
       const filaA = new THREE.Group();
-      _gonBuildFila(filaA, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
+      _gonBuildFila(filaA, l.tipoGon, l.medida, _nivFila(l,'A',l.modulos), l.modulos, l.cabeceras, l.niveles, _gonCara2(l,'A'));
       filaA.position.set(0, 0, off);
       gLin.add(filaA);
       const filaB = new THREE.Group();
-      _gonBuildFila(filaB, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
+      _gonBuildFila(filaB, l.tipoGon, l.medida, _nivFila(l,'B',l.modulos), l.modulos, l.cabeceras, l.niveles, _gonCara2(l,'B'));
       filaB.rotation.y = Math.PI;
       filaB.position.set(0, 0, -off);
       gLin.add(filaB);
     } else {
-      _gonBuildFila(gLin, l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras);
+      _gonBuildFila(gLin, l.tipoGon, l.medida, _nivFila(l,'A',l.modulos), l.modulos, l.cabeceras, l.niveles, _gonCara2(l,'A'));
     }
     // Solo aplica a pared: voltear 180° para que las charolas queden al otro lado.
     if(l.tipoGon === 'pared' && l.volteada) gLin.rotation.y = Math.PI;
@@ -6287,7 +6455,7 @@ function buildGondola(){
     const desg = filas.map((l,i)=>{
       const t = l.tipo==='doble' ? 'D' : 'S';
       const tg = l.tipoGon==='central' ? 'C' : 'P';
-      return 'L'+(i+1)+': '+t+' '+tg+' '+l.medida+' · '+l.niveles+'n · '+l.modulos+'m'+(l.cabeceras?' + '+l.cabeceras+'c':'');
+      return 'L'+(i+1)+': '+t+' '+tg+' '+l.medida+' · '+_nivRango(l, l.modulos)+'n · '+l.modulos+'m'+(l.cabeceras?' + '+l.cabeceras+'c':'');
     }).join(' | ');
     if(dimsEl) dimsEl.innerHTML = filas.length+' filas · largo máx <b>'+maxLargo.toFixed(2)+' m</b> · '+desg;
     if(resEl)  resEl.innerHTML  = filas.length+' filas · largo máx <b>'+maxLargo.toFixed(2)+' m</b> · alto máx <b>'+maxAlto.toFixed(2)+' m</b><br>'+desg+'<br>Pasillo entre filas: '+pasilloM.toFixed(1)+' m';
@@ -8083,17 +8251,17 @@ function buildMecano(){
     const gLin = new THREE.Group();
     if(l.tipo === 'doble'){
       const filaA = new THREE.Group();
-      buildMecanoScene(filaA, l.altoM, cfg.anchoM, cfg.fondoM, l.niveles, l.cuerpos);
+      buildMecanoScene(filaA, l.altoM, cfg.anchoM, cfg.fondoM, _nivFila(l,'A',l.cuerpos), l.cuerpos);
       filaA.position.set(-l.largoTotM/2, 0, cfg.fondoM/2);
       gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildMecanoScene(filaB, l.altoM, cfg.anchoM, cfg.fondoM, l.niveles, l.cuerpos);
+      buildMecanoScene(filaB, l.altoM, cfg.anchoM, cfg.fondoM, _nivFila(l,'B',l.cuerpos), l.cuerpos);
       filaB.rotation.y = Math.PI;   // espalda con espalda
       filaB.position.set(l.largoTotM/2, 0, -cfg.fondoM/2);
       gLin.add(filaB);
     } else {
       const fila = new THREE.Group();
-      buildMecanoScene(fila, l.altoM, cfg.anchoM, cfg.fondoM, l.niveles, l.cuerpos);
+      buildMecanoScene(fila, l.altoM, cfg.anchoM, cfg.fondoM, _nivFila(l,'A',l.cuerpos), l.cuerpos);
       fila.position.set(-l.largoTotM/2, 0, 0);
       gLin.add(fila);
     }
@@ -8165,12 +8333,13 @@ function calcularBomMecano(){
     const F = l.tipo === 'doble' ? 2 : 1;
     const modulos = l.cuerpos * F;
     const skuBarra = l.altoCm === 250 ? MEC.BARRA_250 : MEC.BARRA_200;
-    const tornillosTotal = MEC_COMPO.tornillosBase + MEC_COMPO.tornillosPorNivel * l.niveles;
+    // Paneles: suma de los niveles de cada modulo (= niveles*modulos si es parejo)
+    const paneles = _nivTotBom(l, l.cuerpos, l.cuerpos, F === 2);
     add(skuBarra,     MEC_COMPO.barras    * modulos);
     add(MEC.BASE,     MEC_COMPO.bases     * modulos);
-    add(MEC.PANEL,    l.niveles           * modulos);
+    add(MEC.PANEL,    paneles);
     add(MEC.ESCUADRA, MEC_COMPO.escuadras * modulos);
-    add(MEC.TORNILLO, tornillosTotal      * modulos);
+    add(MEC.TORNILLO, MEC_COMPO.tornillosBase * modulos + MEC_COMPO.tornillosPorNivel * paneles);
   });
   return orden.map(sku => [sku, items[sku]]);
 }
@@ -8207,9 +8376,17 @@ function renderLineasAplick(){
   cont.innerHTML = lineasAplick.map((l, i) => {
     const nivOpts = [];
     for(let n = APL_NIV_MIN; n <= APL_NIV_MAX; n++) nivOpts.push([n, String(n)]);
+    const esDA = l.tipo === 'doble';
+    const bdA = esDA ? '#f0c4ae' : '#b5d4f4', txA = esDA ? '#993C1D' : '#185FA5';
+    _nivNormaliza(l);
     const detalle =
       '<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="laSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px">'+_opts(nivOpts, l.niveles)+'</select></div>'
-      +'<div style="display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#444;cursor:pointer;padding-bottom:3px"><input type="checkbox" onchange="laSet('+i+',\'rejilla\',this.checked)"'+(_aplConRejilla(l)?' checked':'')+'> Con rejilla</label></div>';
+      +'<div style="display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#444;cursor:pointer;padding-bottom:3px"><input type="checkbox" onchange="laSet('+i+',\'rejilla\',this.checked)"'+(_aplConRejilla(l)?' checked':'')+'> Con rejilla</label></div>'
+      // Niveles por módulo: mismo editor que Selectivo y Picking
+      +'<div style="grid-column:1/3;border-top:1px dashed '+bdA+';padding-top:4px;margin-top:1px">'
+        +'<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+txA+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="laNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+        +(l.nivMod ? _nivModEditor(l, i, esDA, l.cuerpos, l.cuerpos, 'laNivSet') : '')
+      +'</div>';
     const letraB = bloquesAplick.length > 1 ? '📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ' : '';
     const selB = bloquesAplick.length > 1
       ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px;padding-top:3px"><span style="font-size:10px;color:#666;font-weight:600">📦 Bloque</span>'
@@ -8218,7 +8395,7 @@ function renderLineasAplick(){
         + '</select></div>'
       : '';
     return _cardLinea('la', i, l, {total: lineasAplick.length, abPermitido:false,
-      chip: letraB+'48"×24"×84" · '+l.niveles+' niveles'+(_aplConRejilla(l)?'':' · sin rejilla'), detalle: detalle + selB});
+      chip: letraB+'48"×24"×84" · '+_nivRango(l, l.cuerpos)+' niveles'+(_aplConRejilla(l)?'':' · sin rejilla'), detalle: detalle + selB});
   }).join('');
   cont.innerHTML = htmlB + cont.innerHTML;
   const pr = document.getElementById('aplPasilloRow');
@@ -8239,6 +8416,22 @@ function laDup(i){ _dupFila(lineasAplick, i, renderLineasAplick, 8); }
 function laDel(i){ if(lineasAplick.length<=1) return; lineasAplick.splice(i,1); renderLineasAplick(); build(); }
 function laCuerpos(i,d){ const l=lineasAplick[i]; l.cuerpos=Math.max(1,Math.min(30,l.cuerpos+d)); renderLineasAplick(); build(); }
 function laTipo(i){ lineasAplick[i].tipo = lineasAplick[i].tipo==='doble'?'sencilla':'doble'; renderLineasAplick(); build(); }
+// Niveles por módulo en Aplick (cada anaquel con sus niveles)
+function laNivMod(i, on){
+  const l = lineasAplick[i];
+  l.nivMod = !!on;
+  if(on) _nivNormaliza(l);
+  renderLineasAplick(); build();
+}
+function laNivSet(i, fila, c, val){
+  const l = lineasAplick[i];
+  const _n = parseInt(val);
+  const v = Math.max(APL_NIV_MIN, Math.min(APL_NIV_MAX, Number.isFinite(_n) ? _n : l.niveles));
+  const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
+  if(!Array.isArray(l[key])) l[key] = [];
+  l[key][c] = v;
+  renderLineasAplick(); build();
+}
 function laToggle(i){ lineasAplick[i].abierta = !lineasAplick[i].abierta; renderLineasAplick(); }
 function laSet(i,c,v){
   if(c === 'niveles') v = Math.max(APL_NIV_MIN, Math.min(APL_NIV_MAX, parseInt(v) || 3));
@@ -8283,6 +8476,7 @@ function getConfigApl(){
   const paso = anchoM + APL_SEP_M;
   const lineas = lineasAplick.map(l => ({
     tipo: l.tipo, cuerpos: l.cuerpos, niveles: l.niveles, rejilla: _aplConRejilla(l),
+    nivMod: !!l.nivMod, nivelesA: l.nivelesA || null, nivelesB: l.nivelesB || null,
     altoM: altoM,
     largoTotM: paso * l.cuerpos - APL_SEP_M,
     bloque: _bloqueDe(l),
@@ -8360,8 +8554,9 @@ function _buildAplickUno(parent, x0, cfg, niveles, conRejilla){
     }
   });
 }
+// niveles: numero o arreglo por anaquel (niveles por modulo)
 function buildAplickScene(parent, cfg, niveles, cuerpos, conRejilla){
-  for(let c = 0; c < cuerpos; c++) _buildAplickUno(parent, c * cfg.paso, cfg, niveles, conRejilla);
+  for(let c = 0; c < cuerpos; c++) _buildAplickUno(parent, c * cfg.paso, cfg, Array.isArray(niveles) ? niveles[c] : niveles, conRejilla);
 }
 function buildAplick(){
   const cfg = getConfigApl();
@@ -8374,17 +8569,17 @@ function buildAplick(){
       const gLin = new THREE.Group();
       if(l.tipo === 'doble'){
         const fA = new THREE.Group();
-        buildAplickScene(fA, cfg, l.niveles, l.cuerpos, l.rejilla);
+        buildAplickScene(fA, cfg, _nivFila(l,'A',l.cuerpos), l.cuerpos, l.rejilla);
         fA.position.set(-l.largoTotM/2, 0, (cfg.fondoM + APL_SEP_M)/2);
         gLin.add(fA);
         const fB = new THREE.Group();
-        buildAplickScene(fB, cfg, l.niveles, l.cuerpos, l.rejilla);
+        buildAplickScene(fB, cfg, _nivFila(l,'B',l.cuerpos), l.cuerpos, l.rejilla);
         fB.rotation.y = Math.PI;
         fB.position.set(l.largoTotM/2, 0, -(cfg.fondoM + APL_SEP_M)/2);
         gLin.add(fB);
       } else {
         const f = new THREE.Group();
-        buildAplickScene(f, cfg, l.niveles, l.cuerpos, l.rejilla);
+        buildAplickScene(f, cfg, _nivFila(l,'A',l.cuerpos), l.cuerpos, l.rejilla);
         f.position.set(-l.largoTotM/2, 0, 0);
         gLin.add(f);
       }
@@ -8418,7 +8613,7 @@ function buildAplick(){
   targetY = cfg.maxAltoM * 0.46;
   camDist = Math.max(cfg.maxAltoM*1.5 + 1.0, maxLen*0.9 + 1.2, profTotal*1.6 + 1.0);
   agregarCotas(grupo, maxLen, profTotal, cfg.maxAltoM, null, 0);
-  if(cfg.lineas.length === 1){
+  if(cfg.lineas.length === 1 && !cfg.lineas[0].nivMod){   // con niveles por modulo cada anaquel va distinto
     agregarCotasClaros(grupo, _aplAlturas(cfg.altoM, cfg.lineas[0].niveles), -maxLen/2 - 0.25, profTotal/2 + 0.05);
   }
   const lineas = cfg.lineas;
@@ -8427,7 +8622,7 @@ function buildAplick(){
     'Aplick · '+filaTxt+' · Largo <b>'+maxLen.toFixed(2)+' m</b> · Alto <b>'+cfg.maxAltoM.toFixed(2)+' m</b> · '+
     cfg.cuerposTot+' anaquel'+(cfg.cuerposTot>1?'es':'');
   const lineasHtml = lineas.length > 1
-    ? '<span style="font-size:10px;color:#888">' + lineas.map((l,i)=>'L'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaq · '+l.niveles+' niv').join(' | ') + '</span>'
+    ? '<span style="font-size:10px;color:#888">' + lineas.map((l,i)=>'L'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaq · '+_nivRango(l, l.cuerpos)+' niv').join(' | ') + '</span>'
     : '';
   document.getElementById('medidasResumen').innerHTML =
     '<b>Aplick · '+filaTxt+'</b><br>'+
@@ -8445,10 +8640,12 @@ function calcularBomAplick(){
   }
   cfg.lineas.forEach(l => {
     const anaqueles = l.cuerpos * (l.tipo === 'doble' ? 2 : 1);
+    // Suma de niveles de todos los anaqueles (= niveles*anaqueles si es parejo)
+    const nivTot = _nivTotBom(l, l.cuerpos, l.cuerpos, l.tipo === 'doble');
     add(APL.POSTE,   4 * anaqueles);
-    add(APL.VIGA48,  2 * l.niveles * anaqueles);
-    add(APL.VIGA24,  2 * l.niveles * anaqueles);
-    if(l.rejilla) add(APL.REJILLA, l.niveles * anaqueles);
+    add(APL.VIGA48,  2 * nivTot);
+    add(APL.VIGA24,  2 * nivTot);
+    if(l.rejilla) add(APL.REJILLA, nivTot);
   });
   return orden.map(sku => [sku, items[sku]]);
 }
@@ -8456,7 +8653,9 @@ function calcularBomAplick(){
 
 // Core: BOM de UNA fila con parametros explicitos. Multiplicador aplica a "doble"
 // (2 gondolas espalda con espalda). Retorna [[sku, qty]...].
-function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult){
+// nivMods (opcional): niveles de cada modulo (niveles por modulo). Sin el, todos llevan `niveles`.
+// nivMods2 (opcional): los de la cara 2 en una central. Sin el, igual que la cara 1.
+function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult, nivMods, nivMods2){
   const m = MED[medidaKey];
   const items = {}; const orden = [];
   function add(sku, q){
@@ -8466,13 +8665,19 @@ function _bomGonBase(tipoGon, medidaKey, niveles, modulos, cabeceras, mult){
   }
   const c = tipoGon==='central', mul = c?2:1, A = m.anchoCm, a211 = m.pilar==='211';
   const postesC = modulos+1;
+  // Suma de niveles de todos los modulos (= niveles*modulos si es parejo)
+  // y sumando las dos caras si es central.
+  const _suma = arr => arr.reduce((a,v)=>a+v, 0);
+  const sumF = Array.isArray(nivMods) ? _suma(nivMods) : niveles*modulos;
+  const sumR = c ? (Array.isArray(nivMods2) ? _suma(nivMods2) : sumF) : 0;
+  const sumNiv = sumF + sumR;   // charolas de todas las caras
   add('PILAR '+m.pilar+'CM', postesC);
-  add('BRAZO', (niveles-1)*2*mul*modulos);
-  add('CHAROLA '+A+'CM X 47CM', niveles*mul*modulos);
+  add('BRAZO', (sumNiv - modulos*mul)*2);
+  add('CHAROLA '+A+'CM X 47CM', sumNiv);
   add('PANEL TRASERO '+A+'CMX40CM', (a211?5:3)*2*modulos);
   if(!a211) add('PANEL TRASERO '+A+'CMX10CM', 2*modulos);
   add('BASE', (c?2:1)*postesC);
-  add('PORTA PRECIO '+A+'CM', niveles*mul*modulos);
+  add('PORTA PRECIO '+A+'CM', sumNiv);
   add('CUBRE POLVO '+A+'CM', (c?2:1)*modulos);
   add('CUBIERTA SUPERIOR '+A+'CM', modulos);
   if(cabeceras>0){
@@ -8510,6 +8715,11 @@ function calcularBomGondola(){
         cabeceras: parseInt(document.getElementById('cabeceras').value)
       }];
   filas.forEach(l => {
+    if(l.nivMod){   // niveles por modulo: cada gondola de la doble con los suyos
+      acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, 1, _nivArrRaw(l, 'A', l.modulos), _gonCara2(l, 'A')));
+      if(l.tipo === 'doble') acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, 1, _nivArrRaw(l, 'B', l.modulos), _gonCara2(l, 'B')));
+      return;
+    }
     const mult = l.tipo === 'doble' ? 2 : 1;
     acumular(_bomGonBase(l.tipoGon, l.medida, l.niveles, l.modulos, l.cabeceras, mult));
   });
@@ -9778,7 +9988,7 @@ function configResumen(){
       // Todas las filas (antes solo describia la 1) y las dobles cuentan x2.
       txt: 'Mecano · '+cfg.anchoCm+'cm × '+cfg.fondoCm+'cm · '
         + cfg.lineas.map(function(l, i){
-            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.altoCm+'cm alto, '+l.niveles+' entrepaños, '+l.cuerpos+' módulo'+(l.cuerpos>1?'s':'');
+            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.altoCm+'cm alto, '+_nivTxtMec(l)+' entrepaños, '+l.cuerpos+' módulo'+(l.cuerpos>1?'s':'');
           }).join(' | ')
         + ' · '+cfg.cuerposTot+' módulo'+(cfg.cuerposTot>1?'s':'')+' tot'
     };
@@ -9789,14 +9999,14 @@ function configResumen(){
       sistema: 'Aplick',
       txt: 'Aplick · 48" × 24" × 84" alto · gris · '
         + cfg.lineas.map(function(l, i){
-            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaquel'+(l.cuerpos>1?'es':'')+', '+l.niveles+' niveles'+(l.rejilla?'':' sin rejilla');
+            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaquel'+(l.cuerpos>1?'es':'')+', '+_nivRango(l, l.cuerpos)+' niveles'+(l.rejilla?'':' sin rejilla');
           }).join(' | ')
         + ' · '+cfg.cuerposTot+' anaquel'+(cfg.cuerposTot>1?'es':'')+' tot'
     };
   }
   if(sistemaActual === 'cantilever'){
     const cfg = getConfigCan();
-    const desg = cfg.lineas.map((l,i)=>'L'+(i+1)+': '+l.tipo+' '+l.columnas+' col '+l.altoFt+'ft brazo '+l.brazoIn+'in '+l.niveles+' niv').join(' | ');
+    const desg = cfg.lineas.map((l,i)=>'L'+(i+1)+': '+l.tipo+' '+l.columnas+' col '+l.altoFt+'ft brazo '+l.brazoIn+'in '+_nivRangoCan(l)+' niv').join(' | ');
     return {
       sistema: 'Cantilever',
       txt: 'Cantilever · '+cfg.lineas.length+' línea'+(cfg.lineas.length>1?'s':'')+' · '+desg+(cfg.lineas.length>1?' · pasillo '+cfg.pasilloM.toFixed(1)+'m':'')
@@ -9827,7 +10037,7 @@ function configResumen(){
       niveles: l.niveles,
       modulos: l.modulos,
       cabeceras: cb,
-      txt: 'Góndola · '+(l.tipo==='doble'?'Doble · ':'')+_lblTipoGon(l.tipoGon)+' · '+_lblMedida(l.medida)+' · '+l.niveles+' niveles · '+l.modulos+' módulo'+(l.modulos>1?'s':'')+(cb>0?' + '+cb+' cabecera'+(cb>1?'s':''):'')
+      txt: 'Góndola · '+(l.tipo==='doble'?'Doble · ':'')+_lblTipoGon(l.tipoGon)+' · '+_lblMedida(l.medida)+' · '+_nivRango(l, l.modulos)+' niveles · '+l.modulos+' módulo'+(l.modulos>1?'s':'')+(cb>0?' + '+cb+' cabecera'+(cb>1?'s':''):'')
     };
   }
   const nSen = filas.filter(l=>l.tipo!=='doble').length;
