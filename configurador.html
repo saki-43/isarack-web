@@ -8277,9 +8277,17 @@ function renderLineasAplick(){
   cont.innerHTML = lineasAplick.map((l, i) => {
     const nivOpts = [];
     for(let n = APL_NIV_MIN; n <= APL_NIV_MAX; n++) nivOpts.push([n, String(n)]);
+    const esDA = l.tipo === 'doble';
+    const bdA = esDA ? '#f0c4ae' : '#b5d4f4', txA = esDA ? '#993C1D' : '#185FA5';
+    _nivNormaliza(l);
     const detalle =
       '<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="laSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px">'+_opts(nivOpts, l.niveles)+'</select></div>'
-      +'<div style="display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#444;cursor:pointer;padding-bottom:3px"><input type="checkbox" onchange="laSet('+i+',\'rejilla\',this.checked)"'+(_aplConRejilla(l)?' checked':'')+'> Con rejilla</label></div>';
+      +'<div style="display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#444;cursor:pointer;padding-bottom:3px"><input type="checkbox" onchange="laSet('+i+',\'rejilla\',this.checked)"'+(_aplConRejilla(l)?' checked':'')+'> Con rejilla</label></div>'
+      // Niveles por módulo: mismo editor que Selectivo y Picking
+      +'<div style="grid-column:1/3;border-top:1px dashed '+bdA+';padding-top:4px;margin-top:1px">'
+        +'<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:'+txA+';cursor:pointer;font-weight:600"><input type="checkbox" '+(l.nivMod?'checked':'')+' onchange="laNivMod('+i+',this.checked)"> Niveles por módulo</label>'
+        +(l.nivMod ? _nivModEditor(l, i, esDA, l.cuerpos, l.cuerpos, 'laNivSet') : '')
+      +'</div>';
     const letraB = bloquesAplick.length > 1 ? '📦 '+String.fromCharCode(65+_bloqueDe(l))+' · ' : '';
     const selB = bloquesAplick.length > 1
       ? '<div style="grid-column:1/3;display:flex;align-items:center;gap:6px;padding-top:3px"><span style="font-size:10px;color:#666;font-weight:600">📦 Bloque</span>'
@@ -8288,7 +8296,7 @@ function renderLineasAplick(){
         + '</select></div>'
       : '';
     return _cardLinea('la', i, l, {total: lineasAplick.length, abPermitido:false,
-      chip: letraB+'48"×24"×84" · '+l.niveles+' niveles'+(_aplConRejilla(l)?'':' · sin rejilla'), detalle: detalle + selB});
+      chip: letraB+'48"×24"×84" · '+_nivRango(l, l.cuerpos)+' niveles'+(_aplConRejilla(l)?'':' · sin rejilla'), detalle: detalle + selB});
   }).join('');
   cont.innerHTML = htmlB + cont.innerHTML;
   const pr = document.getElementById('aplPasilloRow');
@@ -8309,6 +8317,22 @@ function laDup(i){ _dupFila(lineasAplick, i, renderLineasAplick, 8); }
 function laDel(i){ if(lineasAplick.length<=1) return; lineasAplick.splice(i,1); renderLineasAplick(); build(); }
 function laCuerpos(i,d){ const l=lineasAplick[i]; l.cuerpos=Math.max(1,Math.min(30,l.cuerpos+d)); renderLineasAplick(); build(); }
 function laTipo(i){ lineasAplick[i].tipo = lineasAplick[i].tipo==='doble'?'sencilla':'doble'; renderLineasAplick(); build(); }
+// Niveles por módulo en Aplick (cada anaquel con sus niveles)
+function laNivMod(i, on){
+  const l = lineasAplick[i];
+  l.nivMod = !!on;
+  if(on) _nivNormaliza(l);
+  renderLineasAplick(); build();
+}
+function laNivSet(i, fila, c, val){
+  const l = lineasAplick[i];
+  const _n = parseInt(val);
+  const v = Math.max(APL_NIV_MIN, Math.min(APL_NIV_MAX, Number.isFinite(_n) ? _n : l.niveles));
+  const key = (fila === 'B') ? 'nivelesB' : 'nivelesA';
+  if(!Array.isArray(l[key])) l[key] = [];
+  l[key][c] = v;
+  renderLineasAplick(); build();
+}
 function laToggle(i){ lineasAplick[i].abierta = !lineasAplick[i].abierta; renderLineasAplick(); }
 function laSet(i,c,v){
   if(c === 'niveles') v = Math.max(APL_NIV_MIN, Math.min(APL_NIV_MAX, parseInt(v) || 3));
@@ -8353,6 +8377,7 @@ function getConfigApl(){
   const paso = anchoM + APL_SEP_M;
   const lineas = lineasAplick.map(l => ({
     tipo: l.tipo, cuerpos: l.cuerpos, niveles: l.niveles, rejilla: _aplConRejilla(l),
+    nivMod: !!l.nivMod, nivelesA: l.nivelesA || null, nivelesB: l.nivelesB || null,
     altoM: altoM,
     largoTotM: paso * l.cuerpos - APL_SEP_M,
     bloque: _bloqueDe(l),
@@ -8430,8 +8455,9 @@ function _buildAplickUno(parent, x0, cfg, niveles, conRejilla){
     }
   });
 }
+// niveles: numero o arreglo por anaquel (niveles por modulo)
 function buildAplickScene(parent, cfg, niveles, cuerpos, conRejilla){
-  for(let c = 0; c < cuerpos; c++) _buildAplickUno(parent, c * cfg.paso, cfg, niveles, conRejilla);
+  for(let c = 0; c < cuerpos; c++) _buildAplickUno(parent, c * cfg.paso, cfg, Array.isArray(niveles) ? niveles[c] : niveles, conRejilla);
 }
 function buildAplick(){
   const cfg = getConfigApl();
@@ -8444,17 +8470,17 @@ function buildAplick(){
       const gLin = new THREE.Group();
       if(l.tipo === 'doble'){
         const fA = new THREE.Group();
-        buildAplickScene(fA, cfg, l.niveles, l.cuerpos, l.rejilla);
+        buildAplickScene(fA, cfg, _nivFila(l,'A',l.cuerpos), l.cuerpos, l.rejilla);
         fA.position.set(-l.largoTotM/2, 0, (cfg.fondoM + APL_SEP_M)/2);
         gLin.add(fA);
         const fB = new THREE.Group();
-        buildAplickScene(fB, cfg, l.niveles, l.cuerpos, l.rejilla);
+        buildAplickScene(fB, cfg, _nivFila(l,'B',l.cuerpos), l.cuerpos, l.rejilla);
         fB.rotation.y = Math.PI;
         fB.position.set(l.largoTotM/2, 0, -(cfg.fondoM + APL_SEP_M)/2);
         gLin.add(fB);
       } else {
         const f = new THREE.Group();
-        buildAplickScene(f, cfg, l.niveles, l.cuerpos, l.rejilla);
+        buildAplickScene(f, cfg, _nivFila(l,'A',l.cuerpos), l.cuerpos, l.rejilla);
         f.position.set(-l.largoTotM/2, 0, 0);
         gLin.add(f);
       }
@@ -8488,7 +8514,7 @@ function buildAplick(){
   targetY = cfg.maxAltoM * 0.46;
   camDist = Math.max(cfg.maxAltoM*1.5 + 1.0, maxLen*0.9 + 1.2, profTotal*1.6 + 1.0);
   agregarCotas(grupo, maxLen, profTotal, cfg.maxAltoM, null, 0);
-  if(cfg.lineas.length === 1){
+  if(cfg.lineas.length === 1 && !cfg.lineas[0].nivMod){   // con niveles por modulo cada anaquel va distinto
     agregarCotasClaros(grupo, _aplAlturas(cfg.altoM, cfg.lineas[0].niveles), -maxLen/2 - 0.25, profTotal/2 + 0.05);
   }
   const lineas = cfg.lineas;
@@ -8497,7 +8523,7 @@ function buildAplick(){
     'Aplick · '+filaTxt+' · Largo <b>'+maxLen.toFixed(2)+' m</b> · Alto <b>'+cfg.maxAltoM.toFixed(2)+' m</b> · '+
     cfg.cuerposTot+' anaquel'+(cfg.cuerposTot>1?'es':'');
   const lineasHtml = lineas.length > 1
-    ? '<span style="font-size:10px;color:#888">' + lineas.map((l,i)=>'L'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaq · '+l.niveles+' niv').join(' | ') + '</span>'
+    ? '<span style="font-size:10px;color:#888">' + lineas.map((l,i)=>'L'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaq · '+_nivRango(l, l.cuerpos)+' niv').join(' | ') + '</span>'
     : '';
   document.getElementById('medidasResumen').innerHTML =
     '<b>Aplick · '+filaTxt+'</b><br>'+
@@ -8515,10 +8541,12 @@ function calcularBomAplick(){
   }
   cfg.lineas.forEach(l => {
     const anaqueles = l.cuerpos * (l.tipo === 'doble' ? 2 : 1);
+    // Suma de niveles de todos los anaqueles (= niveles*anaqueles si es parejo)
+    const nivTot = _nivTotBom(l, l.cuerpos, l.cuerpos, l.tipo === 'doble');
     add(APL.POSTE,   4 * anaqueles);
-    add(APL.VIGA48,  2 * l.niveles * anaqueles);
-    add(APL.VIGA24,  2 * l.niveles * anaqueles);
-    if(l.rejilla) add(APL.REJILLA, l.niveles * anaqueles);
+    add(APL.VIGA48,  2 * nivTot);
+    add(APL.VIGA24,  2 * nivTot);
+    if(l.rejilla) add(APL.REJILLA, nivTot);
   });
   return orden.map(sku => [sku, items[sku]]);
 }
@@ -9867,7 +9895,7 @@ function configResumen(){
       sistema: 'Aplick',
       txt: 'Aplick · 48" × 24" × 84" alto · gris · '
         + cfg.lineas.map(function(l, i){
-            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaquel'+(l.cuerpos>1?'es':'')+', '+l.niveles+' niveles'+(l.rejilla?'':' sin rejilla');
+            return 'F'+(i+1)+': '+(l.tipo==='doble'?'doble ':'')+l.cuerpos+' anaquel'+(l.cuerpos>1?'es':'')+', '+_nivRango(l, l.cuerpos)+' niveles'+(l.rejilla?'':' sin rejilla');
           }).join(' | ')
         + ' · '+cfg.cuerposTot+' anaquel'+(cfg.cuerposTot>1?'es':'')+' tot'
     };
