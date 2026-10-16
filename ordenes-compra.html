@@ -542,7 +542,7 @@
   @media print {
     @page { size: letter; margin: 0; }
     html, body { margin: 0 !important; padding: 0 !important; background: white; font-size: 11px; }
-    .app-header, .tabs, .actions, .no-print, .add-row-btn, .del-btn { display: none !important; }
+    .app-header, .tabs, .actions, .no-print, .add-row-btn, .del-btn, .toast { display: none !important; }
     .container { padding: 0 !important; margin: 0 !important; max-width: 100%; }
     .document {
       box-shadow: none;
@@ -947,7 +947,7 @@ async function ocSincronizarNube(){
   saveOrders(Object.values(porId));
   // La hoja en blanco toma el siguiente folio considerando TAMBIEN los de la nube
   // (antes un equipo nuevo empezaba en 53 aunque la nube fuera en 92).
-  if (!editingSavedId && currentOrder) {
+  if (!editingSavedId && currentOrder && String(currentOrder.folio).trim() !== '') {
     const sig = getNextFolio();
     if ((parseInt(currentOrder.folio) || 0) < sig) {
       currentOrder.folio = sig;
@@ -1386,7 +1386,10 @@ function renderCurrentOrder() {
 }
 
 function readOrderFromForm() {
-  currentOrder.folio = parseInt(document.getElementById('folio').value) || currentOrder.folio;
+  // Folio vacío = orden SIN folio (Isaac, 16 oct 2026: reposiciones de órdenes perdidas).
+  // Antes un campo vacío se quedaba con el folio automático y se gastaban números.
+  { const _fv = String(document.getElementById('folio').value || '').trim();
+    currentOrder.folio = _fv === '' ? '' : (parseInt(_fv) || currentOrder.folio); }
   currentOrder.fecha = document.getElementById('fecha').value;
   currentOrder.razonSocial = document.getElementById('razon-social').value.trim();
   currentOrder.contacto = document.getElementById('contacto').value.trim();
@@ -1416,7 +1419,7 @@ function saveCurrentOrder() {
       orders[idx] = { ...currentOrder, id: editingSavedId, savedAt: orders[idx].savedAt, updatedAt: now };
       saveOrders(orders);
       ocCloudUpsert(orders[idx]).then(ok => { if(!ok) showToast('⚠ Guardada local, pero no subió a la nube', true); });
-      showToast('✓ Orden #' + currentOrder.folio + ' actualizada');
+      showToast(currentOrder.folio ? '✓ Orden #' + currentOrder.folio + ' actualizada' : '✓ Orden sin folio actualizada');
       return;
     }
   }
@@ -1424,7 +1427,7 @@ function saveCurrentOrder() {
   // se avisa. Antes se podian guardar varias hojas con el mismo folio (128 x3,
   // Isaac, 2 oct 2026).
   const _fol = parseInt(currentOrder.folio) || 0;
-  if (orders.some(o => (parseInt(o.folio) || 0) === _fol)) {
+  if (_fol && orders.some(o => (parseInt(o.folio) || 0) === _fol)) {
     const libre = getNextFolio();
     showToast('⚠ El folio ' + _fol + ' ya estaba usado — esta orden queda como #' + libre, true);
     currentOrder.folio = libre;
@@ -1435,9 +1438,9 @@ function saveCurrentOrder() {
   orders.push(nuevo);
   saveOrders(orders);
   ocCloudUpsert(nuevo).then(ok => { if(!ok) showToast('⚠ Guardada local, pero no subió a la nube', true); });
-  setLastFolio(currentOrder.folio);
+  if (_fol) setLastFolio(currentOrder.folio);
   editingSavedId = id;
-  showToast('✓ Orden #' + currentOrder.folio + ' guardada');
+  showToast(_fol ? '✓ Orden #' + currentOrder.folio + ' guardada' : '✓ Orden sin folio guardada');
 }
 
 // ============ UI: tabs / views ============
@@ -1501,7 +1504,7 @@ function renderHistory() {
     card.className = 'history-card';
     card.innerHTML = `
       <div class="history-folio">
-        FOLIO<span class="num">${escapeHtml(o.folio)}</span>${(_cuentaFolio[parseInt(o.folio) || 0] > 1) ? '<span style="display:block;color:#c0392b;font-size:10px;font-weight:700">⚠ repetido</span>' : ''}
+        FOLIO<span class="num">${o.folio ? escapeHtml(o.folio) : '—'}</span>${(parseInt(o.folio) && _cuentaFolio[parseInt(o.folio) || 0] > 1) ? '<span style="display:block;color:#c0392b;font-size:10px;font-weight:700">⚠ repetido</span>' : ''}
       </div>
       <div class="history-info">
         <div class="top">${escapeHtml(o.person)} — ${escapeHtml(o.razonSocial || '(sin proveedor)')}</div>
@@ -1647,7 +1650,7 @@ window.addEventListener('afterprint', () => {
   setTimeout(() => {
     const impresa = currentOrder.folio;
     loadOrderFromDefaults(currentPerson);
-    showToast('✓ Orden #' + impresa + ' guardada · lista la #' + currentOrder.folio);
+    showToast((impresa ? '✓ Orden #' + impresa : '✓ Orden sin folio') + ' guardada · lista la #' + currentOrder.folio);
   }, 300);
 });
 
