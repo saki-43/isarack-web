@@ -173,6 +173,9 @@
     text-align: left;
   }
   .folio-date input:hover { border-color: var(--border-dark); }
+  .folio-date .fecha-fija-lbl { text-align: left; font-weight: 600; font-size: 11px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 5px; }
+  .folio-date .fecha-fija-lbl input { width: auto; padding: 0; margin: 0; background: none; }
+  .folio-date .fecha-fija-lbl.on { color: #DA6635; }
   .folio-date input:focus { outline: none; border-color: var(--primary); background: white; }
 
   .section-title {
@@ -647,6 +650,8 @@
             <input type="number" id="folio" min="1">
             <label>FECHA DE EMISIÓN:</label>
             <input type="date" id="fecha">
+            <span class="no-print"></span>
+            <label class="no-print fecha-fija-lbl" title="Las órdenes nuevas usan esta fecha hasta que quites la palomita"><input type="checkbox" id="fecha-fija"> 📌 Dejar esta fecha fija</label>
           </div>
         </div>
       </div>
@@ -1129,6 +1134,39 @@ function fmtMoney(n) {
   return '$' + num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Fecha fija (Isaac, 16 oct 2026): para capturar varias órdenes con una fecha anterior
+// (ej. 3 de la semana pasada). Mientras la palomita esté puesta, cada orden nueva usa esa
+// fecha en vez de la de hoy. Se guarda en este equipo hasta que se quite.
+const FECHA_FIJA_KEY = 'oc_fecha_fija';
+function _fechaFija() {
+  try { return localStorage.getItem(FECHA_FIJA_KEY) || ''; } catch (e) { return ''; }
+}
+function _pintarFechaFija() {
+  const chk = document.getElementById('fecha-fija');
+  if (!chk) return;
+  const f = _fechaFija();
+  chk.checked = !!f;
+  chk.parentElement.classList.toggle('on', !!f);
+}
+function _initFechaFija() {
+  const chk = document.getElementById('fecha-fija');
+  const inp = document.getElementById('fecha');
+  if (!chk || !inp) return;
+  chk.addEventListener('change', () => {
+    try {
+      if (chk.checked && inp.value) localStorage.setItem(FECHA_FIJA_KEY, inp.value);
+      else localStorage.removeItem(FECHA_FIJA_KEY);
+    } catch (e) {}
+    if (chk.checked && !inp.value) chk.checked = false;
+    _pintarFechaFija();
+    if (typeof showToast === 'function') showToast(chk.checked ? 'Fecha fija: las órdenes nuevas usarán ' + inp.value : 'Fecha fija quitada: las órdenes nuevas usarán la de hoy');
+  });
+  // Si cambias la fecha con la palomita puesta, la fija pasa a ser la nueva.
+  inp.addEventListener('change', () => {
+    if (chk.checked && inp.value) { try { localStorage.setItem(FECHA_FIJA_KEY, inp.value); } catch (e) {} }
+  });
+  _pintarFechaFija();
+}
 function todayISO() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -1274,7 +1312,7 @@ function loadOrderFromDefaults(person) {
   currentOrder = {
     person: person,
     folio: getNextFolio(),
-    fecha: todayISO(),
+    fecha: _fechaFija() || todayISO(),
     razonSocial: d.razonSocial || '',
     contacto: d.contacto || '',
     telefono: d.telefono || '',
@@ -1802,6 +1840,7 @@ window.addEventListener('paste', (e)=>{
 // initial load
 populateProveedorSelect();
 loadOrderFromDefaults(currentPerson);
+_initFechaFija();
 ocSincronizarNube();
 </script>
 
