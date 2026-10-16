@@ -1056,6 +1056,15 @@ const BASE_PROVEEDORES = {
     direccion: '',
     direccionEnvio: 'ISARACK'
   },
+  // Razón social con la que se le hacen las órdenes desde ago-2026 (folios 98–126).
+  // De base para que no se vuelva a perder de la lista (16 oct 2026).
+  'ANGEL MANUEL RODRIGUEZ CASTAÑEDA': {
+    razonSocial: 'ANGEL MANUEL RODRIGUEZ CASTAÑEDA',
+    contacto: 'GILBERTO RODRIGUEZ',
+    telefono: '664 232 3708',
+    direccion: '',
+    direccionEnvio: 'ISARACK'
+  },
   'BRYAN ALEXIS': {
     razonSocial: 'BRYAN ALEXIS',
     contacto: 'BRAYAN',
@@ -1070,14 +1079,95 @@ function loadProveedores() {
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
+      // Rescate (16 oct 2026): el guardado automático pisaba un proveedor de base
+      // cuando se escribía OTRO nombre con él seleccionado (MANUEL RODRIGUEZ quedó
+      // como "MAQUINARIA DE ELEVACION", CLAUDIA como "JUANA SAAVEDRA"). El de base
+      // vuelve a su lugar y lo que se había escrito se conserva con su propio nombre.
+      const _rescato = _rescatarBase(parsed);
+      if (_rescato) { try { localStorage.setItem(PROVEEDORES_KEY, JSON.stringify(parsed)); } catch(e) {} }
       return { ...BASE_PROVEEDORES, ...parsed };
     } catch(e) {}
   }
   return JSON.parse(JSON.stringify(BASE_PROVEEDORES));
 }
 
+function _rescatarBase(obj) {
+  let cambio = false;
+  Object.keys(BASE_PROVEEDORES).forEach(k => {
+    const v = obj[k];
+    if (v && _normProv(v.razonSocial) !== _normProv(BASE_PROVEEDORES[k].razonSocial)) {
+      const nk = _llaveProv(v.razonSocial);
+      if (nk && !obj[nk] && !BASE_PROVEEDORES[nk]) obj[nk] = v;
+      delete obj[k];
+      cambio = true;
+    }
+  });
+  return cambio;
+}
+
+function _normProv(s) { return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim(); }
+function _llaveProv(rs) {
+  rs = String(rs || '').trim();
+  return rs.toUpperCase().replace(/\s*(S\.?A\.?\s*DE\s*C\.?V\.?|SA\s*DE\s*CV)\s*$/i, '').trim() || rs;
+}
+
 function saveProveedores(provs) {
   localStorage.setItem(PROVEEDORES_KEY, JSON.stringify(provs));
+}
+
+// ---- Proveedores en la NUBE (16 oct 2026) ----
+// Antes vivían solo en el navegador de cada equipo: si se borraban los datos del
+// navegador o se cambiaba de computadora, se perdían. Ahora se respaldan en
+// empresa_config (clave 'oc_proveedores') y se fusionan con lo local: por
+// proveedor gana la versión más reciente (_upd). Los borrados se recuerdan en
+// 'borrados' para que la nube no los reviva.
+const PROV_BORRADOS_KEY = 'isarack_proveedores_borrados_v1';
+const PROV_NUBE_CLAVE = 'oc_proveedores';
+function _loadProvBorrados() { try { return JSON.parse(localStorage.getItem(PROV_BORRADOS_KEY) || '{}') || {}; } catch(e) { return {}; } }
+function _saveProvBorrados(b) { try { localStorage.setItem(PROV_BORRADOS_KEY, JSON.stringify(b)); } catch(e) {} }
+function _marcarProv(key) { if (proveedores[key]) proveedores[key]._upd = Date.now(); }
+let _provSyncTimer = null;
+function ocProvProgramarSync() { clearTimeout(_provSyncTimer); _provSyncTimer = setTimeout(ocProvSincronizar, 800); }
+async function ocProvSincronizar() {
+  try {
+    const r = await fetch(SB_URL + '/rest/v1/empresa_config?clave=eq.' + PROV_NUBE_CLAVE + '&select=valor', {
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY }
+    });
+    if (!r.ok) return;
+    const rows = await r.json();
+    let nube = rows && rows[0] ? rows[0].valor : null;
+    if (typeof nube === 'string') { try { nube = JSON.parse(nube); } catch(e) { nube = null; } }
+    const nProvs = (nube && nube.provs) || {}, nBorr = (nube && nube.borrados) || {};
+    _rescatarBase(nProvs);
+    // fusiona borrados (gana la fecha más nueva)
+    const borr = _loadProvBorrados();
+    Object.keys(nBorr).forEach(k => { if (!(borr[k] >= nBorr[k])) borr[k] = nBorr[k]; });
+    // fusiona proveedores (gana el _upd más nuevo; sin _upd cuenta como 0)
+    const loc = JSON.parse(localStorage.getItem(PROVEEDORES_KEY) || '{}') || {};
+    const res = {};
+    new Set([...Object.keys(loc), ...Object.keys(nProvs)]).forEach(k => {
+      const a = loc[k], b = nProvs[k];
+      const v = !a ? b : !b ? a : ((b._upd || 0) > (a._upd || 0) ? b : a);
+      if (v && !(borr[k] > (v._upd || 0))) res[k] = v;
+    });
+    saveProveedores(res);
+    _saveProvBorrados(borr);
+    const sel = document.getElementById('proveedor-select');
+    const actual = sel ? sel.value : '';
+    proveedores = { ...BASE_PROVEEDORES, ...res };
+    Object.keys(borr).forEach(k => { if (!BASE_PROVEEDORES[k] && proveedores[k] && !(proveedores[k]._upd >= borr[k])) delete proveedores[k]; });
+    populateProveedorSelect(actual);
+    // sube lo fusionado si cambió algo respecto a la nube
+    const valor = { provs: res, borrados: borr };
+    if (JSON.stringify(valor) !== JSON.stringify({ provs: nProvs, borrados: nBorr })) {
+      await fetch(SB_URL + '/rest/v1/empresa_config?on_conflict=clave', {
+        method: 'POST',
+        headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json',
+                   Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ clave: PROV_NUBE_CLAVE, valor, updated_at: new Date().toISOString() })
+      });
+    }
+  } catch(e) { console.warn('Proveedores nube', e); }
 }
 
 let proveedores = loadProveedores();
@@ -1118,6 +1208,11 @@ function fillProveedorFields(key) {
 function saveCurrentProveedorFields() {
   const key = document.getElementById('proveedor-select').value;
   if (!key) return;
+  // Si la razón social ya es OTRA, no es una corrección de este proveedor: no lo pisa.
+  // (Para darlo de alta está "＋ Guardar nuevo".)
+  const rsForm = document.getElementById('razon-social').value.trim();
+  if (proveedores[key] && _normProv(rsForm) !== _normProv(proveedores[key].razonSocial)) return;
+  const _provPrevio = proveedores[key];
   proveedores[key] = {
     razonSocial: document.getElementById('razon-social').value.trim(),
     contacto: document.getElementById('contacto').value.trim(),
@@ -1125,8 +1220,10 @@ function saveCurrentProveedorFields() {
     direccion: document.getElementById('direccion').value.trim(),
     direccionEnvio: document.getElementById('direccion-envio').value.trim()
   };
-  saveProveedores(proveedores);
+  const _antes = JSON.stringify(_sinUpd(_provPrevio));
+  if (_antes !== JSON.stringify(_sinUpd(proveedores[key]))) { _marcarProv(key); saveProveedores(proveedores); ocProvProgramarSync(); }
 }
+function _sinUpd(p) { if (!p) return p; const { _upd, ...r } = p; return r; }
 
 // ============ HELPERS ============
 function fmtMoney(n) {
@@ -1599,7 +1696,7 @@ document.getElementById('proveedor-select').addEventListener('change', (e) => {
 document.getElementById('btn-save-proveedor').addEventListener('click', () => {
   const rs = document.getElementById('razon-social').value.trim();
   if (!rs) { showToast('Ingresa una razón social primero', true); return; }
-  const key = rs.toUpperCase().replace(/\s*(S\.?A\.?\s*DE\s*C\.?V\.?|SA\s*DE\s*CV)\s*$/i, '').trim() || rs;
+  const key = _llaveProv(rs);
   proveedores[key] = {
     razonSocial: rs,
     contacto: document.getElementById('contacto').value.trim(),
@@ -1607,7 +1704,10 @@ document.getElementById('btn-save-proveedor').addEventListener('click', () => {
     direccion: document.getElementById('direccion').value.trim(),
     direccionEnvio: document.getElementById('direccion-envio').value.trim()
   };
+  _marcarProv(key);
+  { const b = _loadProvBorrados(); if (b[key]) { delete b[key]; _saveProvBorrados(b); } }
   saveProveedores(proveedores);
+  ocProvProgramarSync();
   populateProveedorSelect(key);
   showToast('✓ Proveedor "' + rs + '" guardado');
 });
@@ -1620,7 +1720,9 @@ document.getElementById('btn-del-proveedor').addEventListener('click', async () 
   const ok = await confirmModal('Borrar proveedor', '¿Borrar el proveedor "' + nom + '"? No afecta las órdenes ya guardadas.');
   if (!ok) return;
   delete proveedores[key];
+  { const b = _loadProvBorrados(); b[key] = Date.now(); _saveProvBorrados(b); }
   saveProveedores(proveedores);
+  ocProvProgramarSync();
   populateProveedorSelect('');
   showToast('Proveedor borrado');
 });
@@ -1845,6 +1947,7 @@ populateProveedorSelect();
 loadOrderFromDefaults(currentPerson);
 _initFechaFija();
 ocSincronizarNube();
+ocProvSincronizar();
 </script>
 
 
