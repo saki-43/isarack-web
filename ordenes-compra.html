@@ -1070,10 +1070,31 @@ function loadProveedores() {
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
+      // Rescate (16 oct 2026): el guardado automático pisaba un proveedor de base
+      // cuando se escribía OTRO nombre con él seleccionado (MANUEL RODRIGUEZ quedó
+      // como "MAQUINARIA DE ELEVACION", CLAUDIA como "JUANA SAAVEDRA"). El de base
+      // vuelve a su lugar y lo que se había escrito se conserva con su propio nombre.
+      let _rescato = false;
+      Object.keys(BASE_PROVEEDORES).forEach(k => {
+        const v = parsed[k];
+        if (v && _normProv(v.razonSocial) !== _normProv(BASE_PROVEEDORES[k].razonSocial)) {
+          const nk = _llaveProv(v.razonSocial);
+          if (nk && !parsed[nk] && !BASE_PROVEEDORES[nk]) parsed[nk] = v;
+          delete parsed[k];
+          _rescato = true;
+        }
+      });
+      if (_rescato) { try { localStorage.setItem(PROVEEDORES_KEY, JSON.stringify(parsed)); } catch(e) {} }
       return { ...BASE_PROVEEDORES, ...parsed };
     } catch(e) {}
   }
   return JSON.parse(JSON.stringify(BASE_PROVEEDORES));
+}
+
+function _normProv(s) { return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim(); }
+function _llaveProv(rs) {
+  rs = String(rs || '').trim();
+  return rs.toUpperCase().replace(/\s*(S\.?A\.?\s*DE\s*C\.?V\.?|SA\s*DE\s*CV)\s*$/i, '').trim() || rs;
 }
 
 function saveProveedores(provs) {
@@ -1118,6 +1139,10 @@ function fillProveedorFields(key) {
 function saveCurrentProveedorFields() {
   const key = document.getElementById('proveedor-select').value;
   if (!key) return;
+  // Si la razón social ya es OTRA, no es una corrección de este proveedor: no lo pisa.
+  // (Para darlo de alta está "＋ Guardar nuevo".)
+  const rsForm = document.getElementById('razon-social').value.trim();
+  if (proveedores[key] && _normProv(rsForm) !== _normProv(proveedores[key].razonSocial)) return;
   proveedores[key] = {
     razonSocial: document.getElementById('razon-social').value.trim(),
     contacto: document.getElementById('contacto').value.trim(),
@@ -1599,7 +1624,7 @@ document.getElementById('proveedor-select').addEventListener('change', (e) => {
 document.getElementById('btn-save-proveedor').addEventListener('click', () => {
   const rs = document.getElementById('razon-social').value.trim();
   if (!rs) { showToast('Ingresa una razón social primero', true); return; }
-  const key = rs.toUpperCase().replace(/\s*(S\.?A\.?\s*DE\s*C\.?V\.?|SA\s*DE\s*CV)\s*$/i, '').trim() || rs;
+  const key = _llaveProv(rs);
   proveedores[key] = {
     razonSocial: rs,
     contacto: document.getElementById('contacto').value.trim(),
