@@ -860,6 +860,20 @@ const UNIONES_SEL = {
   36:   'SEL-0346'
 };
 
+// MARCO EXTENDIDO (Isaac, 16 oct 2026): marco normal (p.ej. 42") + un POSTE
+// suelto amarrado con separadores horizontales (las mismas UNION DE MARCO),
+// sin diagonales. Da un marco mas ancho. Fondo total = fondo del marco + separacion.
+// Por marco: 1 poste 3"x3" de la altura del marco, 1 pie de poste, 2 anclas y
+// EXT_SEPARADORES_POR_MARCO uniones de la medida elegida. Lleva 3 vigas por
+// nivel: frente, INTERMEDIA (en el poste del marco que da al separador) y atras.
+const POSTES_SEL = {
+  96:'SEL-0439', 144:'SEL-0232', 168:'SEL-0420', 192:'SEL-0236', 216:'SEL-0421', 240:'SEL-0237',
+  264:'SEL-0422', 288:'SEL-0382', 312:'SEL-0445', 336:'SEL-0383', 360:'SEL-0426'
+};
+const PIE_POSTE_SEL = 'SEL-0218';   // PIE POSTE 3" GALV. 1/8"
+const EXT_SEPARADORES_POR_MARCO = 3; // a 15 %, 50 % y 90 % de la altura, como la union de la doble
+function _extIn(l){ const v = parseFloat(l && l.extIn); return (l && l.extOn && v > 0) ? v : 0; }
+
 const VIGAS_INFO = {
   'SEL-0362': {largoIn:96,  altIn:3.0,  capKg:910,  capLb:2008},
   'SEL-0364': {largoIn:96,  altIn:4.0,  capKg:2040, capLb:4062},
@@ -963,7 +977,8 @@ const BARRA_PROT_OPC = [
 // Largo que pide la orilla, en pulgadas.
 function _largoBarraIn(cfg, l){
   if(!l) return 0;
-  return (l.tipo === 'doble') ? (l.fondoIn*2 + (Number(cfg && cfg.unionIn) || 0)) : l.fondoIn;
+  const f = l.fondoIn + _extIn(l);
+  return (l.tipo === 'doble') ? (f*2 + (Number(cfg && cfg.unionIn) || 0)) : f;
 }
 // MALLA ANTICAIDA: panel de alambre soldado con marco, atornillado a los postes
 // por medio de sujeciones que lo despegan del rack. Va en las filas SENCILLAS,
@@ -5081,7 +5096,7 @@ function renderLineasAlmacen(){
     const letraB = bloquesAlmacen.length > 1
       ? '<b style="background:#fff;border:1px solid '+bd+';border-radius:4px;padding:0 4px;margin-right:4px">📦 '+String.fromCharCode(65+_bloqueDe(l))+'</b>' : '';
     const chip = !l.abierta
-      ? '<div onclick="lnToggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+letraB+l.altoIn+'" × '+l.fondoIn+'" · viga '+(info.largoIn||'')+'" · '+l.niveles+' niv</div>'
+      ? '<div onclick="lnToggle('+i+')" style="cursor:pointer;font-size:9.5px;color:'+tx+';padding:0 6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+letraB+l.altoIn+'" × '+l.fondoIn+'"'+(_extIn(l) ? '+'+_extIn(l)+'"' : '')+' · viga '+(info.largoIn||'')+'" · '+l.niveles+' niv</div>'
       : '';
     const nivOpts = [2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(n=>[n,String(n)]);
     const cA = l.cuerpos, cB = (l.cuerposB==null ? l.cuerpos : l.cuerposB);
@@ -5108,6 +5123,20 @@ function renderLineasAlmacen(){
       ? '<div style="background:#fff;border-top:1px solid '+bd+';padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:10px">'
         +'<div><div style="color:#666;margin-bottom:1px">Alto</div><select onchange="lnSet('+i+',\'altoIn\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_optsDe('selAlto', SEL_ALTOS, l.altoIn)+'</select></div>'
         +'<div><div style="color:#666;margin-bottom:1px">Fondo</div><select onchange="lnSet('+i+',\'fondoIn\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_optsDe('selFondo', SEL_FONDOS, l.fondoIn)+'</select></div>'
+        +(function(){
+            // MARCO EXTENDIDO: poste extra amarrado con separadores
+            const on = !!l.extOn;
+            const optsExt = Object.keys(UNIONES_SEL).map(Number).sort(function(a,b){return a-b;})
+              .map(function(v){ return '<option value="'+v+'"'+(parseFloat(l.extIn)===v?' selected':'')+'>'+v+'"</option>'; }).join('');
+            let h = '<div style="grid-column:1/3;display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
+              +'<label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" '+(on?'checked':'')+' onchange="lnSetExt('+i+',this.checked)"> Marco extendido</label>';
+            if(on){
+              h += '<span style="color:#666">sep.</span><select onchange="lnSet('+i+',\'extIn\',parseFloat(this.value))" style="width:auto;font-size:10px;padding:1px 14px 1px 2px">'+optsExt+'</select>';
+              if(l.tipo !== 'doble') h += '<select onchange="lnSet('+i+',\'extLado\',this.value)" style="width:auto;font-size:10px;padding:1px 14px 1px 2px"><option value="atras"'+(l.extLado!=='frente'?' selected':'')+'>poste atrás</option><option value="frente"'+(l.extLado==='frente'?' selected':'')+'>poste al frente</option></select>';
+              h += '<span style="color:#da6635;font-weight:600">= '+(l.fondoIn + _extIn(l))+'" de fondo</span>';
+            }
+            return h + '</div>';
+          })()
         +'<div><div style="color:#666;margin-bottom:1px">Viga</div><select onchange="lnSet('+i+',\'vigaSku\',this.value)" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_optsDe('selViga', SEL_VIGAS, l.vigaSku)+'</select></div>'
         +'<div><div style="color:#666;margin-bottom:1px">Niveles</div><select onchange="lnSet('+i+',\'niveles\',parseInt(this.value))" style="width:100%;font-size:10px;padding:2px 14px 2px 2px;text-overflow:ellipsis">'+_opts(nivOpts, l.niveles)+'</select></div>'
         +(function(){
@@ -5433,6 +5462,13 @@ function lnToggle(i){
   lineasAlmacen[i].abierta = !lineasAlmacen[i].abierta;
   renderLineasAlmacen();
 }
+function lnSetExt(i, on){
+  const l = lineasAlmacen[i];
+  l.extOn = !!on;
+  if(on && !(parseFloat(l.extIn) > 0)) l.extIn = 36;
+  renderLineasAlmacen();
+  build();
+}
 function lnSet(i, campo, valor){
   lineasAlmacen[i][campo] = valor;
   renderLineasAlmacen();
@@ -5464,7 +5500,10 @@ function getConfigSel(){
   const _pasOnSel = lineasAlmacen.length > 1 && !!(document.getElementById('selChkPasarela') || {}).checked;
   const lineas = lineasAlmacen.map(l => {
     const vi = VIGAS_INFO[l.vigaSku] || VIGAS_INFO['SEL-0362'];
-    const altoM = l.altoIn * IN_TO_M, fondoM = l.fondoIn * IN_TO_M, vigaM = vi.largoIn * IN_TO_M;
+    // fondoM es el fondo TOTAL (marco + extension); fondoMarcoM solo el marco con diagonales
+    const extIn = _extIn(l);
+    const altoM = l.altoIn * IN_TO_M, fondoM = (l.fondoIn + extIn) * IN_TO_M, vigaM = vi.largoIn * IN_TO_M;
+    const fondoMarcoM = l.fondoIn * IN_TO_M, extM = extIn * IN_TO_M;
     const cuerposA = l.cuerpos;
     const cuerposB = l.tipo==='doble' ? (l.cuerposB==null ? l.cuerpos : l.cuerposB) : l.cuerpos;
     const cuerposMaxLn = Math.max(cuerposA, cuerposB);
@@ -5499,7 +5538,7 @@ function getConfigSel(){
       clarosModA: (l.clarosOn && l.nivMod ? (l.clarosModA || []).map(function(a){return (a||[]).slice();}) : []),
       clarosModB: (l.clarosOn && l.nivMod ? (l.clarosModB || []).map(function(a){return (a||[]).slice();}) : []),
       clarosTab: l.clarosTab || null,
-      altoM, fondoM, vigaM,
+      altoM, fondoM, vigaM, extOn: extIn > 0, extIn, extM, fondoMarcoM, extLado: l.extLado,
       largoM: vigasM ? vigasM.reduce(function(a, v){ return a + v; }, 0) : vigaM * cuerposMaxLn,
       pasM: l.pasM,
       profM: l.tipo==='doble' ? fondoM*2 + unionM : fondoM};
@@ -6097,8 +6136,10 @@ function _mallaDeLinea(gLin, cfg, l){
 // sola por marco, la del lado del pasillo — el poste interior queda entre las dos
 // filas y nadie lo golpea (Isaac, 17 sep 2026). 'front' = zFront, 'back' = zBack,
 // 'ambos' (default) = fila sencilla, que puede tener pasillo de los dos lados.
-function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota, tienePunt, altoBotaM, altoPuntM, marcosBota2, alturasNivelM, sinPunt){
-  altoBotaM = altoBotaM || 0.41;   // 16" por omision
+function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tieneRejilla, tienePanelSel, tieneBotas, skipCuerpo, bandasLibres, huecosMarco, marcosGhost, ladoBota, tienePunt, altoBotaM, altoPuntM, marcosBota2, alturasNivelM, sinPunt, extM, extLado){
+  altoBotaM = altoBotaM || 0.41;
+  // Marco extendido: extM metros de poste suelto del lado extLado (-1 = -Z, +1 = +Z)
+  extM = extM || 0; extLado = extLado || -1;   // 16" por omision
   altoPuntM = altoPuntM || 0.61;   // 24" por omision
   const postW = 0.076, postD = 0.076, vigaH = 0.10, vigaD = 0.06;
   const nMarcos = cuerpos + 1;
@@ -6123,6 +6164,25 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
     const matPie   = esGhost ? matPieGhost   : matPieSel;
     const zFront = fondoM/2 - postD/2;
     const zBack  = -fondoM/2 + postD/2;
+    // Con extension, las diagonales van solo entre los postes del marco (zDiagA..zDiagB)
+    // y el poste suelto (zExt) se amarra con separadores horizontales.
+    const zDiagA = (extM > 0 && extLado > 0) ? zFront - extM : zFront;
+    const zDiagB = (extM > 0 && extLado < 0) ? zBack + extM : zBack;
+    if(extM > 0){
+      const zMid = extLado < 0 ? zDiagB : zDiagA;
+      const zExt = extLado < 0 ? zBack : zFront;
+      const pm = box(postW, altoM, postD, matPoste); pm.position.set(x, altoM/2, zMid); parent.add(pm);
+      const fm = box(0.24, 0.014, 0.22, matPie); fm.position.set(x, 0.007, zMid); parent.add(fm);
+      if(!esGhost){
+        const pg = new THREE.CylinderGeometry(0.012, 0.012, 0.025, 8);
+        [[-0.095,-0.085],[0.095,0.085]].forEach(([px,pz])=>{ const pn = new THREE.Mesh(pg, matPerno); pn.position.set(x+px, 0.026, zMid+pz); parent.add(pn); });
+      }
+      const sepLen = Math.abs(zMid - zExt) - postD;
+      [0.15, 0.5, 0.90].forEach(fy => {
+        const sp = box(0.035, 0.035, sepLen, matPoste);
+        sp.position.set(x, altoM*fy, (zMid + zExt)/2); parent.add(sp);
+      });
+    }
     const p1 = box(postW, altoM, postD, matPoste);
     p1.position.set(x, altoM/2, zFront); parent.add(p1);
     const p2 = box(postW, altoM, postD, matPoste);
@@ -6213,12 +6273,13 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
     const nSeg = Math.max(2, Math.floor((yFin - yIni) / seg));
     const pasoSeg = (yFin - yIni) / nSeg;
     // Solo 2 travesaños horizontales: uno arriba, otro abajo
-    const travLen = fondoM - postD;
+    const travLen = (zDiagA - zDiagB) - postD;
+    const zTrav = (zDiagA + zDiagB) / 2;
     const travAb = box(0.028, 0.028, travLen, matPoste);
-    travAb.position.set(x, yIni, 0);
+    travAb.position.set(x, yIni, zTrav);
     parent.add(travAb);
     const travAr = box(0.028, 0.028, travLen, matPoste);
-    travAr.position.set(x, yFin, 0);
+    travAr.position.set(x, yFin, zTrav);
     parent.add(travAr);
     // Diagonales en zigzag continuo
     for(let i=0;i<nSeg;i++){
@@ -6229,8 +6290,8 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
         else if(yB > hueco.y0 && yA < hueco.y1) continue;
       }
       const dir = (i%2===0) ? 1 : -1;
-      const zA = dir>0 ? zFront : zBack;
-      const zB = dir>0 ? zBack : zFront;
+      const zA = dir>0 ? zDiagA : zDiagB;
+      const zB = dir>0 ? zDiagB : zDiagA;
       const dy = yB - yA, dz = zB - zA;
       const len = Math.sqrt(dy*dy + dz*dz);
       const g = new THREE.BoxGeometry(0.022, len, 0.022);
@@ -6284,11 +6345,18 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
       vF.position.set(cxV, y, fondoM/2 - postD/2); parent.add(vF);
       const vB = box(vigaC - postW, vigaH, vigaD, matVigaSel);
       vB.position.set(cxV, y, -fondoM/2 + postD/2); parent.add(vB);
+      // Marco extendido: viga INTERMEDIA en el poste del marco que da al separador
+      const zVM = extM > 0 ? (extLado < 0 ? -fondoM/2 + postD/2 + extM : fondoM/2 - postD/2 - extM) : null;
+      if(zVM !== null){
+        const vM = box(vigaC - postW, vigaH, vigaD, matVigaSel);
+        vM.position.set(cxV, y, zVM); parent.add(vM);
+      }
       // Uniones (conectores color marco pegados al poste)
       const uniW = 0.032, uniH = vigaH + 0.08, uniD = vigaD * 1.7;
       const xIzq = cxV - (vigaC - postW)/2 - uniW/2;
       const xDer = cxV + (vigaC - postW)/2 + uniW/2;
       [xIzq, xDer].forEach(xU => {
+        if(zVM !== null){ const uM = box(uniW, uniH, uniD, matMarcoSel); uM.position.set(xU, y, zVM); parent.add(uM); }
         const u1 = box(uniW, uniH, uniD, matMarcoSel);
         u1.position.set(xU, y, fondoM/2 - postD/2); parent.add(u1);
         const u2 = box(uniW, uniH, uniD, matMarcoSel);
@@ -7289,10 +7357,10 @@ function buildSelectivo(){
       const vA = l.vigasM ? l.vigasM.slice(0, l.cuerposA) : l.vigaM;
       const vB = l.vigasM ? l.vigasM.slice(0, l.cuerposB).reverse() : l.vigaM;
       const filaA = new THREE.Group();
-      buildRackSelectivo(filaA, l.altoM, l.fondoM, vA, _nivFila(l,'A',l.cuerposA), l.cuerposA, (cfg.rejilla ? (l.rejXClaro || true) : false), cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA, 'A'), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasPorCuerpoM(l, 'A', l.cuerposA), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(filaA, l.altoM, l.fondoM, vA, _nivFila(l,'A',l.cuerposA), l.cuerposA, (cfg.rejilla ? (l.rejXClaro || true) : false), cfg.panel, cfg.botas, skipDe(l.cuerposA, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposA, 'A'), ghostA, 'front', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'A'), alturasPorCuerpoM(l, 'A', l.cuerposA), _ladoSinPunt(l, 'A'), l.extM, -1);
       filaA.position.set(-l.largoM/2 + lenA/2, 0, centroFila); gLin.add(filaA);
       const filaB = new THREE.Group();
-      buildRackSelectivo(filaB, l.altoM, l.fondoM, vB, _nivFila(l,'B',l.cuerposB), l.cuerposB, (cfg.rejilla ? (l.rejXClaro || true) : false), cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn, 'B'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB, 'B'), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'));
+      buildRackSelectivo(filaB, l.altoM, l.fondoM, vB, _nivFila(l,'B',l.cuerposB), l.cuerposB, (cfg.rejilla ? (l.rejXClaro || true) : false), cfg.panel, cfg.botas, skipDe(l.cuerposB, iLn, 'B'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerposB, 'B'), ghostB, 'back', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), _bota2De(cfg, l, 'B'), alturasPorCuerpoM(l, 'B', l.cuerposB), _ladoSinPunt(l, 'B'), l.extM, 1);
       filaB.position.set(-l.largoM/2 + lenB/2, 0, -centroFila); gLin.add(filaB);
       // Uniones horizontales solo donde las 2 filas tienen marcos frente a frente
       const nMarcosU = cfg.unionM > 0.01 ? Math.min(l.cuerposA, l.cuerposB) + 1 : 0;
@@ -7307,7 +7375,7 @@ function buildSelectivo(){
         });
       }
     } else {
-      buildRackSelectivo(gLin, l.altoM, l.fondoM, (l.vigasM ? l.vigasM.slice(0, l.cuerpos) : l.vigaM), _nivFila(l,'A',l.cuerpos), l.cuerpos, (cfg.rejilla ? (l.rejXClaro || true) : false), cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos, 'A'), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasPorCuerpoM(l, 'A', l.cuerpos), _ladoSinPunt(l, 'A'));
+      buildRackSelectivo(gLin, l.altoM, l.fondoM, (l.vigasM ? l.vigasM.slice(0, l.cuerpos) : l.vigaM), _nivFila(l,'A',l.cuerpos), l.cuerpos, (cfg.rejilla ? (l.rejXClaro || true) : false), cfg.panel, cfg.botas, skipDe(l.cuerpos, iLn, 'A'), bandasPasarela(cfg), huecosMarcoPS2(cfg, iLn, xInicio, l.vigaM, l.cuerpos, 'A'), ghostSen, 'ambos', cfg.punt, _altoBotaM(cfg), _altoPuntM(cfg), null, alturasPorCuerpoM(l, 'A', l.cuerpos), _ladoSinPunt(l, 'A'), l.extM, (l.extLado === 'frente' ? 1 : -1));
     }
     _barrasDeLinea(gLin, cfg, l);
     _mallaDeLinea(gLin, cfg, l);
@@ -8850,11 +8918,21 @@ function calcularBomSelectivo(){
     }
     // Vigas por modulo: cada SKU con los niveles de SUS claros
     const _pv = l.vigaMod ? _cargaPorViga(l, cA, cB, esD, cfg, iLn) : null;
-    const vigasNormales = 2 * nivCarga - vigasPasarelaEspecial;
-    if(_pv) Object.keys(_pv).forEach(function(sk){ add(sk, 2 * _pv[sk]); });
+    // Marco extendido: 3 vigas por nivel (frente, intermedia y atras)
+    const _vxN = _extIn(l) > 0 ? 3 : 2;
+    const vigasNormales = _vxN * nivCarga - vigasPasarelaEspecial;
+    if(_pv) Object.keys(_pv).forEach(function(sk){ add(sk, _vxN * _pv[sk]); });
     else if(vigasNormales > 0) add(l.vigaSku, vigasNormales);
     if(vigasPasarelaEspecial > 0) add(VIGA_PASARELA_LADO, vigasPasarelaEspecial);
     add(ANCLA_STD_SEL, 4 * nMarcos);
+    // Marco extendido: poste suelto + pie + 2 anclas + separadores, por marco
+    const _ext = _extIn(l);
+    if(_ext > 0 && nMarcos > 0){
+      add(POSTES_SEL[l.altoIn] || ('POSTE 3"X3" VERDE ' + l.altoIn + '"'), nMarcos);
+      add(PIE_POSTE_SEL, nMarcos);
+      add(ANCLA_STD_SEL, 2 * nMarcos);
+      add(UNIONES_SEL[_ext] || ('UNION DE MARCO ' + _ext + '"'), EXT_SEPARADORES_POR_MARCO * nMarcos);
+    }
     if(cfg.rejilla){
       // La rejilla se elige por (fondo del marco, ancho de rejilla que exige la viga).
       // Ver comentario "REGLA DE OBRA (ISARACK)" arriba, junto a REJILLAS_SEL.
@@ -8900,7 +8978,7 @@ function calcularBomSelectivo(){
           // Filas desparejas: la orilla izquierda lleva una barra larga que cruza
           // las dos filas, y la derecha una barra corta por fila (sobre su fondo).
           if(!l.marcoIzqExistente) add(_barraProtSku(_largoBarraIn(cfg, l)), 1);
-          add(_barraProtSku(l.fondoIn), 2);
+          add(_barraProtSku(l.fondoIn + _extIn(l)), 2);
           // y esos dos marcos si necesitan las dos botas, no una
           add(cfg.botaSku || BOTA_SEL, 2);
         } else {
