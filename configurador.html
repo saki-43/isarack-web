@@ -114,6 +114,12 @@
     #cotz .body{max-height:60vh;overflow:auto}
     #dims,#hint{display:none}
     .modal{max-height:88vh}
+    /* iPhone hace zoom al tocar un campo con letra menor a 16px y la ventana
+       se salia por la derecha. Con 16px no hace zoom. */
+    .modal input,.modal select,.modal textarea{font-size:16px !important}
+    .mbody .grid2>*{min-width:0}
+    .mbody input{width:100%;box-sizing:border-box}
+    #ov{padding:10px}
   }
 /* Tabs selector de sistema */
 .tabs{display:flex;flex-wrap:wrap;background:#f6f4ee;padding:3px;border-radius:8px;margin-bottom:8px;gap:3px}
@@ -767,7 +773,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.17.03';
+const CFG_VERSION = '2026.10.17.04';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -9713,8 +9719,16 @@ async function _cargarContactosISA(){
   if(!_comercialISA()) return [];
   if(_contactosISACache) return _contactosISACache;
   try{
-    const rows = await sbFetch('contactos?select=nombre,razon,rfc,email,tel,cel,dir&order=nombre.asc&limit=5000');
-    _contactosISACache = Array.isArray(rows) ? rows.filter(function(c){ return c && c.nombre; }) : [];
+    // Supabase entrega maximo 1000 por consulta: se piden por paginas (habia 1293
+    // y se quedaban 293 fuera).
+    let todos = [];
+    for(let off = 0; off < 20000; off += 1000){
+      const rows = await sbFetch('contactos?select=nombre,razon,rfc,email,tel,cel,dir&order=nombre.asc&limit=1000&offset=' + off);
+      if(!Array.isArray(rows)) break;
+      todos = todos.concat(rows);
+      if(rows.length < 1000) break;
+    }
+    _contactosISACache = todos.filter(function(c){ return c && c.nombre; });
   }catch(e){ console.warn('contactos ISA:', e); _contactosISACache = []; }
   return _contactosISACache;
 }
@@ -9739,6 +9753,27 @@ async function siguienteFolio(prefix){
     console.warn('siguienteFolio fallback timestamp:', e);
     return prefix + (''+Date.now()).slice(-5);
   }
+}
+
+// Ventana final en celular: abrir / compartir el PDF con un toque del usuario.
+function _pdfListoMovil(pdfBlob, nombre, folio){
+  const blobUrl = URL.createObjectURL(pdfBlob);
+  let archivo = null;
+  try{ archivo = new File([pdfBlob], nombre, {type:'application/pdf'}); }catch(e){}
+  const puedeCompartir = !!(archivo && navigator.canShare && navigator.canShare({files:[archivo]}));
+  abrirModal();
+  mTit.textContent = 'Cotización lista';
+  mBody.innerHTML = '<div style="text-align:center;padding:6px 0 4px">'
+    + '<div style="font-size:40px;line-height:1">✅</div>'
+    + '<div style="font-size:18px;font-weight:800;color:#D85A30;margin-top:6px">' + folio + '</div>'
+    + '<div style="font-size:13px;color:#666;margin-top:6px">Quedó guardada en ISA-OS → Ventas (Web).</div></div>'
+    + '<button id="bAbrirPdf" class="prm" style="width:100%;margin-top:14px;padding:13px;font-size:16px;border:none;border-radius:10px;background:#D85A30;color:#fff;font-weight:700">📄 Abrir PDF</button>'
+    + (puedeCompartir ? '<button id="bCompPdf" style="width:100%;margin-top:10px;padding:13px;font-size:16px;border:1px solid #D85A30;border-radius:10px;background:#fff;color:#D85A30;font-weight:700">📤 Compartir o guardar (WhatsApp, Archivos…)</button>' : '');
+  mFoot.innerHTML = '<button class="sec" id="bCerrarPdf">Cerrar</button>';
+  document.getElementById('bAbrirPdf').onclick = function(){ window.open(blobUrl, '_blank'); };
+  const bc = document.getElementById('bCompPdf');
+  if(bc) bc.onclick = function(){ navigator.share({files:[archivo], title:'Cotización ' + folio}).catch(function(){}); };
+  document.getElementById('bCerrarPdf').onclick = function(){ cerrarModal(); setTimeout(function(){ URL.revokeObjectURL(blobUrl); }, 1000); };
 }
 
 async function sbInsertVenta(body){
@@ -10870,10 +10905,13 @@ async function generarPDF(datos, opts){
     try{
       const esMovil = /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
       if(esMovil){
-        // En móvil: abrir el PDF en nueva pestaña — el visor nativo permite guardar/compartir
-        const blobUrl = URL.createObjectURL(pdfBlob);
-        window.open(blobUrl, '_blank');
-        setTimeout(()=>URL.revokeObjectURL(blobUrl), 60000);
+        // En celular (Isaac, 17 oct 2026): antes se abria solo con window.open,
+        // pero como va DESPUES de subir el PDF y la venta, el iPhone lo tomaba como
+        // ventana emergente y lo bloqueaba: "a donde se van las descargas".
+        // Ahora queda una ventanita con botones; el toque del usuario si lo deja abrir.
+        _pdfListoMovil(pdfBlob, pdfFileName, folio);
+        if(btnSubmit){ btnSubmit.disabled = false; btnSubmit.textContent = submitTxt; }
+        return;
       } else {
         // En desktop: descarga directa
         const blobUrl = URL.createObjectURL(pdfBlob);
