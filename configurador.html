@@ -767,7 +767,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.17.02';
+const CFG_VERSION = '2026.10.17.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -9705,8 +9705,18 @@ let _contactosISACache = null;
 // publico. El autollenado no llego a funcionar y exponia la cartera de clientes.
 // Cuando haya perfiles de cliente/distribuidor (con acceso propio), el
 // autollenado se hace desde ahi con los datos de ESE cliente nada mas.
+// v2026.10.17.03: REACTIVADO SOLO PARA USO INTERNO. Se cargan unicamente cuando
+// el configurador se abrio desde ISA-OS (boton Configurador, que manda ?com=
+// con el comercial; ver _comercialISA). Un visitante del sitio publico no los
+// baja. Una vez por pestaña.
 async function _cargarContactosISA(){
-  return [];
+  if(!_comercialISA()) return [];
+  if(_contactosISACache) return _contactosISACache;
+  try{
+    const rows = await sbFetch('contactos?select=nombre,razon,rfc,email,tel,cel,dir&order=nombre.asc&limit=5000');
+    _contactosISACache = Array.isArray(rows) ? rows.filter(function(c){ return c && c.nombre; }) : [];
+  }catch(e){ console.warn('contactos ISA:', e); _contactosISACache = []; }
+  return _contactosISACache;
 }
 
 // Devuelve el siguiente folio consecutivo para el prefijo dado (RW-/GW-/PW-).
@@ -10175,37 +10185,55 @@ function abrirFormCliente(){
   // Autocompletar con contactos de ISA-OS: al abrir el modal, cargar la lista
   // (una sola vez por sesion) y al escribir un nombre que coincida, autollenar
   // los demas campos.
+  // Autocompletado PREDICTIVO de contactos (solo interno, ver _cargarContactosISA):
+  // al escribir 2+ letras sale la lista de coincidencias por nombre, razon social,
+  // RFC o telefono, como en ISA-OS. Al tocar uno se llenan sus datos.
   _cargarContactosISA().then(list=>{
     if(!list||!list.length)return;
-    var dl=document.getElementById('f_cli_list');
-    if(dl){
-      dl.innerHTML=list.slice(0,500).map(function(c){return '<option value="'+String(c.nombre||'').replace(/"/g,'&quot;')+'"></option>';}).join('');
-    }
     var hint=document.getElementById('f_cli_hint');
-    if(hint)hint.textContent='— '+list.length+' contactos disponibles';
+    if(hint)hint.textContent='· '+list.length+' contactos';
     var cli=document.getElementById('f_cliente');
-    var _autoFill=function(){
-      var val=(cli.value||'').trim().toUpperCase();
-      if(!val)return;
-      // Coincidencia exacta (case-insensitive)
-      var match=list.find(function(c){return (String(c.nombre||'').trim().toUpperCase())===val;});
-      if(!match)return;
-      var set=function(id,v){var el=document.getElementById(id);if(el && !el.value && v){el.value=v;}};
-      set('f_razon', match.razon||'');
-      set('f_rfc', (match.rfc||'').toUpperCase());
-      set('f_contacto', match.contacto||'');
-      // tel puede venir en 'tel' o 'cel'
-      var tel=String(match.tel||match.cel||'').replace(/\D/g,'').slice(0,10);
-      set('f_tel', tel);
-      set('f_email', match.email||'');
-      set('f_dir', match.dir||'');
+    var dl=document.getElementById('f_cli_list'); if(dl) dl.remove(); cli.removeAttribute('list');
+    var caja=document.createElement('div');
+    caja.id='f_cli_sug';
+    caja.style.cssText='display:none;position:absolute;left:0;right:0;top:100%;z-index:5;background:#fff;border:1px solid #e3ddd2;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.15);max-height:240px;overflow-y:auto;margin-top:2px';
+    var fila=cli.closest('.grid2')||cli.parentElement; fila.style.position='relative'; fila.appendChild(caja);
+    var norm=function(t){return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');};
+    var esc=function(t){return String(t||'').replace(/[&<>"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch];});};
+    var telDe=function(c){return String(c.cel||c.tel||'').replace(/\D/g,'').slice(-10);};
+    var llenar=function(c){
+      cli.value=c.nombre||'';
+      var put=function(id,v){var el=document.getElementById(id);if(el&&v)el.value=v;};
+      put('f_tel', telDe(c));
+      put('f_razon', c.razon||''); put('f_rfc', String(c.rfc||'').toUpperCase());
+      put('f_email', c.email||''); put('f_dir', c.dir||'');
+      caja.style.display='none';
     };
-    cli.addEventListener('change', _autoFill);
-    cli.addEventListener('blur', _autoFill);
-    cli.addEventListener('input', function(){
-      // Auto-fill inmediato si el input matches exactamente (caso del click en datalist)
-      _autoFill();
-    });
+    var mostrar=function(){
+      var q=norm(cli.value.trim());
+      if(q.length<2){caja.style.display='none';return;}
+      var qd=q.replace(/\D/g,'');
+      var hits=list.filter(function(c){
+        return norm(c.nombre).indexOf(q)>=0||norm(c.razon).indexOf(q)>=0||norm(c.rfc).indexOf(q)>=0||(qd.length>=4&&telDe(c).indexOf(qd)>=0);
+      });
+      // Primero los que EMPIEZAN con lo escrito
+      hits.sort(function(a,b){return (norm(a.nombre).indexOf(q)===0?0:1)-(norm(b.nombre).indexOf(q)===0?0:1);});
+      hits=hits.slice(0,8);
+      if(!hits.length){caja.style.display='none';return;}
+      caja.innerHTML=hits.map(function(c,k){
+        var sub=[c.razon&&c.razon!==c.nombre?c.razon:'', telDe(c)].filter(Boolean).join(' · ');
+        return '<div data-k="'+k+'" style="padding:9px 11px;border-bottom:1px solid #f1eee8;cursor:pointer"><div style="font-size:13.5px;font-weight:600;color:#222">'+esc(c.nombre)+'</div>'+(sub?'<div style="font-size:11.5px;color:#888">'+esc(sub)+'</div>':'')+'</div>';
+      }).join('');
+      Array.prototype.forEach.call(caja.children,function(el){
+        // mousedown/touchstart para ganarle al blur del input
+        var tomar=function(ev){ev.preventDefault();llenar(hits[+el.getAttribute('data-k')]);};
+        el.addEventListener('mousedown',tomar); el.addEventListener('touchstart',tomar,{passive:false});
+      });
+      caja.style.display='block';
+    };
+    cli.addEventListener('input', mostrar);
+    cli.addEventListener('focus', mostrar);
+    cli.addEventListener('blur', function(){ setTimeout(function(){caja.style.display='none';},150); });
   }).catch(function(e){console.warn('contactos ISA:',e);});
   mFoot.innerHTML = '<button class="sec" id="bCancel">Cancelar</button><button class="prm" id="bPdf">⬇ Descargar PDF</button>';
   document.getElementById('bCancel').onclick = cerrarModal;
