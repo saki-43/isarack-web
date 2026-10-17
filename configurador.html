@@ -767,7 +767,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.17.01';
+const CFG_VERSION = '2026.10.17.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -10143,18 +10143,25 @@ function abrirFormCliente(){
   mBody.innerHTML = `
     <div style="margin-bottom:14px"><span class="badge">Configuración</span>
       <div style="margin-top:6px;font-size:13px;color:#555">${configResumen().txt}</div></div>
-    <div class="row"><label>Cliente * <span id="f_cli_hint" style="font-size:11px;color:#999;font-weight:400"></span></label><input id="f_cliente" placeholder="Nombre o empresa" maxlength="80" autocomplete="off" list="f_cli_list"><datalist id="f_cli_list"></datalist></div>
+    <!-- Solo Nombre y Celular son obligatorios (Isaac, 17 oct 2026): pedir
+         muchos datos espantaba al cliente. Lo demas va plegado y opcional. -->
     <div class="grid2">
-      <div class="row"><label>Razón social</label><input id="f_razon" placeholder="Opcional" maxlength="120"></div>
-      <div class="row"><label>RFC</label><input id="f_rfc" placeholder="Opcional" maxlength="13" style="text-transform:uppercase"></div>
+      <div class="row"><label>Nombre * <span id="f_cli_hint" style="font-size:11px;color:#999;font-weight:400"></span></label><input id="f_cliente" placeholder="Tu nombre o empresa" maxlength="80" autocomplete="off" list="f_cli_list"><datalist id="f_cli_list"></datalist></div>
+      <div class="row"><label>Celular *</label><input id="f_tel" placeholder="6644211088" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel"></div>
     </div>
-    <div class="grid2">
-      <div class="row"><label>Contacto</label><input id="f_contacto" placeholder="Nombre" maxlength="60" autocomplete="name"></div>
-      <div class="row"><label>Teléfono / Cel *</label><input id="f_tel" placeholder="6644211088" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel"></div>
-    </div>
-    <div class="row"><label>Email</label><input id="f_email" placeholder="correo@empresa.com" type="email" maxlength="80" autocomplete="email"></div>
-    <div class="row"><label>Dirección de entrega</label><input id="f_dir" placeholder="Ciudad / dirección" maxlength="200"></div>
-    <div id="f_error" style="display:none;margin-top:10px;padding:10px;background:#fee;border:1px solid #fcc;border-radius:6px;color:#c00;font-size:13px"></div>
+    <details id="f_mas" style="margin-top:4px">
+      <summary style="cursor:pointer;font-size:12.5px;color:#D85A30;font-weight:600;padding:4px 0">＋ Más datos (opcional): razón social, RFC, correo, dirección</summary>
+      <div class="grid2">
+        <div class="row"><label>Razón social</label><input id="f_razon" placeholder="Opcional" maxlength="120"></div>
+        <div class="row"><label>RFC</label><input id="f_rfc" placeholder="Opcional" maxlength="13" style="text-transform:uppercase"></div>
+      </div>
+      <div class="grid2">
+        <div class="row"><label>Contacto</label><input id="f_contacto" placeholder="Nombre" maxlength="60" autocomplete="name"></div>
+        <div class="row"><label>Email</label><input id="f_email" placeholder="correo@empresa.com" type="email" maxlength="80" autocomplete="email"></div>
+      </div>
+      <div class="row"><label>Dirección de entrega</label><input id="f_dir" placeholder="Ciudad / dirección" maxlength="200"></div>
+    </details>
+<div id="f_error" style="display:none;margin-top:10px;padding:10px;background:#fee;border:1px solid #fcc;border-radius:6px;color:#c00;font-size:13px"></div>
   `;
   // Restringir teléfono a solo dígitos
   const inpTel = document.getElementById('f_tel');
@@ -10214,12 +10221,14 @@ function abrirFormCliente(){
     const email = document.getElementById('f_email').value.trim();
     const dir = document.getElementById('f_dir').value.trim();
     // Validaciones básicas
-    if(!cliente){ mostrarError('Captura el nombre del cliente.'); return; }
-    if(cliente.length < 2){ mostrarError('El nombre del cliente es muy corto.'); return; }
-    if(!tel){ mostrarError('Captura el teléfono de contacto.'); return; }
-    if(tel.length !== 10){ mostrarError('El teléfono debe tener 10 dígitos (formato México).'); return; }
-    if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ mostrarError('El correo electrónico no es válido.'); return; }
-    if(rfc && !/^([A-ZÑ&]{3,4})\d{6}([A-Z0-9]{3})?$/.test(rfc)){ mostrarError('El RFC no tiene formato válido (ej: XAXX010101000).'); return; }
+    if(!cliente){ mostrarError('Captura tu nombre.'); return; }
+    if(cliente.length < 2){ mostrarError('El nombre es muy corto.'); return; }
+    if(!tel){ mostrarError('Captura tu número de celular.'); return; }
+    if(tel.length !== 10){ mostrarError('El celular debe tener 10 dígitos.'); return; }
+    // Si un dato opcional esta mal, abrir la seccion para que se vea
+    const _abreMas = ()=>{ const d = document.getElementById('f_mas'); if(d) d.open = true; };
+    if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ _abreMas(); mostrarError('El correo electrónico no es válido.'); return; }
+    if(rfc && !/^([A-ZÑ&]{3,4})\d{6}([A-Z0-9]{3})?$/.test(rfc)){ _abreMas(); mostrarError('El RFC no tiene formato válido (ej: XAXX010101000).'); return; }
     // Filtro anti-groserías (lista básica)
     // Filtro anti-groserias POR PALABRA COMPLETA. Antes buscaba pedazos de texto
     // y rechazaba clientes reales: "Computadoras" (puta), "Maricela" (maric),
