@@ -99,7 +99,12 @@
 
   @media (max-width:768px){
     body{overflow-y:auto;overflow-x:hidden;background:#eef0f2}
-    #cv{position:relative !important;inset:auto !important;width:100vw;height:55vh}
+    /* Celular (Isaac, 17 oct 2026): el 3D se queda FIJO arriba y los controles
+       se deslizan por debajo, para ir moviendo y ver el cambio al momento.
+       Un poco mas bajito (45 %) para que suban los controles. */
+    #cv{position:fixed !important;top:0 !important;left:0 !important;right:auto !important;bottom:auto !important;z-index:30;width:100vw;height:45vh;height:45svh;background:#eef0f2;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+    body{padding-top:45vh;padding-top:45svh}
+    body.modo-visor,body.visor-full{padding-top:0 !important}
     .panel{position:relative !important;inset:auto !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;width:auto !important;max-height:none !important;margin:10px;backdrop-filter:none}
     #ctrl{padding:12px 14px}
     #ctrl h1{font-size:13px}
@@ -762,7 +767,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.14.01';
+const CFG_VERSION = '2026.10.17.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
