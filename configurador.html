@@ -864,7 +864,8 @@ const UNIONES_SEL = {
 // suelto amarrado con separadores horizontales (las mismas UNION DE MARCO),
 // sin diagonales. Da un marco mas ancho. Fondo total = fondo del marco + separacion.
 // Por marco: 1 poste 3"x3" de la altura del marco, 1 pie de poste, 2 anclas y
-// EXT_SEPARADORES_POR_MARCO uniones de la medida elegida.
+// EXT_SEPARADORES_POR_MARCO uniones de la medida elegida. Lleva 3 vigas por
+// nivel: frente, INTERMEDIA (en el poste del marco que da al separador) y atras.
 const POSTES_SEL = {
   96:'SEL-0439', 144:'SEL-0232', 168:'SEL-0420', 192:'SEL-0236', 216:'SEL-0421', 240:'SEL-0237',
   264:'SEL-0422', 288:'SEL-0382', 312:'SEL-0445', 336:'SEL-0383', 360:'SEL-0426'
@@ -6344,11 +6345,18 @@ function buildRackSelectivo(parent, altoM, fondoM, vigaM, niveles, cuerpos, tien
       vF.position.set(cxV, y, fondoM/2 - postD/2); parent.add(vF);
       const vB = box(vigaC - postW, vigaH, vigaD, matVigaSel);
       vB.position.set(cxV, y, -fondoM/2 + postD/2); parent.add(vB);
+      // Marco extendido: viga INTERMEDIA en el poste del marco que da al separador
+      const zVM = extM > 0 ? (extLado < 0 ? -fondoM/2 + postD/2 + extM : fondoM/2 - postD/2 - extM) : null;
+      if(zVM !== null){
+        const vM = box(vigaC - postW, vigaH, vigaD, matVigaSel);
+        vM.position.set(cxV, y, zVM); parent.add(vM);
+      }
       // Uniones (conectores color marco pegados al poste)
       const uniW = 0.032, uniH = vigaH + 0.08, uniD = vigaD * 1.7;
       const xIzq = cxV - (vigaC - postW)/2 - uniW/2;
       const xDer = cxV + (vigaC - postW)/2 + uniW/2;
       [xIzq, xDer].forEach(xU => {
+        if(zVM !== null){ const uM = box(uniW, uniH, uniD, matMarcoSel); uM.position.set(xU, y, zVM); parent.add(uM); }
         const u1 = box(uniW, uniH, uniD, matMarcoSel);
         u1.position.set(xU, y, fondoM/2 - postD/2); parent.add(u1);
         const u2 = box(uniW, uniH, uniD, matMarcoSel);
@@ -8910,8 +8918,10 @@ function calcularBomSelectivo(){
     }
     // Vigas por modulo: cada SKU con los niveles de SUS claros
     const _pv = l.vigaMod ? _cargaPorViga(l, cA, cB, esD, cfg, iLn) : null;
-    const vigasNormales = 2 * nivCarga - vigasPasarelaEspecial;
-    if(_pv) Object.keys(_pv).forEach(function(sk){ add(sk, 2 * _pv[sk]); });
+    // Marco extendido: 3 vigas por nivel (frente, intermedia y atras)
+    const _vxN = _extIn(l) > 0 ? 3 : 2;
+    const vigasNormales = _vxN * nivCarga - vigasPasarelaEspecial;
+    if(_pv) Object.keys(_pv).forEach(function(sk){ add(sk, _vxN * _pv[sk]); });
     else if(vigasNormales > 0) add(l.vigaSku, vigasNormales);
     if(vigasPasarelaEspecial > 0) add(VIGA_PASARELA_LADO, vigasPasarelaEspecial);
     add(ANCLA_STD_SEL, 4 * nMarcos);
