@@ -773,7 +773,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.17.04';
+const CFG_VERSION = '2026.10.22.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -9776,6 +9776,26 @@ function _pdfListoMovil(pdfBlob, nombre, folio){
   document.getElementById('bCerrarPdf').onclick = function(){ cerrarModal(); setTimeout(function(){ URL.revokeObjectURL(blobUrl); }, 1000); };
 }
 
+async function _sbActualizarVenta(body){
+  const folio = body.num;
+  const cambios = Object.assign({}, body);
+  ['num','comercial','tipo','stage','estatus'].forEach(function(k){ delete cambios[k]; });
+  // La columna se llama tiempo_entrega (el insert lo arregla con su reintento).
+  if('tiempoEntrega' in cambios){ cambios.tiempo_entrega = cambios.tiempoEntrega; delete cambios.tiempoEntrega; }
+  cambios.updated_at = new Date().toISOString();
+  const r = await fetch(SB_URL + '/rest/v1/ventas?num=eq.' + encodeURIComponent(folio) + '&tipo=eq.' + encodeURIComponent('Cotización'), {
+    method:'PATCH',
+    headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json', Prefer:'return=representation' },
+    body: JSON.stringify(cambios)
+  });
+  const filas = r.ok ? await r.json() : [];
+  if(!r.ok || !filas.length){
+    console.error('_sbActualizarVenta', r.status);
+    alert('No se pudo actualizar la cotización ' + folio + ' en ISA-OS (¿ya se pasó a Venta?). El PDF sí se generó.');
+    return false;
+  }
+  return true;
+}
 async function sbInsertVenta(body){
   const r = await fetch(SB_URL+'/rest/v1/ventas', {
     method:'POST',
@@ -10272,6 +10292,16 @@ function abrirFormCliente(){
   }).catch(function(e){console.warn('contactos ISA:',e);});
   mFoot.innerHTML = '<button class="sec" id="bCancel">Cancelar</button><button class="prm" id="bPdf">⬇ Descargar PDF</button>';
   document.getElementById('bCancel').onclick = cerrarModal;
+  const _ed = _edicionCot();
+  if(_ed){
+    const dd = _ed.datos || {};
+    const put = function(id, v){ const el = document.getElementById(id); if(el && v) el.value = v; };
+    put('f_cliente', dd.cliente); put('f_tel', String(dd.tel || '').replace(/\D/g,'').slice(-10));
+    put('f_razon', dd.razon); put('f_rfc', String(dd.rfc || '').toUpperCase());
+    put('f_contacto', dd.contacto); put('f_email', dd.email); put('f_dir', dd.dir);
+    mTit.textContent = 'Actualizar cotización ' + _ed.folio;
+    document.getElementById('bPdf').textContent = '💾 Actualizar ' + _ed.folio;
+  }
   document.getElementById('bPdf').onclick = ()=>{
     const errBox = document.getElementById('f_error');
     const mostrarError = m=>{ errBox.textContent = m; errBox.style.display='block'; };
@@ -10531,7 +10561,17 @@ async function generarPDF(datos, opts){
   const ivaUSD = subtotalUSD * (IVA_FIJO/100);
   const totalUSD = subtotalUSD + ivaUSD;
   const folioPrefix = sistemaActual==='piezas' ? 'PZ-' : (sistemaActual==='selectivo' ? 'RW-' : (sistemaActual==='picking' ? 'PW-' : 'GW-'));
-  const folio = await siguienteFolio(folioPrefix);
+  const _ed = soloInterno ? null : _edicionCot();
+  let folio;
+  if(_ed){
+    const tipo = await _tipoVentaWeb(_ed.folio);
+    if(tipo === null){ alert('No encontré la cotización ' + _ed.folio + ' en ISA-OS. No se actualizó nada.'); return; }
+    if(tipo === undefined){ alert('Sin conexión: no se pudo revisar la cotización ' + _ed.folio + '. Intenta de nuevo.'); return; }
+    if(tipo && tipo !== 'Cotización'){ alert('La ' + _ed.folio + ' ya se pasó a Venta: ya no se modifica desde el configurador. Cámbiala en ISA-OS.'); return; }
+    folio = _ed.folio;
+  } else {
+    folio = await siguienteFolio(folioPrefix);
+  }
   const fechaHoy = new Date();
   const fechaVenc = new Date(fechaHoy.getTime() + 15*24*60*60*1000);
   const dFmt = d => d.toLocaleDateString('es-MX', {day:'2-digit',month:'2-digit',year:'numeric'});
@@ -10798,7 +10838,8 @@ async function generarPDF(datos, opts){
   // Nombre limpio para el archivo
   const clienteSafe = (datos.cliente||'cliente').replace(/[^a-z0-9]/gi,'_').substring(0,40);
   const pdfFileName = (soloInterno ? 'Desglose_INTERNO_' : 'Cotizacion_') + folio + '_' + clienteSafe + '.pdf';
-  const storagePath = 'cotizaciones-web/' + folio + '_' + clienteSafe + '.pdf';
+  let storagePath = 'cotizaciones-web/' + folio + '_' + clienteSafe + '.pdf';
+  if(_ed){ const _prev = await _pdfExistente(folio); if(_prev) storagePath = 'cotizaciones-web/' + _prev; }
 
   const pdfBlob = doc.output('blob');
 
@@ -10867,9 +10908,21 @@ async function generarPDF(datos, opts){
       }
     }catch(e){ console.error('Upload render:', e); }
 
-    // 2) Insertar venta en tabla ventas (aparece en pestaña 🌐 Web de ISA-OS)
+    // 1c) El diseño, para poder modificar la cotizacion despues desde ISA-OS
+    // (boton "Modificar en configurador"). (Isaac, 22 oct 2026)
     try{
-      await sbInsertVenta({
+      await fetch(SB_URL + '/storage/v1/object/planos/cotizaciones-web/' + encodeURIComponent(folio) + '.json', {
+        method: 'POST',
+        headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'x-upsert': 'true' },
+        body: JSON.stringify(estadoConfigurador())
+      });
+    }catch(e){ console.error('Upload diseño:', e); }
+
+    // 2) Insertar venta en tabla ventas (aparece en pestaña 🌐 Web de ISA-OS).
+    // Si se esta modificando, se actualiza la misma (el comercial no cambia; la
+    // version anterior queda en ventas_historial).
+    try{
+      await (_ed ? _sbActualizarVenta : sbInsertVenta)({
         num: folio,
         fecha: fechaHoy.toISOString().slice(0,10),
         cliente: datos.cliente,
@@ -10899,6 +10952,7 @@ async function generarPDF(datos, opts){
         tiempoEntrega: '5 A 6 DIAS HABILES',
         plazo: 'INMEDIATO'
       });
+      if(_ed){ _salirEdicion(); }
     }catch(e){ console.error('sbInsertVenta:', e); }
 
     // 3) Entregar SOLO el PDF al cliente (sin abrir WhatsApp)
@@ -11461,6 +11515,51 @@ function decodificarEstado(txt){
     return JSON.parse(decodeURIComponent(escape(atob(b))));
   }catch(e){ return null; }
 }
+// Cotizacion que se esta modificando (ver ?editar=). null = cotizacion nueva.
+function _edicionCot(){
+  try{ const e = JSON.parse(sessionStorage.getItem('isarack_editar') || 'null'); return (e && e.folio) ? e : null; }catch(e){ return null; }
+}
+function _salirEdicion(){
+  try{ sessionStorage.removeItem('isarack_editar'); }catch(e){}
+  const b = document.getElementById('avisoEdicion'); if(b) b.remove();
+}
+function _pintarAvisoEdicion(){
+  const ed = _edicionCot();
+  let d = document.getElementById('avisoEdicion');
+  if(!ed){ if(d) d.remove(); return; }
+  if(!d){
+    d = document.createElement('div');
+    d.id = 'avisoEdicion';
+    d.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9999;background:#1f2937;color:#fff;'
+      + 'border-radius:10px;padding:8px 10px 8px 14px;font:600 13px system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.25);'
+      + 'display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px)';
+    document.body.appendChild(d);
+  }
+  d.innerHTML = '<span>✏️ Modificando <b style="color:#F5A47C">' + String(ed.folio).replace(/[<>&"]/g,'') + '</b> · al pedir la cotización se actualiza ese folio</span>'
+    + '<button type="button" id="bSalirEd" style="width:auto;max-width:none;margin:0;background:#fff;color:#1f2937;border:0;border-radius:7px;padding:5px 10px;font:700 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap">Salir sin guardar</button>';
+  document.getElementById('bSalirEd').onclick = function(){
+    if(!confirm('¿Salir sin actualizar la cotización ' + ed.folio + '? Los cambios del diseño no se guardan.')) return;
+    _salirEdicion(); location.href = location.pathname;
+  };
+}
+// La cotizacion sigue siendo Cotizacion? (si ya se paso a Venta no se toca desde aqui)
+async function _tipoVentaWeb(folio){
+  try{ const r = await sbFetch('ventas?select=tipo&num=eq.' + encodeURIComponent(folio)); return (r && r[0]) ? (r[0].tipo || '') : null; }
+  catch(e){ return undefined; }   // sin red: no se sabe
+}
+// Nombre del PDF que ya tiene ese folio, para reemplazarlo y no dejar dos.
+async function _pdfExistente(folio){
+  try{
+    const r = await fetch(SB_URL + '/storage/v1/object/list/planos', {
+      method:'POST', headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ prefix:'cotizaciones-web', search:folio, limit:50 })
+    });
+    if(!r.ok) return '';
+    const rows = await r.json();
+    const m = (rows || []).find(function(x){ return x && x.name && x.name.toLowerCase().indexOf(folio.toLowerCase() + '_') === 0 && /\.pdf$/i.test(x.name); });
+    return m ? m.name : '';
+  }catch(e){ return ''; }
+}
 function linkParaCliente(){
   const folio = (document.getElementById('cotFolio') || {}).value || '';
   const u = new URL(location.href);
@@ -11591,6 +11690,23 @@ let _visorPendiente = null;
 let _reanudarSt = null;   // diseno guardado justo antes de una actualizacion automatica
 (function(){
   const params = new URLSearchParams(location.search);
+  // Modificar una cotizacion web desde ISA-OS (boton "Modificar en configurador"):
+  // ?editar=FOLIO&d=<diseno>&c=<datos del cliente>. El diseno se pone editable y
+  // al pedir la cotizacion se actualiza ESE folio en lugar de sacar uno nuevo.
+  if(params.get('editar') && params.get('d')){
+    const st = decodificarEstado(params.get('d'));
+    const folioEd = String(params.get('editar')).trim().slice(0, 40);
+    if(st){
+      aplicarEstado(st); _reanudarSt = st;
+      try{ sessionStorage.setItem('isarack_editar', JSON.stringify({ folio: folioEd, datos: decodificarEstado(params.get('c') || '') || {} })); }catch(e){}
+    }
+    try{
+      const u = new URL(location.href);
+      ['editar','d','c'].forEach(function(k){ u.searchParams.delete(k); });
+      history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
+    }catch(e){}
+    return;
+  }
   if(params.get('v') === '1' && params.get('d')){
     const st = decodificarEstado(params.get('d'));
     if(st){ aplicarEstado(st); _visorPendiente = params.get('f') || '—'; }
@@ -11663,6 +11779,7 @@ if(_visorPendiente !== null || _reanudarSt){
     setTimeout(resumenVisor, 400);
   }
 }
+try{ if(_visorPendiente === null) _pintarAvisoEdicion(); }catch(e){}
 
 // ── Actualizacion automatica ──
 // Vercel publica en cuanto se hace merge, pero quien deja la pestaña abierta
