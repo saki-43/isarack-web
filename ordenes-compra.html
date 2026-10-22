@@ -647,7 +647,7 @@
           <h3>ORDEN DE COMPRA</h3>
           <div class="folio-date">
             <label>FOLIO DE ORDEN:</label>
-            <input type="number" id="folio" min="1">
+            <input type="number" id="folio" min="0" placeholder="sin folio">
             <label>FECHA DE EMISIÓN:</label>
             <input type="date" id="fecha">
             <span class="no-print"></span>
@@ -1485,8 +1485,11 @@ function renderCurrentOrder() {
 function readOrderFromForm() {
   // Folio vacío = orden SIN folio (Isaac, 16 oct 2026: reposiciones de órdenes perdidas).
   // Antes un campo vacío se quedaba con el folio automático y se gastaban números.
+  // 0 también es "sin folio": el campo tenía mínimo 1 y al bajarlo con las flechas
+  // se quedaba en 1 (4 órdenes salieron "folio 1 repetido", Isaac 22 oct 2026).
   { const _fv = String(document.getElementById('folio').value || '').trim();
-    currentOrder.folio = _fv === '' ? '' : (parseInt(_fv) || currentOrder.folio); }
+    const _fn = parseInt(_fv);
+    currentOrder.folio = (_fv === '' || _fn === 0) ? '' : (_fn > 0 ? _fn : currentOrder.folio); }
   currentOrder.fecha = document.getElementById('fecha').value;
   currentOrder.razonSocial = document.getElementById('razon-social').value.trim();
   currentOrder.contacto = document.getElementById('contacto').value.trim();
