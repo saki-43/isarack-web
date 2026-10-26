@@ -467,7 +467,7 @@ function svgElevacion(o){
     x+=tw; pts.push([x,y]);
   }
   if(esL && descLenP>0){ x+=descLenP; pts.push([x,y]); }
-  const maxX=x, maxY=y, W=360,H=252, padL=66,padR=28,padT=26,padB=42;
+  const maxX=x, maxY=y, W=360,H=252, padL=66,padR=(esL&&flipX)?54:28,padT=26,padB=42;   // a la derecha va la cota del descanso
   const s=Math.min((W-padL-padR)/maxX,(H-padT-padB)/maxY);
   const X=v=> flipX ? padL+(maxX-v)*s : padL+v*s;
   const Y=v=>H-padB-v*s;
@@ -477,11 +477,20 @@ function svgElevacion(o){
   if(esL){
     const hDesc=lower*peralte;
     const xa=X(lower*huella), xb=X(lower*huella+descLen), xr=Math.max(xa,xb);
+    // La altura del descanso se mide DESDE EL PISO. Isaac la leia desde arriba porque la
+    // etiqueta iba pegada a la linea: ahora lleva su cota del piso al descanso. (26 oct 2026)
+    // Cota lejos de la de altura total (izquierda): volteada, junto al arranque (piso,
+    // a la derecha); normal, junto a la orilla del descanso.
+    const xc=flipX ? X(0)+10 : xr+8;
     extra=`<line x1="${padL}" y1="${Y(hDesc).toFixed(1)}" x2="${xr.toFixed(1)}" y2="${Y(hDesc).toFixed(1)}" stroke="#b44e23" stroke-width="0.8" stroke-dasharray="3 3"/>`+
-      `<text x="${(padL+3).toFixed(1)}" y="${(Y(hDesc)-5).toFixed(1)}" font-size="10" fill="#b44e23" text-anchor="start">desc ${fmt(hDesc)}</text>`;
+      `<text x="${(padL+3).toFixed(1)}" y="${(Y(hDesc)-5).toFixed(1)}" font-size="10" fill="#b44e23" text-anchor="start">descanso a ${fmt(hDesc)} del piso</text>`+
+      `<line x1="${xc.toFixed(1)}" y1="${Y(0)}" x2="${xc.toFixed(1)}" y2="${Y(hDesc).toFixed(1)}" stroke="#b44e23" stroke-width="0.8"/>`+`<line x1="${(xc-3).toFixed(1)}" y1="${Y(0)}" x2="${(xc+3).toFixed(1)}" y2="${Y(0)}" stroke="#b44e23" stroke-width="0.8"/>`+
+      `<line x1="${(xc-3).toFixed(1)}" y1="${Y(hDesc).toFixed(1)}" x2="${(xc+3).toFixed(1)}" y2="${Y(hDesc).toFixed(1)}" stroke="#b44e23" stroke-width="0.8"/>`+
+      `<text x="${(xc+3).toFixed(1)}" y="${((Y(0)+Y(hDesc))/2).toFixed(1)}" font-size="11" fill="#b44e23" text-anchor="start" dominant-baseline="middle">${fmt(hDesc)}</text>`;
   }
   return `<svg viewBox="0 0 ${W} ${H}" font-family="monospace">
     <line x1="${padL}" y1="${Y(0)}" x2="${X(maxX)+6}" y2="${Y(0)}" stroke="#c7ccd2"/>
+    <text x="${(flipX?X(0)-2:X(0)+2).toFixed(1)}" y="${Y(0)+11}" font-size="9" fill="#9aa4b1" text-anchor="${flipX?'end':'start'}">PISO</text>
     <path d="M ${X(0)} ${Y(0)} L ${X(maxX)} ${Y(maxY)}" stroke="#9aa4b1" stroke-dasharray="4 3" fill="none"/>
     <polyline points="${poly}" fill="none" stroke="#DA6635" stroke-width="2" stroke-linejoin="round"/>
     ${extra}
