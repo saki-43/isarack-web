@@ -773,7 +773,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.22.01';
+const CFG_VERSION = '2026.10.23.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -9768,6 +9768,7 @@ function _pdfListoMovil(pdfBlob, nombre, folio){
     + '<div style="font-size:18px;font-weight:800;color:#D85A30;margin-top:6px">' + folio + '</div>'
     + '<div style="font-size:13px;color:#666;margin-top:6px">Quedó guardada en ISA-OS → Ventas (Web).</div></div>'
     + '<button id="bAbrirPdf" class="prm" style="width:100%;margin-top:14px;padding:13px;font-size:16px;border:none;border-radius:10px;background:#D85A30;color:#fff;font-weight:700">📄 Abrir PDF</button>'
+    + '<a id="bBajarPdf" href="' + blobUrl + '" download="' + String(nombre).replace(/"/g,'') + '" style="display:block;box-sizing:border-box;width:100%;margin-top:10px;padding:13px;font-size:16px;border:1px solid #D85A30;border-radius:10px;background:#fff;color:#D85A30;font-weight:700;text-align:center;text-decoration:none">⬇ Descargar PDF</a>'
     + (puedeCompartir ? '<button id="bCompPdf" style="width:100%;margin-top:10px;padding:13px;font-size:16px;border:1px solid #D85A30;border-radius:10px;background:#fff;color:#D85A30;font-weight:700">📤 Compartir o guardar (WhatsApp, Archivos…)</button>' : '');
   mFoot.innerHTML = '<button class="sec" id="bCerrarPdf">Cerrar</button>';
   document.getElementById('bAbrirPdf').onclick = function(){ window.open(blobUrl, '_blank'); };
@@ -10344,7 +10345,15 @@ function abrirFormCliente(){
         return;
       }
     }
-    generarPDF({ cliente, razon, rfc, contacto, tel, email, dir });
+    // Bloqueado desde el clic hasta que termine: antes se podia picar varias veces
+    // mientras subia y salian cotizaciones repetidas.
+    const _b = document.getElementById('bPdf');
+    if(_b.disabled) return;
+    const _txt = _b.textContent;
+    _b.disabled = true; _b.textContent = '⏳ Generando…';
+    Promise.resolve(generarPDF({ cliente, razon, rfc, contacto, tel, email, dir }))
+      .catch(function(e){ console.error('generarPDF', e); alert('No se pudo generar la cotización. Intenta de nuevo.'); })
+      .finally(function(){ const b = document.getElementById('bPdf'); if(b){ b.disabled = false; b.textContent = _txt; } });
   };
 }
 
@@ -10855,7 +10864,9 @@ async function generarPDF(datos, opts){
     return;
   }
 
-  const btnSubmit = document.querySelector('#modalCliente button.primary, #modalCliente button.btn-primary');
+  // El boton es #bPdf (el selector de #modalCliente no existia: nunca se bloqueaba y
+  // cada clic de mas sacaba otra cotizacion con folio repetido, Isaac 22 oct 2026).
+  const btnSubmit = document.getElementById('bPdf');
   const submitTxt = btnSubmit ? btnSubmit.textContent : '';
   if(btnSubmit){ btnSubmit.disabled = true; btnSubmit.textContent = 'Procesando…'; }
 
@@ -10879,7 +10890,7 @@ async function generarPDF(datos, opts){
     desc: ''
   }));
 
-  (async ()=>{
+  await (async ()=>{
     // 1) Subir PDF a Supabase Storage (queda respaldado para verlo desde ISA-OS)
     try{
       await fetch(SB_URL + '/storage/v1/object/planos/' + storagePath, {
@@ -10967,12 +10978,18 @@ async function generarPDF(datos, opts){
         if(btnSubmit){ btnSubmit.disabled = false; btnSubmit.textContent = submitTxt; }
         return;
       } else {
-        // En desktop: descarga directa
-        const blobUrl = URL.createObjectURL(pdfBlob);
-        const a = document.createElement('a');
-        a.href = blobUrl; a.download = pdfFileName;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(()=>URL.revokeObjectURL(blobUrl), 5000);
+        // En desktop: se intenta la descarga directa, pero como sale varios segundos
+        // despues del clic (primero sube PDF, imagen y venta) Chrome a veces la
+        // bloquea. Por eso queda tambien la ventanita con botones. (Isaac, 22 oct 2026)
+        try{
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          const a = document.createElement('a');
+          a.href = blobUrl; a.download = pdfFileName;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(()=>URL.revokeObjectURL(blobUrl), 5000);
+        }catch(e){ console.error('Descarga directa:', e); }
+        _pdfListoMovil(pdfBlob, pdfFileName, folio);
+        return;
       }
     }catch(e){ console.error('Deliver PDF:', e); }
 
