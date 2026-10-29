@@ -773,7 +773,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.10.23.01';
+const CFG_VERSION = '2026.10.29.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -11358,7 +11358,8 @@ function addEvents(){
   document.getElementById('pdfBtn').addEventListener('click', abrirFormCliente);
   const lb = document.getElementById('linkBtn');
   if(lb) lb.addEventListener('click', async ()=>{
-    const url = linkParaCliente();
+    lb.textContent = '⏳ Preparando link…';
+    const url = await linkCortoParaCliente();
     try{ await navigator.clipboard.writeText(url); lb.textContent = '✓ Link copiado'; }
     catch(e){ prompt('Copia el link para el cliente:', url); }
     setTimeout(()=>{ lb.textContent = '🔗 Copiar link para el cliente'; }, 2200);
@@ -11584,6 +11585,31 @@ function linkParaCliente(){
   u.search = '?v=1&d=' + codificarEstado(estadoConfigurador()) + (folio ? '&f=' + encodeURIComponent(folio) : '');
   return u.toString();
 }
+// Link CORTO para el cliente: el diseno se guarda en Storage (planos/disenos-cliente/ID.json)
+// y el link solo lleva ?v=1&k=ID. El largo (?d=...) pasaba de 2,000 letras y WhatsApp en
+// iPhone solo hacia link la primera parte: el cliente abria el configurador vacio
+// (Isaac, 29 oct 2026). Si no se puede subir, se usa el largo como antes.
+async function linkCortoParaCliente(){
+  const folio = (document.getElementById('cotFolio') || {}).value || '';
+  try{
+    const abc = 'abcdefghijkmnpqrstuvwxyz23456789';
+    const rnd = new Uint8Array(10); crypto.getRandomValues(rnd);
+    const id = Array.from(rnd, function(b){ return abc[b % abc.length]; }).join('');
+    const r = await fetch(SB_URL + '/storage/v1/object/planos/disenos-cliente/' + id + '.json', {
+      method: 'POST',
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'x-upsert': 'true' },
+      body: JSON.stringify(estadoConfigurador())
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const u = new URL(location.href);
+    u.hash = '';
+    u.search = '?v=1&k=' + id + (folio ? '&f=' + encodeURIComponent(folio) : '');
+    return u.toString();
+  }catch(e){
+    console.warn('link corto:', e);
+    return linkParaCliente();
+  }
+}
 function activarModoVisor(folio){
   document.getElementById('ctrl').style.display = 'none';
   document.getElementById('cotz').style.display = 'none';
@@ -11722,6 +11748,31 @@ let _reanudarSt = null;   // diseno guardado justo antes de una actualizacion au
       ['editar','d','c'].forEach(function(k){ u.searchParams.delete(k); });
       history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
     }catch(e){}
+    return;
+  }
+  // Link corto (?v=1&k=ID): se baja el diseno y se recarga como link largo, que es
+  // el camino que ya repone todo (vista en planta, alturas de picking, modo visor).
+  if(params.get('v') === '1' && params.get('k') && !params.get('d')){
+    const id = String(params.get('k')).replace(/[^a-z0-9]/gi, '').slice(0, 20);
+    try{
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#fff;display:flex;align-items:center;justify-content:center;font:600 16px system-ui,sans-serif;color:#555';
+      ov.textContent = 'Cargando diseño…';
+      (document.body || document.documentElement).appendChild(ov);
+    }catch(e){}
+    fetch(SB_URL + '/storage/v1/object/public/planos/disenos-cliente/' + id + '.json', { cache: 'no-store' })
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(st){
+        const u = new URL(location.href);
+        u.searchParams.delete('k');
+        u.searchParams.set('d', codificarEstado(st));
+        location.replace(u.pathname + '?' + u.searchParams.toString() + u.hash);
+      })
+      .catch(function(e){
+        console.warn('link corto', e);
+        alert('No se encontró el diseño de este link. Pide a ISARACK que te lo envíe de nuevo.');
+        location.replace(location.pathname);
+      });
     return;
   }
   if(params.get('v') === '1' && params.get('d')){
