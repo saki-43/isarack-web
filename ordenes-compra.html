@@ -1749,12 +1749,25 @@ document.getElementById('btn-save').addEventListener('click', () => {
 // puede salir con el mismo folio (Isaac, 2 oct 2026). "Guardar" sigue sin
 // cambiar el folio, para poder corregir antes de imprimir.
 let _ocTrasImprimir = false;
+// El PDF toma su nombre del titulo de la pagina. "ISARACK — Órdenes de Compra" llegaba a
+// WhatsApp como "ISARACK â Ã rdenes..." (la raya y la O con acento se descomponen), asi que
+// al imprimir se pone un nombre sin acentos: "ISARACK OC-162 PROVEEDOR" (Isaac, 29 oct 2026).
+const _ocTituloBase = document.title;
+function _ocNombrePdf() {
+  const limpio = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9 .\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const fol = String(currentOrder && currentOrder.folio || '').trim();
+  const prov = limpio(currentOrder && (currentOrder.razonSocial || currentOrder.person) || '').slice(0, 50).trim();
+  return 'ISARACK ' + (fol ? 'OC-' + fol : 'OC sin folio') + (prov ? ' ' + prov : '');
+}
 document.getElementById('btn-print').addEventListener('click', () => {
   saveCurrentOrder();
   _ocTrasImprimir = true;
+  document.title = _ocNombrePdf();
   window.print();
 });
 window.addEventListener('afterprint', () => {
+  document.title = _ocTituloBase;
   if (!_ocTrasImprimir) return;
   _ocTrasImprimir = false;
   setTimeout(() => {
