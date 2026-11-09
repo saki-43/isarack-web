@@ -773,7 +773,10 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // ─── Constantes PICKING ───
 // Version del configurador. SUBIRLA EN CADA CAMBIO: es la unica forma de saber
 // si el navegador ya bajo el deploy nuevo o sigue con la copia vieja.
-const CFG_VERSION = '2026.11.09.01';
+// 9 nov 2026: botas, protectores, mallas, sujeciones y topes de tarima pasaron a sistema
+// ACCESORIOS con SKU ACC- (en ISA-OS y en la nube el mismo dia). Por eso cargarPrecios
+// tambien baja ACCESORIOS: sin eso esas piezas se quedan sin precio.
+const CFG_VERSION = '2026.11.09.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -907,25 +910,25 @@ const ANCLA_QUI_SEL = 'SEL-0003';
 // achaflanadas; la trasera queda abierta.
 // El default de cada una es la medida con mas existencia, para no cotizar aire.
 const BOTA_OPC = [
-  {sku:'SEL-0026', hIn:16, txt:'Reforzada 16"'},
+  {sku:'ACC-0005', hIn:16, txt:'Reforzada 16"'},
   {sku:'SEL-0023', hIn:18, txt:'H18"'},
   {sku:'SEL-0021', hIn:12, txt:'H12"'},
   {sku:'SEL-0022', hIn:16, txt:'H16"'},
   {sku:'SEL-0024', hIn:12, txt:'Reforzada 12"'},
-  {sku:'SEL-0025', hIn:12, txt:'Reforzada 12" x 8"'},
+  {sku:'ACC-0004', hIn:12, txt:'Reforzada 12" x 8"'},
   {sku:'SEL-0027', hIn:18, txt:'Reforzada 18"'},
-  {sku:'SEL-0028', hIn:24, txt:'Reforzada 24"'},
+  {sku:'ACC-0006', hIn:24, txt:'Reforzada 24"'},
   {sku:'SEL-0029', hIn:36, txt:'Reforzada 36"'},
-  {sku:'SEL-0019', hIn:18, txt:'Estructural 18"x8"'},
-  {sku:'SEL-0020', hIn:36, txt:'Estructural 36"x8"'},
-  {sku:'SEL-0018', hIn:24, txt:'Estructural c/placa 24"'}
+  {sku:'ACC-0002', hIn:18, txt:'Estructural 18"x8"'},
+  {sku:'ACC-0003', hIn:36, txt:'Estructural 36"x8"'},
+  {sku:'ACC-0001', hIn:24, txt:'Estructural c/placa 24"'}
 ];
 const PUNTAL_OPC = [
-  {sku:'SEL-0267', hIn:24, txt:'H24"'},
-  {sku:'SEL-0266', hIn:16, txt:'H16"'},
-  {sku:'SEL-0265', hIn:12, txt:'H12"'},
-  {sku:'SEL-0244', hIn:36, txt:'Atornillada 36"'},
-  {sku:'SEL-0268', hIn:36, txt:'H36"x4" double deep'},
+  {sku:'ACC-0031', hIn:24, txt:'H24"'},
+  {sku:'ACC-0030', hIn:16, txt:'H16"'},
+  {sku:'ACC-0029', hIn:12, txt:'H12"'},
+  {sku:'ACC-0013', hIn:36, txt:'Atornillada 36"'},
+  {sku:'ACC-0032', hIn:36, txt:'H36"x4" double deep'},
   {sku:'SEL-0269', hIn:51, txt:'H51"'}
 ];
 const BOTA_SEL = BOTA_OPC[0].sku;      // respaldo si el select no existe
@@ -999,14 +1002,14 @@ function _largoBarraIn(cfg, l){
 // largo de la viga. Para cubrir de la primera viga de carga hasta arriba se
 // apilan los paneles que hagan falta.
 const MALLA_ALTO_IN = 42;
-const MALLA_PANEL = {96:'SEL-0085', 108:'SEL-0081', 120:'SEL-0082', 144:'SEL-0083'};
+const MALLA_PANEL = {96:'ACC-0054', 108:'ACC-0050', 120:'ACC-0051', 144:'ACC-0052'};
 // Sujeciones: la medida es cuanto despega la malla del poste. Default 6", la
 // unica con existencia.
 const SUJECION_OPC = [
-  {sku:'SEL-0326', hIn:6,  txt:'6"'},
-  {sku:'SEL-0325', hIn:4,  txt:'4"'},
-  {sku:'SEL-0327', hIn:8,  txt:'8"'},
-  {sku:'SEL-0324', hIn:10, txt:'10"'}
+  {sku:'ACC-0060', hIn:6,  txt:'6"'},
+  {sku:'ACC-0059', hIn:4,  txt:'4"'},
+  {sku:'ACC-0061', hIn:8,  txt:'8"'},
+  {sku:'ACC-0058', hIn:10, txt:'10"'}
 ];
 const SUJECION_SEL = SUJECION_OPC[0].sku;
 // Sujeciones: cada una agarra hasta LAS 4 ESQUINAS de los paneles que se juntan
@@ -1119,8 +1122,8 @@ function _mallaClaros(l){
 // Va del MISMO lado que la malla anticaida —atras en sencilla, en medio en
 // doble— y por eso reusa _mallaLado(); malla y tope son EXCLUYENTES: "se instala
 // la malla anticaida o el tope, no se pueden juntos".
-const TOPE_TARIMA = {96:'SEL-0335', 108:'SEL-0332', 144:'SEL-0334'};
-const TOPE_UNION  = 'SEL-0444';          // UNION TOPE TARIMA 12"
+const TOPE_TARIMA = {96:'ACC-0045', 108:'ACC-0043', 144:'ACC-0044'};
+const TOPE_UNION  = 'ACC-0046';          // UNION TOPE TARIMA 12"
 const TOPE_SOBRE_VIGA_IN = 4;            // cuanto sube sobre la viga de carga
 const TOPE_SALIDA_IN     = 6;            // cuanto sale hacia afuera
 function _topeSku(vigaIn){ return TOPE_TARIMA[vigaIn] || null; }
@@ -9839,7 +9842,7 @@ async function sbInsertVenta(body){
 
 async function cargarPrecios(){
   if(preciosCache) return preciosCache;
-  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO,MECANO,CANTILEVER,APLICK)&select=sku,producto,precio,sistema,cantidad");
+  const data = await sbFetch("inventario?sistema=in.(GONDOLAS,PICKING,SELECTIVO,MECANO,CANTILEVER,APLICK,ACCESORIOS)&select=sku,producto,precio,sistema,cantidad");
   const map = {};
   inventarioArr = [];
   for(const row of data){
