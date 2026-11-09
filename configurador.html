@@ -776,7 +776,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // 9 nov 2026: botas, protectores, mallas, sujeciones y topes de tarima pasaron a sistema
 // ACCESORIOS con SKU ACC- (en ISA-OS y en la nube el mismo dia). Por eso cargarPrecios
 // tambien baja ACCESORIOS: sin eso esas piezas se quedan sin precio.
-const CFG_VERSION = '2026.11.09.02';
+const CFG_VERSION = '2026.11.09.03';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -911,14 +911,8 @@ const ANCLA_QUI_SEL = 'SEL-0003';
 // El default de cada una es la medida con mas existencia, para no cotizar aire.
 const BOTA_OPC = [
   {sku:'ACC-0005', hIn:16, txt:'Reforzada 16"'},
-  {sku:'SEL-0023', hIn:18, txt:'H18"'},
-  {sku:'SEL-0021', hIn:12, txt:'H12"'},
-  {sku:'SEL-0022', hIn:16, txt:'H16"'},
-  {sku:'SEL-0024', hIn:12, txt:'Reforzada 12"'},
   {sku:'ACC-0004', hIn:12, txt:'Reforzada 12" x 8"'},
-  {sku:'SEL-0027', hIn:18, txt:'Reforzada 18"'},
   {sku:'ACC-0006', hIn:24, txt:'Reforzada 24"'},
-  {sku:'SEL-0029', hIn:36, txt:'Reforzada 36"'},
   {sku:'ACC-0002', hIn:18, txt:'Estructural 18"x8"'},
   {sku:'ACC-0003', hIn:36, txt:'Estructural 36"x8"'},
   {sku:'ACC-0001', hIn:24, txt:'Estructural c/placa 24"'}
@@ -928,8 +922,7 @@ const PUNTAL_OPC = [
   {sku:'ACC-0030', hIn:16, txt:'H16"'},
   {sku:'ACC-0029', hIn:12, txt:'H12"'},
   {sku:'ACC-0013', hIn:36, txt:'Atornillada 36"'},
-  {sku:'ACC-0032', hIn:36, txt:'H36"x4" double deep'},
-  {sku:'SEL-0269', hIn:51, txt:'H51"'}
+  {sku:'ACC-0032', hIn:36, txt:'H36"x4" double deep'}
 ];
 const BOTA_SEL = BOTA_OPC[0].sku;      // respaldo si el select no existe
 const PUNTAL_SEL = PUNTAL_OPC[0].sku;
