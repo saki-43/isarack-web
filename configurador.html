@@ -776,7 +776,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // 9 nov 2026: botas, protectores, mallas, sujeciones y topes de tarima pasaron a sistema
 // ACCESORIOS con SKU ACC- (en ISA-OS y en la nube el mismo dia). Por eso cargarPrecios
 // tambien baja ACCESORIOS: sin eso esas piezas se quedan sin precio.
-const CFG_VERSION = '2026.11.10.01';
+const CFG_VERSION = '2026.11.10.02';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -10956,7 +10956,8 @@ async function generarPDF(datos, opts){
         distribuidor_id: DIST_SES ? DIST_SES.id : null,
         tipo: 'Cotización',
         stage: 'Presupuesto',
-        estatus: 'Web',
+        // Las de distribuidor entran a ISA-OS como cotización normal, no como solicitud web (Isaac, 10 nov 2026)
+        estatus: DIST_SES ? 'Borrador' : 'Web',
         moneda: monedaSel,
         plantilla: sistemaLabel + ' · ' + bloques.map(function(b){ return b.cfgTxt; }).filter(Boolean).join(' | '),
         lineas: lineasVenta,
@@ -11755,24 +11756,32 @@ async function _distRpc(fn, args){
 function _distEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 function _distPintar(){
   let chip = document.getElementById('distChip');
-  const quiere = DIST_SES || /[?&]dist=1/.test(location.search);
-  if(!quiere){ if(chip) chip.remove(); return; }
+  // Siempre visible: aunque abran el link sin ?dist=1, pueden entrar desde aquí
   if(!chip){ chip = document.createElement('div'); chip.id = 'distChip';
     chip.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:60;background:#fff;border:1px solid #e3ddd2;border-radius:20px;padding:6px 14px;font:600 13px system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.12);cursor:pointer;white-space:nowrap';
     document.body.appendChild(chip); }
   chip.innerHTML = DIST_SES ? ('🤝 ' + _distEsc(DIST_SES.nombre) + (Number(DIST_SES.descuento) > 0 ? ' <span style="color:#1e8449">· −' + Number(DIST_SES.descuento) + '%</span>' : '') + ' <span style="color:#999">▾</span>')
-                            : '🤝 Entrar como distribuidor';
+                            : '🤝 Distribuidores';
   chip.onclick = DIST_SES ? _distMenu : _distLogin;
   const pi = document.getElementById('pdfInternoBtn'); if(pi) pi.style.display = DIST_SES ? 'none' : '';
 }
+// Pantalla propia (no usa el modal compartido): antes, con ?dist=1, otra ventana del
+// configurador (reanudar diseño, bienvenida) se encimaba y el acceso no salía (Isaac, 10 nov 2026).
 function _distLogin(){
-  abrirModal(); mTit.textContent = '🤝 Acceso para distribuidores';
-  mBody.innerHTML = '<div class="row"><label>Usuario</label><input id="d_usr" autocomplete="username" autocapitalize="none"></div>' +
-    '<div class="row"><label>Contraseña</label><input id="d_pwd" type="password" autocomplete="current-password"></div>' +
-    '<div id="d_err" style="display:none;margin-top:8px;color:#c00;font-size:13px"></div>' +
-    '<div style="font-size:12px;color:#888;margin-top:8px">¿No tienes acceso? Pídelo a ISARACK.</div>';
-  mFoot.innerHTML = '<button class="sec" id="dCancel">Cancelar</button><button class="prm" id="dOk">Entrar</button>';
-  document.getElementById('dCancel').onclick = cerrarModal;
+  let ov2 = document.getElementById('distLoginOv'); if(ov2) ov2.remove();
+  ov2 = document.createElement('div'); ov2.id = 'distLoginOv';
+  ov2.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(20,20,20,.55);display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,sans-serif';
+  ov2.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:360px;width:100%;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.35)">' +
+    '<div style="font-weight:700;font-size:18px;color:#D85A30;margin-bottom:4px">🤝 Acceso para distribuidores</div>' +
+    '<div style="font-size:12.5px;color:#777;margin-bottom:14px">ISARACK · Cotizador 3D</div>' +
+    '<label style="font-size:12px;color:#555;font-weight:600">Usuario</label><input id="d_usr" autocomplete="username" autocapitalize="none" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;margin:4px 0 10px">' +
+    '<label style="font-size:12px;color:#555;font-weight:600">Contraseña</label><input id="d_pwd" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;margin:4px 0 6px">' +
+    '<div id="d_err" style="display:none;margin:6px 0;color:#c00;font-size:13px"></div>' +
+    '<button id="dOk" style="width:100%;margin-top:8px;padding:11px;border:none;border-radius:9px;background:#D85A30;color:#fff;font-weight:700;font-size:15px;cursor:pointer">Entrar</button>' +
+    '<button id="dCancel" style="width:100%;margin-top:6px;padding:8px;border:none;background:none;color:#888;font-size:13px;cursor:pointer">Entrar sin cuenta (precio de lista)</button>' +
+    '<div style="font-size:11.5px;color:#999;margin-top:6px;text-align:center">¿No tienes acceso? Pídelo a ISARACK.</div></div>';
+  document.body.appendChild(ov2);
+  document.getElementById('dCancel').onclick = function(){ ov2.remove(); };
   const ok = document.getElementById('dOk');
   const go = async function(){
     const err = document.getElementById('d_err'); err.style.display = 'none';
@@ -11783,9 +11792,9 @@ function _distLogin(){
       const r = await _distRpc('dist_login', { p_usuario:u, p_clave:c });
       if(!r || !r.token){ err.textContent = 'Usuario o contraseña incorrectos.'; err.style.display = 'block'; return; }
       DIST_SES = r; try{ localStorage.setItem('isarack_dist', JSON.stringify({ token:r.token })); }catch(e){}
-      _contactosISACache = null; cerrarModal(); _distPintar(); try{ renderCotizacion(); }catch(e){}
+      _contactosISACache = null; ov2.remove(); _distPintar(); try{ renderCotizacion(); }catch(e){}
     }catch(e){ err.textContent = 'No se pudo entrar: ' + e.message; err.style.display = 'block'; }
-    finally{ ok.disabled = false; ok.textContent = 'Entrar'; }
+    finally{ if(document.getElementById('dOk')){ ok.disabled = false; ok.textContent = 'Entrar'; } }
   };
   ok.onclick = go;
   document.getElementById('d_pwd').addEventListener('keydown', function(e){ if(e.key === 'Enter') go(); });
@@ -11880,7 +11889,7 @@ async function _distGuardarCliente(d){
     }
   }catch(e){ console.warn('sesión distribuidor:', e); }
   _distPintar();
-  if(!DIST_SES && /[?&]dist=1/.test(location.search)) setTimeout(_distLogin, 400);
+  if(!DIST_SES && /[?&]dist=1/.test(location.search)) setTimeout(_distLogin, 300);
 })();
 // Link de cliente: aplicar la configuración codificada antes de construir
 let _visorPendiente = null;
