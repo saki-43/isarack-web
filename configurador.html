@@ -776,7 +776,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // 9 nov 2026: botas, protectores, mallas, sujeciones y topes de tarima pasaron a sistema
 // ACCESORIOS con SKU ACC- (en ISA-OS y en la nube el mismo dia). Por eso cargarPrecios
 // tambien baja ACCESORIOS: sin eso esas piezas se quedan sin precio.
-const CFG_VERSION = '2026.11.10.02';
+const CFG_VERSION = '2026.11.12.01';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -11767,10 +11767,11 @@ function _distPintar(){
 }
 // Pantalla propia (no usa el modal compartido): antes, con ?dist=1, otra ventana del
 // configurador (reanudar diseño, bienvenida) se encimaba y el acceso no salía (Isaac, 10 nov 2026).
-function _distLogin(){
+function _distLogin(forzado){
+  forzado = forzado === true;
   let ov2 = document.getElementById('distLoginOv'); if(ov2) ov2.remove();
   ov2 = document.createElement('div'); ov2.id = 'distLoginOv';
-  ov2.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(20,20,20,.55);display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,sans-serif';
+  ov2.style.cssText = 'position:fixed;inset:0;z-index:100000;background:' + (forzado ? '#2a2420' : 'rgba(20,20,20,.55)') + ';display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,sans-serif';
   ov2.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:360px;width:100%;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.35)">' +
     '<div style="font-weight:700;font-size:18px;color:#D85A30;margin-bottom:4px">🤝 Acceso para distribuidores</div>' +
     '<div style="font-size:12.5px;color:#777;margin-bottom:14px">ISARACK · Cotizador 3D</div>' +
@@ -11778,10 +11779,11 @@ function _distLogin(){
     '<label style="font-size:12px;color:#555;font-weight:600">Contraseña</label><input id="d_pwd" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;margin:4px 0 6px">' +
     '<div id="d_err" style="display:none;margin:6px 0;color:#c00;font-size:13px"></div>' +
     '<button id="dOk" style="width:100%;margin-top:8px;padding:11px;border:none;border-radius:9px;background:#D85A30;color:#fff;font-weight:700;font-size:15px;cursor:pointer">Entrar</button>' +
-    '<button id="dCancel" style="width:100%;margin-top:6px;padding:8px;border:none;background:none;color:#888;font-size:13px;cursor:pointer">Entrar sin cuenta (precio de lista)</button>' +
-    '<div style="font-size:11.5px;color:#999;margin-top:6px;text-align:center">¿No tienes acceso? Pídelo a ISARACK.</div></div>';
+    (forzado ? '' : '<button id="dCancel" style="width:100%;margin-top:6px;padding:8px;border:none;background:none;color:#888;font-size:13px;cursor:pointer">Entrar sin cuenta (precio de lista)</button>') +
+    '<div style="font-size:11.5px;color:#999;margin-top:10px;text-align:center">¿No tienes acceso? Pídelo a ISARACK.' +
+    (forzado ? '<br>Si eres del equipo ISARACK, ábrelo desde ISA-OS (botón Cotizador 3D).' : '') + '</div></div>';
   document.body.appendChild(ov2);
-  document.getElementById('dCancel').onclick = function(){ ov2.remove(); };
+  if(!forzado) document.getElementById('dCancel').onclick = function(){ ov2.remove(); };
   const ok = document.getElementById('dOk');
   const go = async function(){
     const err = document.getElementById('d_err'); err.style.display = 'none';
@@ -11812,6 +11814,7 @@ function _distMenu(){
     try{ await _distRpc('dist_salir', { p_token:DIST_SES.token }); }catch(e){}
     DIST_SES = null; try{ localStorage.removeItem('isarack_dist'); }catch(e){}
     _contactosISACache = null; cerrarModal(); _distPintar(); try{ renderCotizacion(); }catch(e){}
+    if(!_cfgEsEquipo()) _distLogin(true);
   };
 }
 async function _distClientes(){
@@ -11879,6 +11882,24 @@ async function _distGuardarCliente(d){
     _contactosISACache = null;
   }catch(e){ console.warn('guardar cliente distribuidor:', e); }
 }
+// ACCESO (Isaac, 12 nov 2026): solo entra quien tiene clave. El equipo entra desde
+// ISA-OS (ya pasó su login): el botón manda ?pase=, este equipo queda marcado y el
+// pase se quita de la barra para que no viaje en links copiados. Los distribuidores
+// entran con usuario y contraseña. Los links de cliente (?v=1, ver un diseño) siguen
+// abiertos. Mismo nivel de seguridad que ISA-OS: frena al curioso, no a un técnico.
+const CFG_PASE = 'isa-equipo-k7m2';
+function _cfgEsEquipo(){ try{ return localStorage.getItem('isarack_equipo') === '1'; }catch(e){ return false; } }
+(function(){
+  try{
+    const prm = new URLSearchParams(location.search);
+    if(prm.get('pase') === CFG_PASE){
+      localStorage.setItem('isarack_equipo', '1');
+      prm.delete('pase');
+      const q = prm.toString();
+      history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
+    }
+  }catch(e){}
+})();
 (async function(){
   try{
     const g = JSON.parse(localStorage.getItem('isarack_dist') || 'null');
@@ -11889,7 +11910,9 @@ async function _distGuardarCliente(d){
     }
   }catch(e){ console.warn('sesión distribuidor:', e); }
   _distPintar();
-  if(!DIST_SES && /[?&]dist=1/.test(location.search)) setTimeout(_distLogin, 300);
+  const esVisor = /[?&]v=1(&|$)/.test(location.search);
+  if(!DIST_SES && !_cfgEsEquipo() && !esVisor) _distLogin(true);
+  else if(!DIST_SES && /[?&]dist=1/.test(location.search)) setTimeout(_distLogin, 300);
 })();
 // Link de cliente: aplicar la configuración codificada antes de construir
 let _visorPendiente = null;
