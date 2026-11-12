@@ -695,6 +695,10 @@ gtag('config', 'G-XXXXXXXXXX');
   <div class="head">
     <button id="pdfBtn">📄 Solicitar cotización (PDF)</button>
     <button id="linkBtn" style="margin-top:4px">🔗 Copiar link para el cliente</button>
+    <div id="disBtns" style="display:flex;gap:4px;margin-top:4px">
+      <button id="disGuardarBtn" style="flex:1;margin:0" onclick="disGuardar()" title="Guarda este diseño en la nube para seguirlo después, en este u otro equipo">💾 Guardar avance</button>
+      <button id="disAbrirBtn" style="flex:1;margin:0" onclick="disMisDisenos()" title="Abrir un diseño que guardaste">📂 Mis diseños</button>
+    </div>
     <a id="pdfInternoBtn" href="#" onclick="event.preventDefault();generarPDFInterno();return false;" style="display:block;margin-top:6px;font-size:10.5px;color:#888;text-align:center;text-decoration:none;cursor:pointer" title="Solo para uso interno — con desglose de SKUs">📋 Descargar desglose interno</a>
   </div>
   <div class="ttl">
@@ -776,7 +780,7 @@ const CAB = {alto:1.41, ancho:1.00, fondo:0.46, pilar:'141', anchoCm:100};
 // 9 nov 2026: botas, protectores, mallas, sujeciones y topes de tarima pasaron a sistema
 // ACCESORIOS con SKU ACC- (en ISA-OS y en la nube el mismo dia). Por eso cargarPrecios
 // tambien baja ACCESORIOS: sin eso esas piezas se quedan sin precio.
-const CFG_VERSION = '2026.11.12.03';
+const CFG_VERSION = '2026.11.12.04';
 // Se pinta aqui mismo, no en el init: asi el sello sale aunque algo mas truene
 // despues, que es justo cuando mas se necesita saber que version se esta viendo.
 try{ var _cfgVerEl = document.getElementById('cfgVer'); if(_cfgVerEl) _cfgVerEl.textContent = 'v' + CFG_VERSION; }catch(e){}
@@ -12046,6 +12050,142 @@ if(_visorPendiente !== null || _reanudarSt){
   }
 }
 try{ if(_visorPendiente === null) _pintarAvisoEdicion(); }catch(e){}
+
+// ── GUARDAR AVANCE (Isaac, 12 nov 2026) ──
+// 1) Guardado automatico: cada 8 s (y al cerrar la pestaña) el diseño se guarda en
+//    ESTE equipo. Al volver a abrir el cotizador se ofrece "Continuar".
+// 2) 💾 Guardar avance / 📂 Mis diseños: con nombre y en la NUBE (tabla
+//    disenos_guardados, solo por las funciones disenos_*). El equipo ve los del
+//    equipo; cada distribuidor, solo los suyos (va con su token).
+// Abrir un diseño reutiliza el camino de "reanudar" (el mismo de la actualizacion
+// automatica): se deja en sessionStorage y se recarga la pagina.
+var _AUTO_KEY = 'isarack_autoguardado';
+var _disActual = null;   // {id, nombre} del diseño de la nube que esta abierto
+try{ _disActual = JSON.parse(sessionStorage.getItem('isarack_dis_actual') || 'null'); }catch(e){}
+function _disEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function _disResumen(){ const d = document.getElementById('dims'); return d ? d.textContent.replace(/\s+/g, ' ').trim().slice(0, 200) : ''; }
+function _disToken(){ return (typeof DIST_SES !== 'undefined' && DIST_SES && DIST_SES.token) || null; }
+function _disAutor(){
+  if(typeof DIST_SES !== 'undefined' && DIST_SES) return 'Distribuidor: ' + DIST_SES.nombre;
+  try{ return _comercialISA() || ''; }catch(e){ return ''; }
+}
+function _disFecha(t){
+  try{ return new Date(t).toLocaleString('es-MX', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit'}); }catch(e){ return ''; }
+}
+function _disAbrirEstado(stTxt, actual){
+  try{
+    sessionStorage.setItem('isarack_reanudar', stTxt);
+    sessionStorage.removeItem('isarack_editar');
+    if(actual) sessionStorage.setItem('isarack_dis_actual', JSON.stringify(actual));
+    else sessionStorage.removeItem('isarack_dis_actual');
+  }catch(e){}
+  location.href = location.pathname + location.hash;
+}
+// --- 1) Automatico ---
+(function(){
+  if(_visorPendiente !== null){ const b = document.getElementById('disBtns'); if(b) b.style.display = 'none'; return; }
+  let previo = null;
+  try{ previo = JSON.parse(localStorage.getItem(_AUTO_KEY) || 'null'); }catch(e){}
+  const inicial = (function(){ try{ return codificarEstado(estadoConfigurador()); }catch(e){ return ''; } })();
+  const vieneDeLink = /[?&](d|k|editar)=/.test(location.search) || _reanudarSt;
+  let ultimo = inicial;
+  function guardar(){
+    try{
+      const st = codificarEstado(estadoConfigurador());
+      if(st === ultimo) return;
+      ultimo = st;
+      localStorage.setItem(_AUTO_KEY, JSON.stringify({st:st, t:Date.now(), res:_disResumen(), act:_disActual}));
+    }catch(e){}
+  }
+  // Ofrecer continuar ANTES de empezar a sobreescribir el guardado anterior.
+  const ofrecer = !vieneDeLink && previo && previo.st && previo.st !== inicial && (Date.now() - (previo.t || 0)) < 30*86400000;
+  function arrancar(){ setInterval(guardar, 8000); window.addEventListener('pagehide', guardar); document.addEventListener('visibilitychange', function(){ if(document.hidden) guardar(); }); }
+  if(!ofrecer){ arrancar(); return; }
+  const d = document.createElement('div');
+  d.id = 'disContinuar';
+  d.style.cssText = 'position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:9000;background:#1f1b18;color:#fff;border-radius:12px;padding:12px 14px;'
+    + 'font:13px system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:min(560px,calc(100vw - 24px))';
+  d.innerHTML = '<div style="flex:1;min-width:200px"><b>¿Continuar con tu diseño del ' + _disEsc(_disFecha(previo.t)) + '?</b>'
+    + (previo.act && previo.act.nombre ? '<div style="opacity:.8;font-size:12px">💾 ' + _disEsc(previo.act.nombre) + '</div>' : '')
+    + (previo.res ? '<div style="opacity:.75;font-size:12px;margin-top:2px">' + _disEsc(previo.res) + '</div>' : '') + '</div>'
+    + '<button id="disContSi" style="width:auto;margin:0;border:0;border-radius:8px;padding:9px 14px;background:#DA6635;color:#fff;font-weight:700;cursor:pointer">Continuar</button>'
+    + '<button id="disContNo" style="width:auto;margin:0;border:0;border-radius:8px;padding:9px 12px;background:#3a332e;color:#ddd;cursor:pointer">Empezar nuevo</button>';
+  document.body.appendChild(d);
+  document.getElementById('disContSi').onclick = function(){ _disAbrirEstado(previo.st, previo.act || null); };
+  document.getElementById('disContNo').onclick = function(){ try{ localStorage.removeItem(_AUTO_KEY); }catch(e){} d.remove(); arrancar(); };
+})();
+// --- 2) En la nube ---
+function disGuardar(){
+  abrirModal(); mTit.textContent = '💾 Guardar avance';
+  const nom = _disActual ? _disActual.nombre : '';
+  mBody.innerHTML = '<div style="font-size:13px;color:#555;margin-bottom:10px">Se guarda en la nube: lo abres después desde <b>📂 Mis diseños</b>, en este o en otro equipo.</div>'
+    + '<label style="font-size:12px;font-weight:600;color:#555">Nombre del diseño</label>'
+    + '<input id="disNom" maxlength="120" value="' + _disEsc(nom) + '" placeholder="Ej. Bodega Ravi v2" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;margin:4px 0 6px">'
+    + '<div style="font-size:12px;color:#888">' + _disEsc(_disResumen()) + '</div>'
+    + '<div id="disErr" style="display:none;color:#c00;font-size:13px;margin-top:8px"></div>';
+  mFoot.innerHTML = '<button class="sec" id="disCan">Cancelar</button>'
+    + (_disActual ? '<button class="sec" id="disNuevo">Guardar como nuevo</button><button class="prm" id="disSobre">Guardar cambios</button>'
+                  : '<button class="prm" id="disNuevo">Guardar</button>');
+  document.getElementById('disCan').onclick = cerrarModal;
+  const go = async function(sobre){
+    const err = document.getElementById('disErr'); err.style.display = 'none';
+    const n = document.getElementById('disNom').value.trim();
+    if(!n){ err.textContent = 'Ponle un nombre.'; err.style.display = 'block'; return; }
+    mFoot.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+    try{
+      const id = await _distRpc('disenos_guardar', { p_token:_disToken(), p_id: sobre && _disActual ? _disActual.id : null, p_nombre:n,
+        p_autor:_disAutor(), p_sistema:sistemaActual, p_resumen:_disResumen(), p_estado:codificarEstado(estadoConfigurador()) });
+      _disActual = { id:id, nombre:n };
+      try{ sessionStorage.setItem('isarack_dis_actual', JSON.stringify(_disActual)); }catch(e){}
+      mBody.innerHTML = '<div style="font-size:15px;color:#2e7d32;font-weight:700;padding:10px 0">✅ Guardado: ' + _disEsc(n) + '</div>'
+        + '<div style="font-size:13px;color:#666">Lo encuentras en 📂 Mis diseños.</div>';
+      mFoot.innerHTML = '<button class="prm" id="disOk">Listo</button>';
+      document.getElementById('disOk').onclick = cerrarModal;
+    }catch(e){
+      err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block';
+      mFoot.querySelectorAll('button').forEach(function(b){ b.disabled = false; });
+    }
+  };
+  document.getElementById('disNuevo').onclick = function(){ go(false); };
+  if(_disActual) document.getElementById('disSobre').onclick = function(){ go(true); };
+  setTimeout(function(){ const i = document.getElementById('disNom'); if(i){ i.focus(); i.select(); } }, 60);
+}
+async function disMisDisenos(){
+  abrirModal(); mTit.textContent = '📂 Mis diseños';
+  mBody.innerHTML = '<div style="color:#999">Cargando…</div>';
+  mFoot.innerHTML = '<button class="sec" id="disCerrar">Cerrar</button>';
+  document.getElementById('disCerrar').onclick = cerrarModal;
+  let lista = [];
+  try{ lista = await _distRpc('disenos_listar', { p_token:_disToken() }) || []; }
+  catch(e){ mBody.innerHTML = '<div style="color:#c00">No se pudieron traer: ' + _disEsc(e.message) + '</div>'; return; }
+  disMisDisenos._lista = lista;
+  mBody.innerHTML = lista.length ? lista.map(function(g, i){
+    const act = _disActual && _disActual.id === g.id;
+    return '<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #f1eee8">'
+      + '<div style="flex:1;min-width:0"><div style="font-weight:700">' + _disEsc(g.nombre) + (act ? ' <span style="color:#DA6635;font-size:11px">(abierto)</span>' : '') + '</div>'
+      + '<div style="font-size:12px;color:#777;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _disEsc(g.resumen || g.sistema || '') + '</div>'
+      + '<div style="font-size:11px;color:#999">' + _disEsc(_disFecha(g.updated_at)) + (g.autor ? ' · ' + _disEsc(g.autor) : '') + '</div></div>'
+      + '<button class="prm" style="width:auto;padding:6px 12px" onclick="_disAbrir(' + i + ')">Abrir</button>'
+      + '<button class="sec" style="width:auto;padding:6px 10px" title="Borrar" onclick="_disBorrar(' + i + ')">🗑</button></div>';
+  }).join('') : '<div style="color:#999;padding:10px 0">Aún no tienes diseños guardados. Usa <b>💾 Guardar avance</b>.</div>';
+}
+async function _disAbrir(i){
+  const g = (disMisDisenos._lista || [])[i]; if(!g) return;
+  try{
+    const st = await _distRpc('disenos_abrir', { p_token:_disToken(), p_id:g.id });
+    if(!st){ alert('No se encontró ese diseño.'); return; }
+    _disAbrirEstado(st, { id:g.id, nombre:g.nombre });
+  }catch(e){ alert('No se pudo abrir: ' + e.message); }
+}
+async function _disBorrar(i){
+  const g = (disMisDisenos._lista || [])[i]; if(!g) return;
+  if(!confirm('¿Borrar el diseño "' + g.nombre + '"? No se puede deshacer.')) return;
+  try{
+    await _distRpc('disenos_borrar', { p_token:_disToken(), p_id:g.id });
+    if(_disActual && _disActual.id === g.id){ _disActual = null; try{ sessionStorage.removeItem('isarack_dis_actual'); }catch(e){} }
+    disMisDisenos();
+  }catch(e){ alert('No se pudo borrar: ' + e.message); }
+}
 
 // ── Actualizacion automatica ──
 // Vercel publica en cuanto se hace merge, pero quien deja la pestaña abierta
